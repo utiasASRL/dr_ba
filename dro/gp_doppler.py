@@ -7,7 +7,6 @@ import torchvision
 import pyboreas as pb
 
 from motion_models import *
-import os
 
 # Euristic on the maximum angular velocity acceptable for a given velocity
 # (used to detect degraded mode when not using a gyro)
@@ -150,8 +149,7 @@ class GPStateEstimator:
                 self.alpha = torch.tensor(local_map_update_alpha).to(self.device)
 
                 self.save_local_maps = opts['log']['save_images']
-                self.local_map_path  = os.path.join('output', 'local_maps')
-                os.makedirs(self.local_map_path, exist_ok=True)
+                self.local_map_path  = opts['log']['local_map_path']
 
                 # Doppler shift to range
                 self.shift_to_range = torch.tensor(radar_res / 2.0).to(self.device)
@@ -761,18 +759,11 @@ class GPStateEstimator:
                         #self.local_map = local_map_update
 
                         if self.save_local_maps:
-                            # lm = (self.local_map.detach().cpu().numpy().clip(0,1)*255).astype('uint8')
-                            # lm = cv2.resize(lm, (640, 640), interpolation=cv2.INTER_NEAREST)
-                            # cv2.imwrite(os.path.join(self.local_map_path,
-                            #         f"local_map_{self.step_counter:06d}.png"), lm)
                             # Remove the resize entirely
                             lm = (self.local_map.detach().cpu().numpy().clip(0, 1) * 255).astype('uint8')
-                            cv2.imwrite(
-                                os.path.join(self.local_map_path, f"local_map_{self.step_counter:06d}.png"),
-                                lm,
-                            )
+                            cv2.imwrite(self.local_map_path + "/" + str(timestamps[0]) + ".png", lm)
 
-                                                    # Blur and normalise the local map
+                        # Blur and normalise the local map
                         self.local_map_blurred = torchvision.transforms.functional.gaussian_blur(self.local_map.unsqueeze(0).unsqueeze(0), 3).squeeze()
                         normalizer = torch.max(self.local_map) / torch.max(self.local_map_blurred)
                         self.local_map_blurred *= normalizer

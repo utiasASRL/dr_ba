@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 def main():
     # Load the configuration file
-    with open('config.yaml') as f:
+    with open('dro/config.yaml') as f:
         config = yaml.safe_load(f)
 
     # Load the data with pyboreas
@@ -98,14 +98,13 @@ def main():
     # Loop over the sequences
     for seq in sequences:
 
-        # # Create the GP model
+        opts['log']['local_map_path'] = os.path.join('output', seq.ID, 'local_maps')
+
+        # Create the GP model
         temp_radar_frame = seq.get_radar(0)
         res = temp_radar_frame.resolution
         state_estimator = gpd.GPStateEstimator(opts, res)
         temp_radar_frame.unload_data()
-
-        # state_estimator.save_local_maps = True          # make sure the flag is on
-        # state_estimator.local_map_path  = local_map_path    
 
         # For logging trajectory and display
         gt_first_T_inv= None
@@ -171,18 +170,10 @@ def main():
                 os.system('rm -r ' + image_output_path)
             os.makedirs(image_output_path, exist_ok=True)
 
-            local_map_path = seq_output_path + '/local_maps'
-            if os.path.exists(local_map_path):
-                os.system('rm -r ' + local_map_path)
-            os.makedirs(local_map_path, exist_ok=True)
-
-        # temp_radar_frame = seq.get_radar(0)
-        # res = temp_radar_frame.resolution
-        # state_estimator = gpd.GPStateEstimator(opts, res)
-        # temp_radar_frame.unload_data()
-
-        state_estimator.save_local_maps = True
-        state_estimator.local_map_path  = local_map_path
+            local_map_output_path = opts['log']['local_map_path']
+            if os.path.exists(local_map_output_path):
+                os.system('rm -r ' + local_map_output_path)
+            os.makedirs(local_map_output_path, exist_ok=True)
 
         # Variables to log the time
         time_sum = 0
