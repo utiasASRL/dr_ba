@@ -10,12 +10,13 @@ pip install -r requirements.txt
 
 
 ## Run DRO
-First, download data from the Boreas dataset [here](https://www.boreas.utias.utoronto.ca/#/download). DRO generates local maps that accounts for motion distortion of the radar scans. 
-In `DRO/config.yaml`, set:
-  ```yaml
-   data:
-     data_path: /absolute/path/to/Boreas/<sequence>
-  ```
+First, download data from the Boreas dataset [here](https://www.boreas.utias.utoronto.ca/#/download). DRO generates local maps that accounts for motion distortion of the radar scans.
+
+Then copy the example config file `DRO/config_example.yaml` to `DRO/config.yaml` and modify the parameters as needed, especially the `data_path` as follows.
+```yaml
+  data:
+    data_path: /absolute/path/to/Boreas/<sequence>
+```
 
 In the `DRO` folder, run:
 
