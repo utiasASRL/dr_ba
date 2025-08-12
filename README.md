@@ -1,6 +1,14 @@
 # DRPoGO: Direct Radar Map Alighnment for Loop Closure in Pose Graph Optimization
 This repository provides the codebase for radar-based coarse registration and evaluation against ground truth. The pipeline includes local map generation using DRO, loop closure proposal using RaPlace, and pose graph optimization.
 
+## Dependencies
+
+All dependencies should be in `requirements.txt`. Please install them in you virtual environment with
+```
+pip install -r requirements.txt
+```
+
+
 ## Run DRO
 First, download data from the Boreas dataset [here](https://www.boreas.utias.utoronto.ca/#/download). DRO generates local maps that accounts for motion distortion of the radar scans. 
 In `DRO/config.yaml`, set:
