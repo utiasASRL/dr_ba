@@ -19,7 +19,7 @@ import yaml
 loop_records = []
 
 kDistThr = 20 # Distance threshold for selecting local maps
-kMinTimeDiff = 2 #150 # Minimum time difference target and query local maps in seconds
+kMinTimeDiff = 150 # Minimum time difference target and query local maps in seconds
 
 def main():
 
@@ -188,8 +188,8 @@ def generateRadon(data_dir, down_shape, dist_thr = 20):
 
     # Prepare the data for the output
     num_data = len(data_names)
-    print("//////////////\nWARNING: Using a subset of the data for debugging purposes. Remove the 2 following line whenever it workds.\n//////////////")
-    num_data = 105
+    #print("//////////////\nWARNING: Using a subset of the data for debugging purposes. Remove the 2 following line whenever it workds.\n//////////////")
+    #num_data = 105
     data_names_kept = []
     theta = np.arange(0, 180)
     sinoffts = []
