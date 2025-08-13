@@ -1,8 +1,8 @@
 import os, sys, pandas as pd
-from RaPlace import RaPlace  # or however you import your RaPlace functions
+from raplace import raplace  # or however you import your RaPlace functions
 
 def export_loops(scan_folder, out_csv, score_thresh=0.0):
-    rp = Raplace()
+    rp = raplace()
     scans = sorted([f for f in os.listdir(scan_folder) if f.endswith('.png') or f.endswith('.bin')])
     records = []
     N = len(scans)

@@ -26,19 +26,12 @@ python dro/radar_gp_state_estimation.py
 It will output the local maps in the `output/<SEQ-NAME>/local_maps` folder, each names with the radar scan's first timestamp. 
 
 ## Run RaPlace
-In `RaPlace/PYTHON/RaPlace.py`, set:
-```python
-radar_data_dir = "../../local_maps"  # path to PNGs
-gtpose = ""                          # unused for this pipeline
-```
-
-In the `RaPlace/PYTHON/` folder, run:
-
+Simply run RaPlace as follows in the root of the repository (all the paths should be autonomatically using what was specified in the DRO config file):
 ```bash
-python RaPlace.py
+python raplace/raplace.py
 ```
 
-It will generate a CSV of proposed scan pairs in the `RaPlace/PYTHON/` folder. 
+It will generate a CSV of proposed scan pairs in the `output/<SEQ-NAME>/raplace_loops.csv` folder.
 
 ## Run Coarse_registration
 
