@@ -15,7 +15,103 @@ from skimage.transform import radon
 from scipy import ndimage
 import scipy.io as sio  # when the python file deal with .mat document
 import pandas as pd
+import yaml
 loop_records = []
+
+kDistThr = 20 # Distance threshold for selecting local maps
+kMinTimeDiff = 2 #150 # Minimum time difference target and query local maps in seconds
+
+def main():
+
+    # Get the data directory from the DRO config file
+    seq_dir = getDataDir()
+
+
+    down_shape = 0.6
+
+    # Generate Radon Transforms (not all the data, only a subset based on a distance threshold)
+    data_sinofft, data_rowkeys, data_names, times = generateRadon(seq_dir, down_shape, dist_thr=kDistThr)
+
+    num_queries = len(data_names)
+
+
+
+    for query_idx in range(num_queries - 1):
+        print("\rProcessing local map", query_idx + 1, " / ", num_queries - 1, end='          ')
+
+        # Get the query data
+        query_sinofft = data_sinofft[query_idx]
+        query_sinofft = (query_sinofft - np.mean(query_sinofft)) / np.std(query_sinofft)
+
+
+        # Get the data that is far enough from the query data
+        mask = (times - times[query_idx]) <  -kMinTimeDiff
+        if sum(mask) == 0:
+            print("No valid candidates for query {query_idx}. Skipping...")
+            continue
+        can_sinofft = [data_sinofft[i] for i in range(len(data_sinofft)) if mask[i] and i != query_idx]
+
+        tmpval = 0
+        maxval = 0
+        rotval = 0
+        candnum = 0
+
+        all_scores = []            # keep every (score, idx)
+
+
+        for cands, tmp_sinofft in enumerate(can_sinofft):
+            _, score = fast_dft(query_sinofft, tmp_sinofft)
+            all_scores.append((score, cands))
+            if score > maxval:
+                maxval  = score
+                candnum = cands
+
+        # for cands in range(len(can_sinofft)):
+        #     tmp_sinofft = can_sinofft[cands]
+        #     fftresult, tmpval = fast_dft(query_sinofft, tmp_sinofft)
+        #     if maxval < tmpval:
+        #         maxval = tmpval
+        #         candnum = cands
+
+        nearest_idx = candnum
+        _, tmpval = fast_dft(query_sinofft, query_sinofft)
+        min_dist = abs(tmpval - maxval) 
+
+        # Write the loop closure candidates to a CSV file
+        loop_records.append({
+            'time_i': times[query_idx],
+            'time_j': times[nearest_idx],
+            'scan_i_name': data_names[query_idx],
+            'scan_j_name': data_names[nearest_idx],
+            'score': float(maxval),
+            'min_dist': float(min_dist)
+        })    
+
+
+
+    df = pd.DataFrame(loop_records)
+    df.to_csv(seq_dir + '/raplace_loops.csv', index=False)
+    print(f"Wrote {len(df)} loop candidates to raplace_loops.csv")
+
+
+
+
+def getDataDir():
+    # Fetch the sequence ID from the DRO config file
+    with open(os.path.join("dro", "config.yaml"), 'r') as f:
+        opts = yaml.safe_load(f)
+    if opts['data']['multi_sequence']:
+        raise ValueError("This script is not designed for multi-sequence data.")
+    data_dir = opts['data']['data_path']
+    if data_dir.endswith('/'):
+        data_dir = data_dir[:-1]
+    sequence_id = data_dir.split('/')[-1]
+
+    # Get the data path
+    data_dir = os.path.join("output", sequence_id)
+    return data_dir
+
+
 
 # Calculate the Euclidean distance between two two-dimensional postures
 def dist_btn_pose(pose1, pose2):
@@ -59,43 +155,69 @@ def osdir(path):
     return sorted(files, key=lambda fn: int(fn.split('.')[0]))
 
 # Perform radon transformation
-def generateRadon(data_dir, down_shape):
-    # radar_data_dir = os.path.join(data_dir, 'sensor_data/radar/backward_cart/')
-
-    # radar_data_dir = '/home/liweican-2025-research/data/boreas-2021-04-08-12-44/radar/cart_full'
-    radar_data_dir = '/home/liweican-2025-research/root/dro/output/boreas-2021-04-08-12-44_July/local_maps'
+def generateRadon(data_dir, down_shape, dist_thr = 20):
     
+    # Get the local map paths
+    local_map_dir = os.path.join(data_dir, 'local_maps')
+    data_names = osdir(local_map_dir)
+
+    # Odometry poses
+    traj_dir = os.path.join(data_dir, 'odometry_result')
+    # Load the *.txt file containing in the traj_dir
+    traj_file = [file for file in os.listdir(traj_dir) if file.endswith('.txt')]
+    traj = np.loadtxt(os.path.join(traj_dir, traj_file[0]), delimiter=' ')
+    if traj.shape[0] != (len(data_names) + 1):
+        raise ValueError(f"Trajectory length {traj.shape[0]} does not match number of data files {len(data_names)}.")
     
-    data_names = osdir(radar_data_dir)
+    # Extract the poses to compute the cumulative distance
+    distances = np.zeros(len(data_names))
+    dist_sum = 0.0
+    for i in range(1, traj.shape[0]):
+        T1_inv = np.eye(4)
+        T1_inv[:3, :] = traj[i - 1, 1:].reshape(3, 4)
+        T2 = np.eye(4)
+        T2[:3, :] = traj[i, 1:].reshape(3, 4)
+        T2 = np.linalg.inv(T2)
 
-    gtpose = np.loadtxt(os.path.join('/home/liweican-2025-research/root/dro/output', 'global_pose.csv'), delimiter=',')
+        dT = T1_inv @ T2
+        
+        dist = np.linalg.norm(dT[:3, 3])
+        dist_sum += dist
+        distances[i - 1] = dist_sum
     
-    # gtpose = np.loadtxt('/home/liweican-2025-research/data/boreas-2021-04-08-12-44/applanix/gps_post_process.csv',
-                    # delimiter=',', skiprows=1)
 
-    # CSV format file storing datas are separated by commas
-
-    gtpose_time = gtpose[:, 0]
-    # if gtpose_time.max() > 1e10:               # convert µs → s if necessary
-    #     gtpose_time = gtpose_time / 1e6
-
-    gtpose_xy = gtpose[:, 1: 3]
-
+    # Prepare the data for the output
     num_data = len(data_names)
+    print("//////////////\nWARNING: Using a subset of the data for debugging purposes. Remove the 2 following line whenever it workds.\n//////////////")
+    num_data = 105
+    data_names_kept = []
     theta = np.arange(0, 180)
     sinoffts = []
-    rowkeys = np.zeros((num_data, int(down_shape * 180)))
-    xy_poses = np.zeros((num_data, 2))
+    rowkeys = []
+    times = []
 
+    # Loop through the local maps
+    last_dist = -2*dist_thr
     for data_idx in range(num_data):
+
+        # Only process the data that is far enough from the last processed data
+        if distances[data_idx] - last_dist < dist_thr:
+            continue
+        last_dist = distances[data_idx]
+
+        # Print the current processing status
         file_name = data_names[data_idx]
-        # data_time = float(file_name[:-4])
+        print("\rDistance:", np.round(distances[data_idx], 2), " / ", np.round(distances[-1], 2), "   index: ", data_idx, " / ", num_data, "   file: ", file_name, end='          ')
 
-        data_time = int(file_name[:-4]) / 1e6      # <-- replace your float(...) line
-        print(file_name)
-        data_path = os.path.join(radar_data_dir, file_name)
+        # Extract the timestamp from the file name
+        time_str = float(file_name.split('.')[0]) / 1e6  # Convert to seconds
+        times.append(time_str)
 
+        # Read the image
+        data_path = os.path.join(local_map_dir, file_name)
         tmp = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE)
+
+        # Perform Radon transform
         R = radon(tmp, theta)
         xp = np.arange(-R.shape[1] // 2, R.shape[1] // 2)
 
@@ -108,264 +230,18 @@ def generateRadon(data_dir, down_shape):
         sinofft_rows = sinofft.shape[0]
         sinofft = sinofft[:sinofft_rows // 2, :]
 
-        # nearest_idx = np.argmin(np.abs(data_time - gtpose_time))
-
-        time_diff = np.abs(np.tile(data_time, len(gtpose_time)) - gtpose_time)
-        nearest_time_gap = np.min(time_diff)
-        nearest_idx = np.argmin(time_diff)
-
-        xy_pose = gtpose_xy[nearest_idx]
-
+        # Append the results
         sinoffts.append(sinofft)
-        rowkeys[data_idx, :] = rowkey(R).flatten()
-        xy_poses[data_idx, :] = xy_pose
+        rowkeys.append(rowkey(R).flatten())
+        data_names_kept.append(file_name)
 
-        if data_idx % 10 == 0:
-            print(f"{data_idx} / {num_data} processed.")
-    
-    return sinoffts, rowkeys, xy_poses, data_names
+    # Convert to numpy arrays
+    rowkeys = np.array(rowkeys)
+    times = np.array(times)
 
-# radar_data_dir = '/home/liweican-2025-research/data/boreas-2021-04-08-12-44/radar/cart'
-# radar_data_dir = '/home/liweican-2025-research/root/dro/output/boreas-2021-04-08-12-44/local_maps'
-radar_data_dir = '/home/liweican-2025-research/root/dro/output/boreas-2021-04-08-12-44_July/local_maps'
+    return sinoffts, rowkeys, data_names_kept, times
 
 
-data_path = '/home/liweican-2025-research/data/boreas-2021-04-08-12-44/radar/cart'
-# data_path = '/home/liweican-2025-research/root/dro/output/boreas-2021-04-08-12-44/local_maps'
-print(f"Processing: {data_path[-12:-10]}{data_path[-4:-1]} within criteria m/")
-down_shape = 0.6
 
-data_sinofft, data_rowkeys, data_poses, data_names = generateRadon(data_path, down_shape)
-
-revisit_criteria = 5
-keyframe_gap = 1
-
-num_candidates = 10
-num_node_enough_apart = 500
-num_top_n = 25
-
-top_n = np.linspace(1, num_top_n, num_top_n)
-
-# Entropy thresholds
-middle_thres = 0.001
-thresholds1 = np.linspace(0, middle_thres, 50)
-thresholds2 = np.linspace(middle_thres, 0.01, 50) # 0.01
-thresholds = np.concatenate((thresholds1, thresholds2))
-num_thresholds = len(thresholds)
-
-# Main variables to store the result for drawing PR curve
-num_hits = np.zeros((num_top_n, num_thresholds))
-num_false_alarms = np.zeros((num_top_n, num_thresholds))
-num_correct_rejections = np.zeros((num_top_n, num_thresholds))
-num_misses = np.zeros((num_top_n, num_thresholds))
-
-# Check the threshold for max value
-case_for_hit = np.zeros((len(data_poses), 3))
-case_for_fa = []
-
-loop_log = []
-exp_poses = []
-exp_rowkeys = []
-exp_sinofft = []
-exp_sinograms = []
-
-num_queries = len(data_poses)
-
-for query_idx in range(num_queries - 1):
-    query_sinofft = data_sinofft[query_idx]
-    query_sinofft = (query_sinofft - np.mean(query_sinofft)) / np.std(query_sinofft)
-    query_rowkey = data_rowkeys[query_idx, :]
-    query_pose = data_poses[query_idx, :]
-
-    exp_sinofft.append(query_sinofft)
-    exp_rowkeys.append(query_rowkey)
-    exp_poses.append(query_pose)
-
-    if query_idx % keyframe_gap != 0:
-        continue
-
-    # if query_idx % keyframe_gap != 0:
-    #     continue
-
-    can_sinofft = exp_sinofft[:-(num_node_enough_apart - 1)]
-
-    tmpval = 0
-    maxval = 0
-    rotval = 0
-    candnum = 0
-
-    all_scores = []            # keep every (score, idx)
-
-
-    for cands, tmp_sinofft in enumerate(can_sinofft):
-        _, score = fast_dft(query_sinofft, tmp_sinofft)
-        all_scores.append((score, cands))
-        if score > maxval:
-            maxval  = score
-            candnum = cands
-
-    # for cands in range(len(can_sinofft)):
-    #     tmp_sinofft = can_sinofft[cands]
-    #     fftresult, tmpval = fast_dft(query_sinofft, tmp_sinofft)
-    #     if maxval < tmpval:
-    #         maxval = tmpval
-    #         candnum = cands
-
-    nearest_idx = candnum
-    fftresult, tmpval = fast_dft(query_sinofft, query_sinofft)
-    min_dist = abs(tmpval - maxval) 
-    real_dist = dist_btn_pose(query_pose, exp_poses[nearest_idx])
-    # print("min_dist", min_dist, "  real_dist", real_dist)
- 
-    for score, cand_idx in sorted(all_scores, reverse=True)[:1]:  # top-5
-        # after your `if maxval < tmpval: …` block, or wherever you compute the final best-match score:
-        loop_records.append({
-            'scan_i': query_idx,
-            'scan_j': nearest_idx,
-            'scan_i_name': data_names[query_idx],
-            'scan_j_name': data_names[nearest_idx],
-            'score': float(maxval),
-            'min_dist': float(min_dist)
-        })
-
-    for topk in range(num_top_n):
-        for thres_idx in range(num_thresholds):
-            threshold = thresholds[thres_idx]
-            reject = 0
-
-            if min_dist > threshold:
-                reject = 1
-
-            if reject == 1:
-                if real_dist < revisit_criteria:
-                    num_correct_rejections[topk, thres_idx] += 1
-                else:
-                    num_misses[topk, thres_idx] += 1
-            else:
-                if real_dist < revisit_criteria:
-                    num_hits[topk, thres_idx] += 1
-                    case_for_hit[query_idx, 0] = 1
-                    case_for_hit[query_idx, 1] = nearest_idx
-                    case_for_hit[query_idx, 2] = dist_btn_pose(query_pose, exp_poses[nearest_idx])
-                else:
-                    num_false_alarms[topk, thres_idx] += 1
-
-    if query_idx % 100 == 0:
-        print(f"{query_idx/num_queries * 100} % processed")
-
-
-df = pd.DataFrame(loop_records)
-df.to_csv('raplace_loops_June_13.csv', index=False)
-print(f"Wrote {len(df)} loop candidates to raplace_loops.csv")
-
-
-# PR-result
-
-ResultsDir = './pr_result/'
-title_str = 'MulRan Sequence (radar polar)'
-FigIdx = 2
-
-# Create figure
-plt.figure(FigIdx)
-plt.clf()
-
-TopNindexes = [0]  # Python indexing starts from 0
-name = 'top1'
-
-nTopNindexes = len(TopNindexes)
-
-# Main
-# SequenceNames = os.listdir(ResultsDir)
-# SequenceNames = [name for name in SequenceNames if os.path.isdir(os.path.join(ResultsDir, name))]
-# nSequences = len(SequenceNames)
-
-nSequences = num_top_n
-
-all_Precisions = []
-all_Recalls = []
-
-for ithTopN in range(nTopNindexes):
-    TopNidx = TopNindexes[ithTopN]
-    line_width = 4
-
-    LineColors = plt.cm.rainbow(np.linspace(0, 1, nSequences))
-    LineColors = np.flipud(LineColors)
-
-    AUCs = np.zeros(nSequences)
-
-    for ithSeq in range(nSequences):
-        nCorrectRejectionsAll = num_correct_rejections
-        nCorrectRejectionsForThisTopN = nCorrectRejectionsAll[TopNidx, :]
-
-        nFalseAlarmsAll = num_false_alarms
-        nFalseAlarmsForThisTopN = nFalseAlarmsAll[TopNidx, :]
-
-        nHitsAll = num_hits
-        nHitsForThisTopN = nHitsAll[TopNidx, :]
-
-        nMissesAll = num_misses
-        nMissesForThisTopN = nMissesAll[TopNidx, :]
-
-        nThres = nCorrectRejectionsAll.shape[1]
-
-        Precisions = np.empty(nThres)
-        Recalls = np.empty(nThres)
-
-        for ithThres in range(nThres):
-            nCorrectRejections = nCorrectRejectionsForThisTopN[ithThres]
-            nFalseAlarms = nFalseAlarmsForThisTopN[ithThres]
-            nHits = nHitsForThisTopN[ithThres]
-            nMisses = nMissesForThisTopN[ithThres]
-
-            nTotalTestPlaces = nCorrectRejections + nFalseAlarms + nHits + nMisses
-
-            Precision = nHits / (nHits + nFalseAlarms)
-            Recall = nHits / (nHits + nMisses)
-
-            Precisions[ithThres] = Precision
-            Recalls[ithThres] = Recall
-
-        all_Precisions.append(Precisions)
-        all_Recalls.append(Recalls)
-
-        # Draw
-        # plot all the figures
-
-        # plt.figure()
-        plt.figure(figsize=(10, 6))
-        plt.plot(Recalls, Precisions, linewidth=line_width, color=LineColors[ithSeq], label = 'MulRan Radar Dataset')
-        plt.title(title_str, fontsize=12)
-        plt.xlabel('Recall', fontsize=12)
-        plt.ylabel('Precision', fontsize=12)
-        plt.xticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
-        plt.yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
-        plt.xlim([0, 1])
-        plt.ylim([0, 1])
-        plt.grid(True)
-        plt.grid(which='minor', linestyle=':', linewidth='0.5', color='black')
-        # plt.legend(SequenceNames, loc='best', fontsize=9)
-        # plt.legend(str(nSequences), loc='best', fontsize=9)
-        plt.legend(loc='best')
-        name = 'prcurve'
-        # plt.savefig(name + '.pdf', format='pdf', bbox_inches='tight')
-
-        plt.show()
-
-# plot the last figure
-
-plt.figure(FigIdx)
-plt.figure(figsize=(10, 6))
-for ithSeq in range(nSequences):
-    plt.plot(all_Recalls[ithSeq], all_Precisions[ithSeq], linewidth=line_width, color=LineColors[ithSeq])
-plt.title(title_str, fontsize=12)
-plt.xlabel('Recall', fontsize=12)
-plt.ylabel('Precision', fontsize=12)
-plt.xticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
-plt.yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
-plt.xlim([0, 1])
-plt.ylim([0, 1])
-plt.grid(True)
-plt.grid(which='minor', linestyle=':', linewidth='0.5', color='black')
-name = 'prcurve'
-plt.show()
-
+if __name__ == "__main__":
+    main()

@@ -18,13 +18,12 @@ Then copy the example config file `DRO/config_example.yaml` to `DRO/config.yaml`
     data_path: /absolute/path/to/Boreas/<sequence>
 ```
 
-In the `DRO` folder, run:
-
+In the root of the repository, run the following command to generate local maps:
 ```bash
-python radar_gp_state_estimation.py
+python dro/radar_gp_state_estimation.py
 ```
 
-It will output the local maps in the `local_maps` folder, each names with the radar scan's first timestamp. 
+It will output the local maps in the `output/<SEQ-NAME>/local_maps` folder, each names with the radar scan's first timestamp. 
 
 ## Run RaPlace
 In `RaPlace/PYTHON/RaPlace.py`, set:
