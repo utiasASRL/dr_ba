@@ -6,6 +6,9 @@ RaPlace：Place Recognition for Imaging Radar using Radon Transform and Mutable 
 
 # Create Time: Aug 11th, 2023
 
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import numpy as np
 import math
 import os
@@ -15,7 +18,7 @@ from skimage.transform import radon
 from scipy import ndimage
 import scipy.io as sio  # when the python file deal with .mat document
 import pandas as pd
-import yaml
+from utils import utils
 loop_records = []
 
 kDistThr = 20 # Distance threshold for selecting local maps
@@ -24,7 +27,7 @@ kMinTimeDiff = 150 # Minimum time difference target and query local maps in seco
 def main():
 
     # Get the data directory from the DRO config file
-    seq_dir = getDataDir()
+    seq_dir = utils.getOutputDataDir()
 
 
     down_shape = 0.6
@@ -93,23 +96,6 @@ def main():
     df.to_csv(seq_dir + '/raplace_loops.csv', index=False)
     print(f"Wrote {len(df)} loop candidates to raplace_loops.csv")
 
-
-
-
-def getDataDir():
-    # Fetch the sequence ID from the DRO config file
-    with open(os.path.join("dro", "config.yaml"), 'r') as f:
-        opts = yaml.safe_load(f)
-    if opts['data']['multi_sequence']:
-        raise ValueError("This script is not designed for multi-sequence data.")
-    data_dir = opts['data']['data_path']
-    if data_dir.endswith('/'):
-        data_dir = data_dir[:-1]
-    sequence_id = data_dir.split('/')[-1]
-
-    # Get the data path
-    data_dir = os.path.join("output", sequence_id)
-    return data_dir
 
 
 
