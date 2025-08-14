@@ -20,7 +20,6 @@ import scipy.io as sio  # when the python file deal with .mat document
 import pandas as pd
 from utils import utils
 import yaml
-loop_records = []
 
 
 def main():
@@ -36,11 +35,13 @@ def main():
     down_shape = 0.6
 
     # Generate Radon Transforms (not all the data, only a subset based on a distance threshold)
-    data_sinofft, data_rowkeys, data_names, times = generateRadon(seq_dir, down_shape, dist_thr=opts['dist_thr'])
+    data_sinofft, data_rowkeys, data_names, times, odom_poses, distances = generateRadon(seq_dir, down_shape, dist_thr=opts['dist_thr'])
 
     num_queries = len(data_names)
 
 
+    # Structure to store the loop candidates
+    loop_records = []
 
     for query_idx in range(num_queries - 1):
         print("\rProcessing local map", query_idx + 1, " / ", num_queries - 1, end='          ')
@@ -50,12 +51,16 @@ def main():
         query_sinofft = (query_sinofft - np.mean(query_sinofft)) / np.std(query_sinofft)
 
 
-        # Get the data that is far enough from the query data
+        # Get the data that is far enough from the query data in time, but close enough spatially
         mask = (times - times[query_idx]) <  -opts['min_time_diff']
+        max_relative_travelled_dist = np.abs(distances - distances[query_idx]) * opts['max_odom_drift']
+        odom_dist = np.sqrt((odom_poses[:,0,3] - odom_poses[query_idx,0,3])**2 + (odom_poses[:,1,3] - odom_poses[query_idx,1,3])**2 + (odom_poses[:,2,3] - odom_poses[query_idx,2,3])**2)
+        mask = np.logical_and(mask, odom_dist < max_relative_travelled_dist)
         if sum(mask) == 0:
             print(f"No valid candidates for query {query_idx}. Skipping...")
             continue
         can_sinofft = [data_sinofft[i] for i in range(len(data_sinofft)) if mask[i] and i != query_idx]
+        can_idx = [i for i in range(len(data_sinofft)) if mask[i] and i != query_idx]
 
         tmpval = 0
         maxval = 0
@@ -72,14 +77,8 @@ def main():
                 maxval  = score
                 candnum = cands
 
-        # for cands in range(len(can_sinofft)):
-        #     tmp_sinofft = can_sinofft[cands]
-        #     fftresult, tmpval = fast_dft(query_sinofft, tmp_sinofft)
-        #     if maxval < tmpval:
-        #         maxval = tmpval
-        #         candnum = cands
 
-        nearest_idx = candnum
+        nearest_idx = can_idx[candnum]
         _, tmpval = fast_dft(query_sinofft, query_sinofft)
         min_dist = abs(tmpval - maxval) 
 
@@ -160,6 +159,7 @@ def generateRadon(data_dir, down_shape, dist_thr = 20):
     
     # Extract the poses to compute the cumulative distance
     distances = np.zeros(len(data_names))
+    poses = np.zeros((len(data_names), 4, 4))
     dist_sum = 0.0
     for i in range(1, traj.shape[0]):
         T1_inv = np.eye(4)
@@ -173,13 +173,14 @@ def generateRadon(data_dir, down_shape, dist_thr = 20):
         dist = np.linalg.norm(dT[:3, 3])
         dist_sum += dist
         distances[i - 1] = dist_sum
+        poses[i-1] = T2
     
 
     # Prepare the data for the output
     num_data = len(data_names)
-    #print("//////////////\nWARNING: Using a subset of the data for debugging purposes. Remove the 2 following line whenever it workds.\n//////////////")
-    #num_data = 105
     data_names_kept = []
+    odom_poses = []
+    distances_kept = []
     theta = np.arange(0, 180)
     sinoffts = []
     rowkeys = []
@@ -223,12 +224,16 @@ def generateRadon(data_dir, down_shape, dist_thr = 20):
         sinoffts.append(sinofft)
         rowkeys.append(rowkey(R).flatten())
         data_names_kept.append(file_name)
+        distances_kept.append(last_dist)
+        odom_poses.append(poses[data_idx,:,:])
 
     # Convert to numpy arrays
     rowkeys = np.array(rowkeys)
     times = np.array(times)
+    distances_kept = np.array(distances_kept)
+    odom_poses = np.array(odom_poses)
 
-    return sinoffts, rowkeys, data_names_kept, times
+    return sinoffts, rowkeys, data_names_kept, times, odom_poses, distances_kept
 
 
 
