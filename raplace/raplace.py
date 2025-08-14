@@ -19,10 +19,9 @@ from scipy import ndimage
 import scipy.io as sio  # when the python file deal with .mat document
 import pandas as pd
 from utils import utils
+import yaml
 loop_records = []
 
-kDistThr = 20 # Distance threshold for selecting local maps
-kMinTimeDiff = 150 # Minimum time difference target and query local maps in seconds
 
 def main():
 
@@ -30,10 +29,14 @@ def main():
     seq_dir = utils.getOutputDataDir()
 
 
+    # Load the RaPlace config file
+    with open(os.path.join("raplace", "config.yaml"), 'r') as f:
+        opts = yaml.safe_load(f)
+
     down_shape = 0.6
 
     # Generate Radon Transforms (not all the data, only a subset based on a distance threshold)
-    data_sinofft, data_rowkeys, data_names, times = generateRadon(seq_dir, down_shape, dist_thr=kDistThr)
+    data_sinofft, data_rowkeys, data_names, times = generateRadon(seq_dir, down_shape, dist_thr=opts['dist_thr'])
 
     num_queries = len(data_names)
 
@@ -48,9 +51,9 @@ def main():
 
 
         # Get the data that is far enough from the query data
-        mask = (times - times[query_idx]) <  -kMinTimeDiff
+        mask = (times - times[query_idx]) <  -opts['min_time_diff']
         if sum(mask) == 0:
-            print("No valid candidates for query {query_idx}. Skipping...")
+            print(f"No valid candidates for query {query_idx}. Skipping...")
             continue
         can_sinofft = [data_sinofft[i] for i in range(len(data_sinofft)) if mask[i] and i != query_idx]
 
