@@ -40,3 +40,23 @@ def getPixelResolution():
     with open(os.path.join("dro", "config.yaml"), 'r') as f:
         opts = yaml.safe_load(f)
     return opts['direct']['local_map_res']
+
+
+def poseToXYTheta(pose):
+    # Convert the pose to (x, y, theta)
+    x = pose[0, 2]
+    y = pose[1, 2]
+    theta = np.arctan2(pose[1, 0], pose[0, 0])
+    return np.array([x, y]), theta
+
+
+def XYThetaToPose(xy, theta):
+    # Convert (x, y, theta) to pose
+    pose = np.eye(3)
+    pose[0, 0] = np.cos(theta)
+    pose[0, 1] = -np.sin(theta)
+    pose[1, 0] = np.sin(theta)
+    pose[1, 1] = np.cos(theta)
+    pose[0, 2] = xy[0]
+    pose[1, 2] = xy[1]
+    return pose

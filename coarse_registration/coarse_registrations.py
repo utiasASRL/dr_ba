@@ -21,9 +21,13 @@ def main():
     pix_res = utils.getPixelResolution()
 
 
-    ## Read the RaPlace matches
+    # Read the RaPlace matches
     raw_loops = pd.read_csv(os.path.join(output_path, "raplace_loops.csv"))
     print("Loaded", len(raw_loops), "RaPlace matches.")
+
+
+    # Store the valid matches
+    valid_matches = []
 
 
     # Create the cv tools for feature extraction and matching
@@ -86,24 +90,31 @@ def main():
         # Reject if the scale is too far from 1
         if np.abs(scale - 1) > 0.05:
             print(f"Skipping match {index} due to scale {scale:.3f} being too far from 1.")
-
-            # Show the registration result
-            cv2.imshow("No match", np.hstack((img1, img2)))
-            cv2.waitKey(0)
             continue
 
 
-        # Draw matches for visualization
-        img_matches = cv2.drawMatches(img1, kp1, img2, kp2, good_matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-        cv2.imshow("Feature matches", img_matches)
-        cv2.waitKey(10)
-
+        # Add the valid match
+        xy, theta = utils.poseToXYTheta(pose)
+        valid_matches.append({
+            'scan_i_name': row['scan_i_name'],
+            'scan_j_name': row['scan_j_name'],
+            'x': xy[0],
+            'y': xy[1],
+            'theta': theta
+        })
 
         # Show the registration result
         img1_reg = cv2.warpAffine(img1, M, (img2.shape[1], img2.shape[0]))
         cv2.imshow("Match", np.hstack((img1_reg, img2)))
         cv2.waitKey(0)
         
+    cv2.destroyAllWindows()
+
+
+    # Save the valid matches
+    valid_matches_df = pd.DataFrame(valid_matches)
+    valid_matches_df.to_csv(os.path.join(output_path, "coarse_registrations.csv"), index=False)
+
 
 if __name__ == "__main__":
     main()
