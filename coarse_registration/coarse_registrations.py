@@ -17,8 +17,9 @@ def main():
     # Load coarse registrations parameters
     opts = yaml.safe_load(open(os.path.join("coarse_registration", "config.yaml"), 'r'))
 
-    # Get the pixel resolution
+    # Get the pixel resolution and maximum image size
     pix_res = utils.getPixelResolution()
+    max_img_size = opts['max_img_size']
 
 
     # Read the RaPlace matches
@@ -40,6 +41,13 @@ def main():
         # Read the images
         img1 = cv2.imread(os.path.join(local_map_path, row['scan_i_name']), cv2.IMREAD_GRAYSCALE)
         img2 = cv2.imread(os.path.join(local_map_path, row['scan_j_name']), cv2.IMREAD_GRAYSCALE)
+        original_shape = img1.shape
+        img_size_ratio = 1.0
+        if img1.shape[0] > max_img_size:
+            img_size_ratio = img1.shape[0] / max_img_size
+            img1 = cv2.resize(img1, (max_img_size, max_img_size))
+            img2 = cv2.resize(img2, (max_img_size, max_img_size))
+            
 
         ## Perform histogram equalization
         #img1 = cv2.equalizeHist(img1)
@@ -51,6 +59,12 @@ def main():
         if des1 is None or des2 is None:
             print(f"Skipping match {index} due to missing descriptors.")
             continue
+        if img_size_ratio != 1.0:
+            # Scale the keypoints to the original image size
+            for kp in kp1:
+                kp.pt = (kp.pt[0] * img_size_ratio, kp.pt[1] * img_size_ratio)
+            for kp in kp2:
+                kp.pt = (kp.pt[0] * img_size_ratio, kp.pt[1] * img_size_ratio)
 
         # Match features
         matches = sift_matcher.knnMatch(des1, des2, k=2)
@@ -76,15 +90,15 @@ def main():
 
 
         # Perform RANSAC registration
-        src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
-        dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+        dst_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+        src_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
         M, _ = cv2.estimateAffinePartial2D(src_pts, dst_pts, method=cv2.RANSAC, ransacReprojThreshold=opts['ransac_thr'])
         if M is None:
             print(f"Skipping match {index} due to failed registration.")
             continue
 
         # Get the pose and scale from the transformation matrix
-        pose, scale = utils.affineToPoseAndScale(M, pix_res, img1.shape)
+        pose, scale = utils.affineToPoseAndScale(M, pix_res, original_shape)
 
 
         # Reject if the scale is too far from 1
@@ -103,12 +117,16 @@ def main():
             'theta': theta
         })
 
-        # Show the registration result
-        img1_reg = cv2.warpAffine(img1, M, (img2.shape[1], img2.shape[0]))
-        cv2.imshow("Match", np.hstack((img1_reg, img2)))
-        cv2.waitKey(0)
+        if opts['visualize']:
+            # Show the registration result
+            M[:,-1] = M[:,-1] / img_size_ratio  # Scale the transformation matrix
+            img1_reg = cv2.warpAffine(img1, M, (img2.shape[1], img2.shape[0]))
+            cv2.imshow("Match", np.hstack((img1_reg, img2)))
+            cv2.waitKey(0)
         
-    cv2.destroyAllWindows()
+    if opts['visualize']:
+        # Close the OpenCV windows
+        cv2.destroyAllWindows()
 
 
     # Save the valid matches

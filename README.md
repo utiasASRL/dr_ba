@@ -32,24 +32,31 @@ python raplace/raplace.py
 ```
 
 It will generate a CSV of proposed scan pairs in the `output/<SEQ-NAME>/raplace_loops.csv` folder.
+Each row contains the following columns:
+- `time_i`: Timestamp of the first scan in the pair \[s\].
+- `time_j`: Timestamp of the second scan in the pair \[s\].
+- `scan_i_name`: Name of the first scan in the pair.
+- `scan_j_name`: Name of the second scan in the pair.
+- `score`: The score of the proposed loop closure as defined in RaPlace (not used)
+- `min_dist`: The minimum dist between the scores as defined in RaPlace (not used)
 
-## Run Coarse_registration
+## Run the feature-based coarse registration
 
-In `Coarse_registration/gps_to_radar.py`, add the argument for the boreas's calibration directory and the path to the gps_post_process.csv. This file converts the Boreas 200 Hz Applanix poses to radar-frame poses, later used to interpolate ground truth poses in the radar frame. 
-In the `Coarse_registration/` folder, run:
-
+In the root of the repository, run the following command:
 ```bash
-python gps_to_radar.py \
-  --calib_dir  <sequence>/calib \
-  --gps_csv    <sequence>/applanix/gps_post_process.csv
+python coarse_registration/coarse_registration.py
 ```
-Produces `radar_frame_poses.csv` with timestamp-aligned SE(2) ground-truth.
 
-Then, run:
+It will generate a CSV of coarse registration results in the `output/<SEQ-NAME>/coarse_registration.csv` folder.
+Each row contains the following columns:
+- `scan_i_name`: Name of the first scan in the pair.
+- `scan_j_name`: Name of the second scan in the pair.
+- `x`, `y`, `theta`: The estimated transformation from scan i to scan j.
+
+## For paper and evaluation
+
+To plot the coarse registration errors, run the following command:
 ```bash
-python compare_est_gt.py \
-  --loops  ../RaPlace/PYTHON/loop_pairs.csv \
-  --imgdir ../local_maps \
-  --gt     radar_frame_poses.csv
+python script_for_paper/plot_coarse_registration_error.py
 ```
-It will visualize the PNGs with the RaPlace proposed loop closure radar scans, the GT distance of the two scans, the tranlation error and rotational error between the SIFT proposed R and t matrices with the GT R and t matrices. It will also output a CSV containing the errors and matrices. 
+

@@ -161,7 +161,12 @@ def main():
         if os.path.exists(odom_output_path):
             os.system('rm -r ' + odom_output_path)
         os.makedirs(odom_output_path)
+        odom_2d_path = seq_output_path + '/odometry_2d'
+        if os.path.exists(odom_2d_path):
+            os.system('rm -r ' + odom_2d_path)
+        os.makedirs(odom_2d_path)
         odom_output_path = odom_output_path + '/' + seq.ID + '.txt'
+        odom_2d_path = odom_2d_path + '/' + seq.ID + '.txt'
         other_log_path = seq_output_path + '/other_log'
         os.makedirs(other_log_path, exist_ok=True)
         if save_images:
@@ -343,7 +348,13 @@ def main():
                 else:
                     df_data.to_csv(odom_output_path, mode='a', header=None, index=None, sep=' ')
 
-
+                # Save the 2D odometry to be synced with the local maps
+                df_data_2d = pd.DataFrame(np.array([radar_frame.timestamps[0][0], current_pos[0][0], current_pos[0][1], current_rot[0]]).reshape(1, -1))
+                df_data_2d[0] = radar_frame.timestamps[0][0].astype(int)
+                if not os.path.exists(odom_2d_path):
+                    df_data_2d.to_csv(odom_2d_path, header=None, index=None, sep=' ')
+                else:
+                    df_data_2d.to_csv(odom_2d_path, mode='a', header=None, index=None, sep=' ')
 
             # Visualisation and image saving
             if visualise or save_images:

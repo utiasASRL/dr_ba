@@ -35,7 +35,7 @@ def main():
     down_shape = 0.6
 
     # Generate Radon Transforms (not all the data, only a subset based on a distance threshold)
-    data_sinofft, data_rowkeys, data_names, times, odom_poses, distances = generateRadon(seq_dir, down_shape, dist_thr=opts['dist_thr'])
+    data_sinofft, data_rowkeys, data_names, times, odom_poses, distances = generateRadon(seq_dir, down_shape, dist_thr=opts['dist_thr'], max_img_size=opts['max_img_size'])
 
     num_queries = len(data_names)
 
@@ -143,7 +143,7 @@ def osdir(path):
     return sorted(files, key=lambda fn: int(fn.split('.')[0]))
 
 # Perform radon transformation
-def generateRadon(data_dir, down_shape, dist_thr = 20):
+def generateRadon(data_dir, down_shape, dist_thr = 20, max_img_size=600):
     
     # Get the local map paths
     local_map_dir = os.path.join(data_dir, 'local_maps')
@@ -206,6 +206,8 @@ def generateRadon(data_dir, down_shape, dist_thr = 20):
         # Read the image
         data_path = os.path.join(local_map_dir, file_name)
         tmp = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE)
+        if tmp.shape[0] > max_img_size:
+            tmp = cv2.resize(tmp, (max_img_size, max_img_size))
 
         # Perform Radon transform
         R = radon(tmp, theta)
