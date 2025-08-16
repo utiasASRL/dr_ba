@@ -10,7 +10,7 @@ sequences = ['boreas-2024-12-03-12-54', # Glenshield
              'boreas-2025-01-08-12-28', # Glenshield
 
              'boreas-2024-12-04-11-56', # Skyway
-             'boreas-2025-12-04-12-08', # Skyway
+             'boreas-2024-12-04-12-08', # Skyway
              'boreas-2024-12-04-12-19', # Skyway
              'boreas-2024-12-04-12-34', # Skyway
             ]
