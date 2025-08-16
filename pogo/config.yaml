@@ -1,0 +1,3 @@
+loss_scale_loop_pos: 2.0 # Scale in meters
+loss_scale_loop_rot: 5.0 # Scale in degrees
+use_coarse_registration: true
