@@ -58,10 +58,17 @@ int main(int argc, char** argv)
         pose_graph.addOdometryEdge(t0, t1, relative_pose);
     }
 
+
+    pose_graph.printLastPose();
+
+
     // Add loop closure edges to the pose graph
     for(const auto& [t0, t1, relative_pose] : loop_closures) {
         pose_graph.addLoopClosureEdge(t0, t1, relative_pose);
     }
+
+    pose_graph.optimize();
+    pose_graph.printLastPose();
 
     return 0;
 }

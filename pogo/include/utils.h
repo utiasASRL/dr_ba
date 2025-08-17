@@ -1,3 +1,5 @@
+#pragma once
+
 #include <eigen3/Eigen/Dense>
 #include <fstream>
 #include <vector>
@@ -28,8 +30,6 @@ inline std::array<double, 3> matToXYTheta(const Eigen::Matrix3d& mat)
     pose[2] = std::atan2(mat(1, 0), mat(0, 0));
     return pose;
 }
-
-
 
 inline std::array<double, 3> relativePose(
     const std::array<double, 3>& pose1,
@@ -92,7 +92,7 @@ inline int64_t fileNameToTimestamp(const std::string& file_name)
     }
 }
 
-std::vector<std::tuple<int64_t, int64_t, std::array<double, 3>>> readLoopClosures(const std::string& file_path)
+inline std::vector<std::tuple<int64_t, int64_t, std::array<double, 3>>> readLoopClosures(const std::string& file_path)
 {
     std::vector<std::tuple<int64_t, int64_t, std::array<double, 3>>> loop_closures;
     std::ifstream file(file_path);
