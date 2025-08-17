@@ -73,6 +73,12 @@ def getPixelResolution():
         opts = yaml.safe_load(f)
     return opts['direct']['local_map_res']
 
+def getMaxLocalMapRange():
+    # Fetch the max local map range from the DRO config file
+    with open(os.path.join("dro", "config.yaml"), 'r') as f:
+        opts = yaml.safe_load(f)
+    return opts['direct']['max_local_map_range']
+
 
 def poseToXYTheta(pose):
     # Convert the pose to (x, y, theta)
