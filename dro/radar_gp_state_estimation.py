@@ -170,11 +170,6 @@ def main():
         other_log_path = seq_output_path + '/other_log'
         os.makedirs(other_log_path, exist_ok=True)
         if save_images:
-            image_output_path = seq_output_path + '/images'
-            if os.path.exists(image_output_path):
-                os.system('rm -r ' + image_output_path)
-            os.makedirs(image_output_path, exist_ok=True)
-
             local_map_output_path = opts['log']['local_map_path']
             if os.path.exists(local_map_output_path):
                 os.system('rm -r ' + local_map_output_path)
@@ -383,8 +378,6 @@ def main():
                     ax.set_ylim(min(np.min(gt_xy[:,1]), np.min(est_xy[:,1]))-100, max(np.max(gt_xy[:,1]), np.max(est_xy[:,1]))+100)
                     plt.draw()
                     plt.pause(0.001)
-            if save_images:
-                cv2.imwrite(image_output_path + '/frame_' + str(i-start_id).zfill(6) + '.png', img)
 
 
 
