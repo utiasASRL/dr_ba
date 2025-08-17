@@ -71,22 +71,35 @@ def main():
     # Get the maximum of sequences per type
     max_seq = max([len(errors) for errors in errors_per_type.values()])
 
+    # Sort the sequences per alphabetical order
+    errors_per_type = {k: v for k, v in sorted(errors_per_type.items(), key=lambda item: item[0])}
+
     # Plot the errors for each type
-    fig, ax = plt.subplots(1, max_seq, figsize=(18, 4), sharey=True, sharex=True)
+    fig, ax = plt.subplots(2, max_seq, figsize=(18, 8))
+    zoomed_area = [-0.5, 5.5, -0.25, 2.75]
+    all_area = [-0.5, np.max(errors_total[:, 0]) + 0.5, -0.25, 180.0]
     for i, (seq_type, errors) in enumerate(errors_per_type.items()):
         for j, seq_errors in enumerate(errors):
             seq_id = list(seq_errors.keys())[0]
             trans_errors = np.array([e[0] for e in seq_errors[seq_id]])
             rot_errors = np.array([e[1] for e in seq_errors[seq_id]])
-            ax[j].scatter(trans_errors, rot_errors, label=seq_type + " n=" + str(len(trans_errors)), alpha=0.5, color=kTypeColors[seq_type])
-            ax[j].legend()
-            ax[j].set_xlabel("Translation Error [m]")
-            
+            ax[0,j].scatter(trans_errors, rot_errors, label=seq_type + " n=" + str(len(trans_errors)), alpha=0.5, color=kTypeColors[seq_type], facecolors='none')
+            ax[0,j].legend(loc='upper right')
+            ax[0,j].set_ylim(all_area[2], all_area[3])
+            ax[0,j].set_xlim(all_area[0], all_area[1])
 
+            ax[1,j].scatter(trans_errors, rot_errors, label=seq_type + " n=" + str(len(rot_errors)), alpha=0.5, color=kTypeColors[seq_type], facecolors='none')
+            ax[1,j].legend(loc='upper right')
+            ax[1,j].set_xlabel("Translation Error [m]")
+            ax[1,j].set_ylim(zoomed_area[2], zoomed_area[3])
+            ax[1,j].set_xlim(zoomed_area[0], zoomed_area[1])
+            ax[1,j].set_xlabel("Translation Error [m]")
 
-    ax[0].set_ylabel("Rotation Error [deg]")
+    ax[0,0].set_ylabel("Rotation Error [deg]")
+    ax[1,0].set_ylabel("Rotation Error [deg]")
     fig.suptitle("Coarse Registration Errors per Sequence Type")
     plt.tight_layout()
+    plt.savefig("output/coarse_registration_errors.pdf")
     plt.show()
 
 

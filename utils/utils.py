@@ -117,6 +117,41 @@ def getGTRadarPosesAndTimes(seq_id):
     gt_poses = np.array(poses)
     return gt_poses, gt_times
 
+def getPogoPosesAndTimes(seq_id):
+    # Get the results path
+    data_path = os.path.join("output", seq_id, "pose_graph_traj.txt")
+    if not os.path.exists(data_path):
+        print(f"Skipping sequence {seq_id} due to missing results.")
+        return None, None
+    data_raw = pd.read_csv(data_path, delimiter=' ')
+    times = data_raw.iloc[:, 0].to_numpy()
+    poses = []
+    for i in range(len(times)):
+        pose = np.eye(4)
+        pose[:2, 3] = data_raw.iloc[i, 1:3].to_numpy()
+        pose[:2, :2] = np.array([[np.cos(data_raw.iloc[i, 3]), -np.sin(data_raw.iloc[i, 3])],
+                                  [np.sin(data_raw.iloc[i, 3]), np.cos(data_raw.iloc[i, 3])]])
+        poses.append(pose)
+    poses = np.array(poses)
+    return poses, times
+
+def getDroPosesAndTimes(seq_id):
+    # Get the results path
+    data_path = os.path.join("output", seq_id, "odometry_2d", seq_id + ".txt")
+    if not os.path.exists(data_path):
+        print(f"Skipping sequence {seq_id} due to missing results.")
+        return None, None
+    data_raw = pd.read_csv(data_path, delimiter=' ')
+    times = data_raw.iloc[:, 0].to_numpy()
+    poses = []
+    for i in range(len(times)):
+        pose = np.eye(4)
+        pose[:2, 3] = data_raw.iloc[i, 1:3].to_numpy()
+        pose[:2, :2] = np.array([[np.cos(data_raw.iloc[i, 3]), -np.sin(data_raw.iloc[i, 3])],
+                                  [np.sin(data_raw.iloc[i, 3]), np.cos(data_raw.iloc[i, 3])]])
+        poses.append(pose)
+    poses = np.array(poses)
+    return poses, times
 
 def getInterpolatedPose(poses, times, query_time):
     # Interpolate the pose at the query time

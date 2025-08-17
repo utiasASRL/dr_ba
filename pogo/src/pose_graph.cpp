@@ -49,6 +49,11 @@ void PoseGraph::addOdometryEdge(const int64_t t0, const int64_t t1, std::array<d
     std::array<double, 3> new_pose = combinePoses(*(node_poses_.back()), relative_pose);
     node_poses_.push_back(std::make_shared<std::array<double, 3>>(new_pose));
 
+    //// Add noise
+    //node_poses_.back()->at(0) += ((double)rand() / RAND_MAX - 0.5) * 1.0;
+    //node_poses_.back()->at(1) += ((double)rand() / RAND_MAX - 0.5) * 1.0;
+    //node_poses_.back()->at(2) += ((double)rand() / RAND_MAX - 0.5) * 2.0*M_PI/180.0;
+
     // Add the new pose as a parameter block
     problem_.AddParameterBlock(node_poses_.back()->data(), 3);
 
