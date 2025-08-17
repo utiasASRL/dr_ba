@@ -70,6 +70,8 @@ int main()
     pose_graph.optimize();
     pose_graph.printLastPose();
 
+    pose_graph.writeToFile("output/" + seq_id + "/pose_graph_traj.txt");
+
     return 0;
 }
 
