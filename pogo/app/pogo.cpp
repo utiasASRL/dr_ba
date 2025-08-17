@@ -5,7 +5,7 @@
 
 
 
-int main(int argc, char** argv)
+int main()
 {
     auto seq_id = getSeqId();
     std::cout << "Sequence ID: " << seq_id << std::endl;

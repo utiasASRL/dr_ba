@@ -53,17 +53,16 @@ void PoseGraph::addOdometryEdge(const int64_t t0, const int64_t t1, std::array<d
     problem_.AddParameterBlock(node_poses_.back()->data(), 3);
 
 
-    // Create residual for the odometry edge
-    ceres::CostFunction* cost_function = new ceres::AutoDiffCostFunction<OdometryResidualFunctor, 3, 3, 3>(
-        new OdometryResidualFunctor(relative_pose)
-    );
+    ceres::CostFunction* cost_function = new OdometryCostFunction(relative_pose);
     problem_.AddResidualBlock(cost_function, nullptr, node_poses_[node_indices_[t0]]->data(), node_poses_[node_indices_[t1]]->data());
 
 }
 
 
 
-void PoseGraph::addLoopClosureEdge(const int64_t t0, const int64_t t1, std::array<double, 3> relative_pose)
+
+
+void PoseGraph::addLoopClosureRotEdge(const int64_t t0, const int64_t t1, std::array<double, 3> relative_pose)
 {
     if(node_indices_.find(t0) == node_indices_.end() || node_indices_.find(t1) == node_indices_.end())
     {
@@ -78,13 +77,32 @@ void PoseGraph::addLoopClosureEdge(const int64_t t0, const int64_t t1, std::arra
         throw std::runtime_error("Loop closure edge indices out of bounds.");
     }
 
-    // Add the loop closure edge to the problem
-    ceres::CostFunction* cost_function_pos = new ceres::AutoDiffCostFunction<LoopClosurePosResidualFunctor, 2, 3, 3>(
-        new LoopClosurePosResidualFunctor(relative_pose)
-    );
-    problem_.AddResidualBlock(cost_function_pos, loss_function_loop_pos_, node_poses_[index0]->data(), node_poses_[index1]->data());
-    ceres::CostFunction* cost_function_rot = new ceres::AutoDiffCostFunction<LoopClosureRotResidualFunctor, 1, 3, 3>(
-        new LoopClosureRotResidualFunctor(relative_pose)
-    );
+    ceres::CostFunction* cost_function_rot = new LoopClosureRotCostFunction(relative_pose);
     problem_.AddResidualBlock(cost_function_rot, loss_function_loop_rot_, node_poses_[index0]->data(), node_poses_[index1]->data());
+
+}
+
+void PoseGraph::addLoopClosurePosEdge(const int64_t t0, const int64_t t1, std::array<double, 3> relative_pose)
+{
+    if(node_indices_.find(t0) == node_indices_.end() || node_indices_.find(t1) == node_indices_.end())
+    {
+        throw std::runtime_error("Loop closure edge contains unknown timestamps.");
+    }
+
+    size_t index0 = node_indices_[t0];
+    size_t index1 = node_indices_[t1];
+
+    if(index0 >= node_poses_.size() || index1 >= node_poses_.size())
+    {
+        throw std::runtime_error("Loop closure edge indices out of bounds.");
+    }
+
+    ceres::CostFunction* cost_function_pos = new LoopClosurePosCostFunction(relative_pose);
+    problem_.AddResidualBlock(cost_function_pos, loss_function_loop_pos_, node_poses_[index0]->data(), node_poses_[index1]->data());
+}
+
+void PoseGraph::addLoopClosureEdge(const int64_t t0, const int64_t t1, std::array<double, 3> relative_pose)
+{
+    addLoopClosurePosEdge(t0, t1, relative_pose);
+    addLoopClosureRotEdge(t0, t1, relative_pose);
 }

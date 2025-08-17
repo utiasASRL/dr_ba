@@ -15,6 +15,8 @@ class PoseGraph {
 
         void addOdometryEdge(const int64_t t0, const int64_t t1, std::array<double, 3> relative_pose);
 
+        void addLoopClosurePosEdge(const int64_t t0, const int64_t t1, std::array<double, 3> relative_pose);
+        void addLoopClosureRotEdge(const int64_t t0, const int64_t t1, std::array<double, 3> relative_pose);
         void addLoopClosureEdge(const int64_t t0, const int64_t t1, std::array<double, 3> relative_pose);
 
         void optimize()
@@ -183,4 +185,185 @@ class LoopClosurePosResidualFunctor
 
     private:
         OdometryResidualFunctor odometry_functor_;
+};
+
+
+
+class OdometryCostFunction : public ceres::SizedCostFunction<3, 3, 3>
+{
+    public:
+        OdometryCostFunction(const std::array<double, 3>& relative_pose)
+        {
+            inv_meas_ = xyThetaToMat(relative_pose).inverse();
+        }
+
+        virtual ~OdometryCostFunction() {}
+
+        virtual bool Evaluate(double const* const* parameters, double* residuals, double** jacobians) const
+        {
+            const std::array<double, 3> pose1 = {parameters[0][0], parameters[0][1], parameters[0][2]};
+            const std::array<double, 3> pose2 = {parameters[1][0], parameters[1][1], parameters[1][2]};
+
+            Eigen::Matrix3d inv_mat1 = xyThetaToMat(pose1).inverse();
+            Eigen::Matrix3d mat2 = xyThetaToMat(pose2);
+
+            Eigen::Matrix3d relative_pose = inv_mat1 * mat2;
+            Eigen::Matrix3d delta = inv_meas_ * relative_pose;
+            residuals[0] = delta(0, 2);
+            residuals[1] = delta(1, 2);
+            residuals[2] = std::atan2(delta(1, 0), delta(0, 0));
+
+            if(jacobians)
+            {
+                Eigen::Matrix2d temp_rot = inv_meas_.block<2, 2>(0, 0) * inv_mat1.block<2, 2>(0, 0);
+
+                // Compute the Jacobian
+                if (jacobians[0] != nullptr) {
+                    double s1 = std::sin(pose1[2]);
+                    double c1 = std::cos(pose1[2]);
+                    double dx = pose2[0] - pose1[0];
+                    double dy = pose2[1] - pose1[1];
+
+                    Eigen::Vector2d temp;
+                    temp[0] = -s1 * dx + c1 * dy;
+                    temp[1] = -c1 * dx - s1 * dy;
+
+                    temp = inv_meas_.block<2, 2>(0, 0) * temp;
+
+                    Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>> jacobian1(jacobians[0]);
+
+                    jacobian1.setZero();
+                    jacobian1.block<2, 2>(0, 0) = -temp_rot;
+                    jacobian1.block<2, 1>(0, 2) = temp;
+                    jacobian1(2,2) = -1;
+                }
+                if (jacobians[1] != nullptr) {
+                    // Jacobian w.r.t. pose2
+                    Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>> jacobian2(jacobians[1]);
+
+                    jacobian2.setZero();
+                    jacobian2.block<2, 2>(0, 0) = temp_rot;
+                    jacobian2(2,2) = 1;
+                }
+            }
+
+
+            return true;
+        }
+
+    private:
+        Eigen::Matrix3d inv_meas_;
+};
+
+
+class LoopClosureRotCostFunction: public ceres::SizedCostFunction<1, 3, 3>
+{
+    public:
+        LoopClosureRotCostFunction(const std::array<double, 3>& relative_pose)
+        {
+            inv_meas_ = xyThetaToMat(relative_pose).inverse();
+        }
+
+        virtual ~LoopClosureRotCostFunction() {}
+
+        virtual bool Evaluate(double const* const* parameters, double* residuals, double** jacobians) const
+        {
+            const std::array<double, 3> pose1 = {parameters[0][0], parameters[0][1], parameters[0][2]};
+            const std::array<double, 3> pose2 = {parameters[1][0], parameters[1][1], parameters[1][2]};
+
+            Eigen::Matrix3d inv_mat1 = xyThetaToMat(pose1).inverse();
+            Eigen::Matrix3d mat2 = xyThetaToMat(pose2);
+
+            Eigen::Matrix3d relative_pose = inv_mat1 * mat2;
+            Eigen::Matrix3d delta = inv_meas_ * relative_pose;
+            residuals[0] = std::atan2(delta(1, 0), delta(0, 0));
+
+            if(jacobians)
+            {
+                // Compute the Jacobian
+                if (jacobians[0] != nullptr) {
+                    Eigen::Map<Eigen::Matrix<double, 1, 3, Eigen::RowMajor>> jacobian1(jacobians[0]);
+
+                    jacobian1.setZero();
+                    jacobian1(0,2) = -1;
+                }
+                if (jacobians[1] != nullptr) {
+                    // Jacobian w.r.t. pose2
+                    Eigen::Map<Eigen::Matrix<double, 1, 3, Eigen::RowMajor>> jacobian2(jacobians[1]);
+
+                    jacobian2.setZero();
+                    jacobian2(0,2) = 1;
+                }
+            }
+
+
+            return true;
+        }
+    private:
+        Eigen::Matrix3d inv_meas_;
+};
+
+
+
+class LoopClosurePosCostFunction : public ceres::SizedCostFunction<2, 3, 3>
+{
+    public:
+        LoopClosurePosCostFunction(const std::array<double, 3>& relative_pose)
+        {
+            inv_meas_ = xyThetaToMat(relative_pose).inverse();
+        }
+
+        virtual ~LoopClosurePosCostFunction() {}
+
+        virtual bool Evaluate(double const* const* parameters, double* residuals, double** jacobians) const
+        {
+            const std::array<double, 3> pose1 = {parameters[0][0], parameters[0][1], parameters[0][2]};
+            const std::array<double, 3> pose2 = {parameters[1][0], parameters[1][1], parameters[1][2]};
+
+            Eigen::Matrix3d inv_mat1 = xyThetaToMat(pose1).inverse();
+            Eigen::Matrix3d mat2 = xyThetaToMat(pose2);
+
+            Eigen::Matrix3d relative_pose = inv_mat1 * mat2;
+            Eigen::Matrix3d delta = inv_meas_ * relative_pose;
+            residuals[0] = delta(0, 2);
+            residuals[1] = delta(1, 2);
+
+            if(jacobians)
+            {
+                Eigen::Matrix2d temp_rot = inv_meas_.block<2, 2>(0, 0) * inv_mat1.block<2, 2>(0, 0);
+
+                // Compute the Jacobian
+                if (jacobians[0] != nullptr) {
+                    double s1 = std::sin(pose1[2]);
+                    double c1 = std::cos(pose1[2]);
+                    double dx = pose2[0] - pose1[0];
+                    double dy = pose2[1] - pose1[1];
+
+                    Eigen::Vector2d temp;
+                    temp[0] = -s1 * dx + c1 * dy;
+                    temp[1] = -c1 * dx - s1 * dy;
+
+                    temp = inv_meas_.block<2, 2>(0, 0) * temp;
+
+                    Eigen::Map<Eigen::Matrix<double, 2, 3, Eigen::RowMajor>> jacobian1(jacobians[0]);
+
+                    jacobian1.setZero();
+                    jacobian1.block<2, 2>(0, 0) = -temp_rot;
+                    jacobian1.block<2, 1>(0, 2) = temp;
+                }
+                if (jacobians[1] != nullptr) {
+                    // Jacobian w.r.t. pose2
+                    Eigen::Map<Eigen::Matrix<double, 2, 3, Eigen::RowMajor>> jacobian2(jacobians[1]);
+
+                    jacobian2.setZero();
+                    jacobian2.block<2, 2>(0, 0) = temp_rot;
+                }
+            }
+
+
+            return true;
+        }
+
+    private:
+        Eigen::Matrix3d inv_meas_;
 };
