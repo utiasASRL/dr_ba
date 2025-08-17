@@ -279,7 +279,8 @@ bool LoopClosureRotCostFunction::Evaluate(double const* const* parameters, doubl
 
 LoopClosurePosCostFunction::LoopClosurePosCostFunction(const std::array<double, 3>& relative_pose)
 {
-    inv_meas_ = xyThetaToMat(relative_pose).inverse();
+    meas_[0] = relative_pose[0];
+    meas_[1] = relative_pose[1];
 }
 
 bool LoopClosurePosCostFunction::Evaluate(double const* const* parameters, double* residuals, double** jacobians) const
@@ -291,14 +292,12 @@ bool LoopClosurePosCostFunction::Evaluate(double const* const* parameters, doubl
     Eigen::Matrix3d mat2 = xyThetaToMat(pose2);
 
     Eigen::Matrix3d relative_pose = inv_mat1 * mat2;
-    Eigen::Matrix3d delta = inv_meas_ * relative_pose;
-    residuals[0] = delta(0, 2);
-    residuals[1] = delta(1, 2);
+    Eigen::Vector2d delta = relative_pose.block<2,1>(0,2) - meas_;
+    residuals[0] = delta(0);
+    residuals[1] = delta(1);
 
     if(jacobians)
     {
-        Eigen::Matrix2d temp_rot = inv_meas_.block<2, 2>(0, 0) * inv_mat1.block<2, 2>(0, 0);
-
         // Compute the Jacobian
         if (jacobians[0] != nullptr) {
             double s1 = std::sin(pose1[2]);
@@ -310,12 +309,10 @@ bool LoopClosurePosCostFunction::Evaluate(double const* const* parameters, doubl
             temp[0] = -s1 * dx + c1 * dy;
             temp[1] = -c1 * dx - s1 * dy;
 
-            temp = inv_meas_.block<2, 2>(0, 0) * temp;
-
             Eigen::Map<Eigen::Matrix<double, 2, 3, Eigen::RowMajor>> jacobian1(jacobians[0]);
 
             jacobian1.setZero();
-            jacobian1.block<2, 2>(0, 0) = -temp_rot;
+            jacobian1.block<2, 2>(0, 0) = -inv_mat1.block<2, 2>(0, 0);
             jacobian1.block<2, 1>(0, 2) = temp;
         }
         if (jacobians[1] != nullptr) {
@@ -323,7 +320,7 @@ bool LoopClosurePosCostFunction::Evaluate(double const* const* parameters, doubl
             Eigen::Map<Eigen::Matrix<double, 2, 3, Eigen::RowMajor>> jacobian2(jacobians[1]);
 
             jacobian2.setZero();
-            jacobian2.block<2, 2>(0, 0) = temp_rot;
+            jacobian2.block<2, 2>(0, 0) = inv_mat1.block<2, 2>(0, 0);
         }
     }
 

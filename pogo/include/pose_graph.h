@@ -83,5 +83,5 @@ class LoopClosurePosCostFunction : public ceres::SizedCostFunction<2, 3, 3>
 
         virtual bool Evaluate(double const* const* parameters, double* residuals, double** jacobians) const;
     private:
-        Eigen::Matrix3d inv_meas_;
+        Eigen::Vector2d meas_;
 };

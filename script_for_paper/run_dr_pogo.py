@@ -30,7 +30,7 @@ for seq in sequences:
     with open(os.path.join("dro", "config.yaml"), 'w') as f:
         yaml.dump(opts, f)
 
-    #subprocess.call(["python3","dro/radar_gp_state_estimation.py"])
-    #subprocess.call(["python3","raplace/raplace.py"])
-    #subprocess.call(["python3","coarse_registration/coarse_registrations.py"])
+    subprocess.call(["python3","dro/radar_gp_state_estimation.py"])
+    subprocess.call(["python3","raplace/raplace.py"])
+    subprocess.call(["python3","coarse_registration/coarse_registrations.py"])
     subprocess.call(["pogo/build/pogo"])
