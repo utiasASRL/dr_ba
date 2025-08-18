@@ -98,12 +98,11 @@ To plot the trajectory estimates and get metrics:
 ```bash
 python script_for_paper/eval.py
 ```
+This will diplay the ATE errors and write to file different trajectory estimates (aligned with the 1st pose in `<SEQ-NAME>_trajectories.pdf` or fully aligned in `<SEQ-NAME>_XXXX_aligned.pdf`)
 
 ## Release TODOs
 
 
-- [ ] In `eval.py` need to add the ATE computation
 - [ ] Create a script to get the pogo parameters automatically from a calib sequence
-- [ ] Once the fine registration is done and get better loops: make a graph initialisation to prevent being too far from loop (or play iteratively with loss scale)
-- [ ] Try adding bias estimation
+- [ ] Try adding bias estimation?
  
