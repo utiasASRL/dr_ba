@@ -29,7 +29,6 @@ def main():
 
 
         # Get the GT, odom and pogo radar poses
-        gt_poses, gt_times = utils.getGTRadarPosesAndTimes(seq_id)
         odom_poses, odom_times = utils.getDroPosesAndTimes(seq_id)
         pogo_poses, pogo_times = utils.getPogoPosesAndTimes(seq_id)
         if(np.any(odom_times != pogo_times)):
@@ -38,18 +37,34 @@ def main():
         # Convert times to seconds
         odom_times = odom_times * 1e-6
         pogo_times = pogo_times * 1e-6
-
-        ## Get the GT at the same times as odom
-        gt_poses_interp = np.zeros(odom_poses.shape)
-        for i in range(len(odom_times)):
-            gt_poses_interp[i,:,:] = utils.getInterpolatedPose(gt_poses, gt_times, odom_times[i])
         
+
+        compute_gt = True
+        gt_interp_path = os.path.join("output", seq_id, "gt_interpolated.npz")
+        if(os.path.exists(gt_interp_path)):
+            data = np.load(gt_interp_path)
+            gt_poses_interp = data['poses']
+            gt_times = data['times']
+            if(np.max(np.abs(gt_times - odom_times))) > 1e-3:
+                compute_gt = True
+            else:
+                compute_gt = False
+
+        if compute_gt:
+            gt_poses, gt_times = utils.getGTRadarPosesAndTimes(seq_id)
+            gt_poses_interp = np.zeros(odom_poses.shape)
+            for i in range(len(odom_times)):
+                gt_poses_interp[i,:,:] = utils.getInterpolatedPose(gt_poses, gt_times, odom_times[i])
+            inv_gt_first = np.linalg.inv(gt_poses_interp[0]).reshape(1,4,4)
+            gt_poses_interp = inv_gt_first @ gt_poses_interp
+
+            np.savez(gt_interp_path, poses=gt_poses_interp, times=odom_times)
+
+
         # Align the poses with identity
-        inv_gt_first = np.linalg.inv(gt_poses_interp[0]).reshape(1,4,4)
         inv_odom_first = np.linalg.inv(odom_poses[0]).reshape(1,4,4)
         inv_pogo_first = np.linalg.inv(pogo_poses[0]).reshape(1,4,4)
 
-        gt_poses_interp = inv_gt_first @ gt_poses_interp
         odom_poses = inv_odom_first @ odom_poses
         pogo_poses = inv_pogo_first @ pogo_poses
 
