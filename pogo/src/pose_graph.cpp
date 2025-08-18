@@ -6,15 +6,22 @@
 
 
 
-PoseGraph::PoseGraph(const double loss_scale_loop_pos, const double loss_scale_loop_rot)
+PoseGraph::PoseGraph(const PoseGraphOpts& opts)
+    : opts_(opts)
 {
-    std::cout << "PoseGraph initialized with loss scales: "
-              << "Position: " << loss_scale_loop_pos 
-              << ", Rotation: " << loss_scale_loop_rot << std::endl;
+    std::cout << "PoseGraph initialized with "
+              << "\n\tloss_scale_loop_pos: " << opts.loss_scale_loop_pos << " m, "
+              << "\n\tloss_scale_loop_rot: " << opts.loss_scale_loop_rot << " rad, "
+              << "\n\tstd_odom_pos: " << opts.odom_pos_std << " m, "
+              << "\n\tstd_odom_rot: " << opts.odom_rot_std << " rad, "
+              << "\n\tstd_loop_pos: " << opts.loop_pos_std << " m, "
+              << "\n\tstd_loop_rot: " << opts.loop_rot_std << " rad" << std::endl;
 
     // Initialize loss functions
-    loss_function_loop_pos_ = new ceres::CauchyLoss(loss_scale_loop_pos);
-    loss_function_loop_rot_ = new ceres::CauchyLoss(loss_scale_loop_rot * M_PI / 180.0); 
+    loss_function_loop_pos_ = new ceres::CauchyLoss(opts.loss_scale_loop_pos / opts.loop_pos_std);
+    loss_function_loop_rot_ = new ceres::CauchyLoss(opts.loss_scale_loop_rot / opts.loop_rot_std);
+    loss_function_odom_pos_ = new ceres::CauchyLoss(10.0);
+    loss_function_odom_rot_ = new ceres::CauchyLoss(100.0);
             
 }
 
@@ -49,18 +56,20 @@ void PoseGraph::addOdometryEdge(const int64_t t0, const int64_t t1, std::array<d
     std::array<double, 3> new_pose = combinePoses(*(node_poses_.back()), relative_pose);
     node_poses_.push_back(std::make_shared<std::array<double, 3>>(new_pose));
 
-    //// Add noise
-    //node_poses_.back()->at(0) += ((double)rand() / RAND_MAX - 0.5) * 1.0;
-    //node_poses_.back()->at(1) += ((double)rand() / RAND_MAX - 0.5) * 1.0;
-    //node_poses_.back()->at(2) += ((double)rand() / RAND_MAX - 0.5) * 2.0*M_PI/180.0;
+    // Add noise
+    node_poses_.back()->at(0) += ((double)rand() / RAND_MAX - 0.5) * 0.1;
+    node_poses_.back()->at(1) += ((double)rand() / RAND_MAX - 0.5) * 0.1;
+    node_poses_.back()->at(2) += ((double)rand() / RAND_MAX - 0.5) * 0.1*M_PI/180.0;
 
     // Add the new pose as a parameter block
     problem_.AddParameterBlock(node_poses_.back()->data(), 3);
 
 
-    ceres::CostFunction* cost_function = new OdometryCostFunction(relative_pose);
-    problem_.AddResidualBlock(cost_function, nullptr, node_poses_[node_indices_[t0]]->data(), node_poses_[node_indices_[t1]]->data());
+    ceres::CostFunction* cost_function_pos = new RelativePosCostFunction(relative_pose, 1.0 / opts_.odom_pos_std);
+    problem_.AddResidualBlock(cost_function_pos, loss_function_odom_pos_, node_poses_[node_indices_[t0]]->data(), node_poses_[node_indices_[t1]]->data());
 
+    ceres::CostFunction* cost_function_rot = new RelativeRotCostFunction(relative_pose, 1.0 / opts_.odom_rot_std);
+    problem_.AddResidualBlock(cost_function_rot, nullptr, node_poses_[node_indices_[t0]]->data(), node_poses_[node_indices_[t1]]->data());
 }
 
 
@@ -82,7 +91,7 @@ void PoseGraph::addLoopClosureRotEdge(const int64_t t0, const int64_t t1, std::a
         throw std::runtime_error("Loop closure edge indices out of bounds.");
     }
 
-    ceres::CostFunction* cost_function_rot = new LoopClosureRotCostFunction(relative_pose);
+    ceres::CostFunction* cost_function_rot = new RelativeRotCostFunction(relative_pose, 1.0 / opts_.loop_rot_std);
     problem_.AddResidualBlock(cost_function_rot, loss_function_loop_rot_, node_poses_[index0]->data(), node_poses_[index1]->data());
 
 }
@@ -102,7 +111,7 @@ void PoseGraph::addLoopClosurePosEdge(const int64_t t0, const int64_t t1, std::a
         throw std::runtime_error("Loop closure edge indices out of bounds.");
     }
 
-    ceres::CostFunction* cost_function_pos = new LoopClosurePosCostFunction(relative_pose);
+    ceres::CostFunction* cost_function_pos = new RelativePosCostFunction(relative_pose, 1.0 / opts_.loop_pos_std);
     problem_.AddResidualBlock(cost_function_pos, loss_function_loop_pos_, node_poses_[index0]->data(), node_poses_[index1]->data());
 }
 
@@ -178,12 +187,18 @@ void PoseGraph::writeToFile(const std::string& filename) const
 
 
 
-OdometryCostFunction::OdometryCostFunction(const std::array<double, 3>& relative_pose)
+
+
+
+
+
+RelativeRotCostFunction::RelativeRotCostFunction(const std::array<double, 3>& relative_pose, double weight)
 {
     inv_meas_ = xyThetaToMat(relative_pose).inverse();
+    weight_ = weight;
 }
 
-bool OdometryCostFunction::Evaluate(double const* const* parameters, double* residuals, double** jacobians) const
+bool RelativeRotCostFunction::Evaluate(double const* const* parameters, double* residuals, double** jacobians) const
 {
     const std::array<double, 3> pose1 = {parameters[0][0], parameters[0][1], parameters[0][2]};
     const std::array<double, 3> pose2 = {parameters[1][0], parameters[1][1], parameters[1][2]};
@@ -193,65 +208,7 @@ bool OdometryCostFunction::Evaluate(double const* const* parameters, double* res
 
     Eigen::Matrix3d relative_pose = inv_mat1 * mat2;
     Eigen::Matrix3d delta = inv_meas_ * relative_pose;
-    residuals[0] = delta(0, 2);
-    residuals[1] = delta(1, 2);
-    residuals[2] = std::atan2(delta(1, 0), delta(0, 0));
-
-    if(jacobians)
-    {
-        Eigen::Matrix2d temp_rot = inv_meas_.block<2, 2>(0, 0) * inv_mat1.block<2, 2>(0, 0);
-
-        // Compute the Jacobian
-        if (jacobians[0] != nullptr) {
-            double s1 = std::sin(pose1[2]);
-            double c1 = std::cos(pose1[2]);
-            double dx = pose2[0] - pose1[0];
-            double dy = pose2[1] - pose1[1];
-
-            Eigen::Vector2d temp;
-            temp[0] = -s1 * dx + c1 * dy;
-            temp[1] = -c1 * dx - s1 * dy;
-
-            temp = inv_meas_.block<2, 2>(0, 0) * temp;
-
-            Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>> jacobian1(jacobians[0]);
-
-            jacobian1.setZero();
-            jacobian1.block<2, 2>(0, 0) = -temp_rot;
-            jacobian1.block<2, 1>(0, 2) = temp;
-            jacobian1(2,2) = -1;
-        }
-        if (jacobians[1] != nullptr) {
-            // Jacobian w.r.t. pose2
-            Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>> jacobian2(jacobians[1]);
-
-            jacobian2.setZero();
-            jacobian2.block<2, 2>(0, 0) = temp_rot;
-            jacobian2(2,2) = 1;
-        }
-    }
-
-
-    return true;
-}
-
-
-LoopClosureRotCostFunction::LoopClosureRotCostFunction(const std::array<double, 3>& relative_pose)
-{
-    inv_meas_ = xyThetaToMat(relative_pose).inverse();
-}
-
-bool LoopClosureRotCostFunction::Evaluate(double const* const* parameters, double* residuals, double** jacobians) const
-{
-    const std::array<double, 3> pose1 = {parameters[0][0], parameters[0][1], parameters[0][2]};
-    const std::array<double, 3> pose2 = {parameters[1][0], parameters[1][1], parameters[1][2]};
-
-    Eigen::Matrix3d inv_mat1 = xyThetaToMat(pose1).inverse();
-    Eigen::Matrix3d mat2 = xyThetaToMat(pose2);
-
-    Eigen::Matrix3d relative_pose = inv_mat1 * mat2;
-    Eigen::Matrix3d delta = inv_meas_ * relative_pose;
-    residuals[0] = std::atan2(delta(1, 0), delta(0, 0));
+    residuals[0] = std::atan2(delta(1, 0), delta(0, 0)) * weight_;
 
     if(jacobians)
     {
@@ -261,6 +218,7 @@ bool LoopClosureRotCostFunction::Evaluate(double const* const* parameters, doubl
 
             jacobian1.setZero();
             jacobian1(0,2) = -1;
+            jacobian1 *= weight_;
         }
         if (jacobians[1] != nullptr) {
             // Jacobian w.r.t. pose2
@@ -268,6 +226,7 @@ bool LoopClosureRotCostFunction::Evaluate(double const* const* parameters, doubl
 
             jacobian2.setZero();
             jacobian2(0,2) = 1;
+            jacobian2 *= weight_;
         }
     }
 
@@ -277,13 +236,15 @@ bool LoopClosureRotCostFunction::Evaluate(double const* const* parameters, doubl
 
 
 
-LoopClosurePosCostFunction::LoopClosurePosCostFunction(const std::array<double, 3>& relative_pose)
+RelativePosCostFunction::RelativePosCostFunction(const std::array<double, 3>& relative_pose, double weight)
+    : weight_(weight)
 {
     meas_[0] = relative_pose[0];
     meas_[1] = relative_pose[1];
+
 }
 
-bool LoopClosurePosCostFunction::Evaluate(double const* const* parameters, double* residuals, double** jacobians) const
+bool RelativePosCostFunction::Evaluate(double const* const* parameters, double* residuals, double** jacobians) const
 {
     const std::array<double, 3> pose1 = {parameters[0][0], parameters[0][1], parameters[0][2]};
     const std::array<double, 3> pose2 = {parameters[1][0], parameters[1][1], parameters[1][2]};
@@ -293,8 +254,8 @@ bool LoopClosurePosCostFunction::Evaluate(double const* const* parameters, doubl
 
     Eigen::Matrix3d relative_pose = inv_mat1 * mat2;
     Eigen::Vector2d delta = relative_pose.block<2,1>(0,2) - meas_;
-    residuals[0] = delta(0);
-    residuals[1] = delta(1);
+    residuals[0] = weight_ * delta(0);
+    residuals[1] = weight_ * delta(1);
 
     if(jacobians)
     {
@@ -314,6 +275,7 @@ bool LoopClosurePosCostFunction::Evaluate(double const* const* parameters, doubl
             jacobian1.setZero();
             jacobian1.block<2, 2>(0, 0) = -inv_mat1.block<2, 2>(0, 0);
             jacobian1.block<2, 1>(0, 2) = temp;
+            jacobian1 *= weight_;
         }
         if (jacobians[1] != nullptr) {
             // Jacobian w.r.t. pose2
@@ -321,6 +283,7 @@ bool LoopClosurePosCostFunction::Evaluate(double const* const* parameters, doubl
 
             jacobian2.setZero();
             jacobian2.block<2, 2>(0, 0) = inv_mat1.block<2, 2>(0, 0);
+            jacobian2 *= weight_;
         }
     }
 

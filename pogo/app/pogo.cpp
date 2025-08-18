@@ -19,18 +19,34 @@ int main()
     if (!config["loss_scale_loop_rot"]) {
         throw std::runtime_error("Loss scale for loop rotation not found in config file.");
     }
+    if (!config["odom_pos_std"]) {
+        throw std::runtime_error("Odometry position standard deviation not found in config file.");
+    }
+    if (!config["odom_rot_std"]) {
+        throw std::runtime_error("Odometry rotation standard deviation not found in config file.");
+    }
+    if (!config["loop_pos_std"]) {
+        throw std::runtime_error("Loop position standard deviation not found in config file.");
+    }
+    if (!config["loop_rot_std"]) {
+        throw std::runtime_error("Loop rotation standard deviation not found in config file.");
+    }
     bool use_coarse_registration = false;
     if (config["use_coarse_registration"]) {
         use_coarse_registration = config["use_coarse_registration"].as<bool>();
     }
-    double loss_scale_loop_pos = config["loss_scale_loop_pos"].as<double>();
-    double loss_scale_loop_rot = config["loss_scale_loop_rot"].as<double>();
 
+    PoseGraphOpts opts;
 
-
+    opts.loss_scale_loop_pos = config["loss_scale_loop_pos"].as<double>();
+    opts.loss_scale_loop_rot = config["loss_scale_loop_rot"].as<double>() * M_PI / 180.0;
+    opts.odom_pos_std = config["odom_pos_std"].as<double>();
+    opts.odom_rot_std = config["odom_rot_std"].as<double>() * M_PI / 180.0;
+    opts.loop_pos_std = config["loop_pos_std"].as<double>();
+    opts.loop_rot_std = config["loop_rot_std"].as<double>() * M_PI / 180.0;
 
     // Initialize the pose graph
-    PoseGraph pose_graph(loss_scale_loop_pos, loss_scale_loop_rot);
+    PoseGraph pose_graph(opts);
 
     // Read the odometry data
     std::string odometry_file = "output/" + seq_id + "/odometry_2d/" + seq_id + ".txt";
@@ -64,8 +80,7 @@ int main()
 
     // Add loop closure edges to the pose graph
     for(const auto& [t0, t1, relative_pose] : loop_closures) {
-        //pose_graph.addLoopClosureEdge(t0, t1, relative_pose);
-        pose_graph.addLoopClosureRotEdge(t0, t1, relative_pose);
+        pose_graph.addLoopClosureEdge(t0, t1, relative_pose);
     }
 
     pose_graph.optimize();

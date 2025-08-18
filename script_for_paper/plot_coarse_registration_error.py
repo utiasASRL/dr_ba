@@ -38,6 +38,8 @@ def main():
         errors_seq = []
         seq_type =  utils.getSeqType(seq_id)
 
+        DEBUG_gt_associations = []
+
         for loop in loops.itertuples():
             time_i = utils.nameToTime(loop.scan_i_name)
             time_j = utils.nameToTime(loop.scan_j_name)
@@ -58,6 +60,17 @@ def main():
             errors_seq.append((trans_err, rot_err))
             errors_total.append((trans_err, rot_err))
 
+            xy_gt, theta_gt = utils.poseToXYTheta(rel_pose_gt)
+
+            DEBUG_gt_associations.append({
+                "scan_i_name": loop.scan_i_name,
+                "scan_j_name": loop.scan_j_name,
+                "x": xy_gt[0],
+                "y": xy_gt[1],
+                "theta": theta_gt
+            })
+
+        pd.DataFrame(DEBUG_gt_associations).to_csv(os.path.join("output", seq_id, "fine_registrations.csv"), index=False)
 
         if(seq_type not in errors_per_type):
             errors_per_type[seq_type] = []

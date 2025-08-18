@@ -8,10 +8,21 @@
 #include <utils.h>
 
 
+struct PoseGraphOpts
+{
+    double loss_scale_loop_pos = 1.0;  // in [m]
+    double loss_scale_loop_rot = 0.05;  // in [rad]
+
+    double odom_pos_std = 0.025;    // in [m]
+    double odom_rot_std = 0.00002;  // in [rad]
+    double loop_pos_std = 0.05;     // in [m]
+    double loop_rot_std = 0.0002;   // in [rad]
+};
+
 
 class PoseGraph {
     public:
-        PoseGraph(const double loss_scale_loop_pos, const double loss_scale_loop_rot);
+        PoseGraph(const PoseGraphOpts& opts);
 
         void addOdometryEdge(const int64_t t0, const int64_t t1, std::array<double, 3> relative_pose);
 
@@ -29,6 +40,8 @@ class PoseGraph {
         void writeToFile(const std::string& filename) const;
 
     private:
+        PoseGraphOpts opts_;
+
         // Storing state variables and timestamps
         std::map<int64_t, size_t> node_indices_;
         std::vector<int64_t> node_times_;
@@ -38,7 +51,8 @@ class PoseGraph {
         // Loss functions
         ceres::LossFunction* loss_function_loop_pos_ = nullptr;
         ceres::LossFunction* loss_function_loop_rot_ = nullptr;
-
+        ceres::LossFunction* loss_function_odom_pos_ = nullptr;
+        ceres::LossFunction* loss_function_odom_rot_ = nullptr;
 
         ceres::Problem problem_;
 
@@ -46,42 +60,31 @@ class PoseGraph {
 
 
 
-class OdometryCostFunction : public ceres::SizedCostFunction<3, 3, 3>
+
+class RelativeRotCostFunction: public ceres::SizedCostFunction<1, 3, 3>
 {
     public:
-        OdometryCostFunction(const std::array<double, 3>& relative_pose);
+        RelativeRotCostFunction(const std::array<double, 3>& relative_pose, double weight = 1.0);
 
-        virtual ~OdometryCostFunction() {}
-
-        virtual bool Evaluate(double const* const* parameters, double* residuals, double** jacobians) const;
-
-    private:
-        Eigen::Matrix3d inv_meas_;
-};
-
-
-class LoopClosureRotCostFunction: public ceres::SizedCostFunction<1, 3, 3>
-{
-    public:
-        LoopClosureRotCostFunction(const std::array<double, 3>& relative_pose);
-
-        virtual ~LoopClosureRotCostFunction() {}
+        virtual ~RelativeRotCostFunction() {}
 
         virtual bool Evaluate(double const* const* parameters, double* residuals, double** jacobians) const;
     private:
         Eigen::Matrix3d inv_meas_;
+        double weight_;
 };
 
 
 
-class LoopClosurePosCostFunction : public ceres::SizedCostFunction<2, 3, 3>
+class RelativePosCostFunction : public ceres::SizedCostFunction<2, 3, 3>
 {
     public:
-        LoopClosurePosCostFunction(const std::array<double, 3>& relative_pose);
+        RelativePosCostFunction(const std::array<double, 3>& relative_pose, double weight = 1.0);
 
-        virtual ~LoopClosurePosCostFunction() {}
+        virtual ~RelativePosCostFunction() {}
 
         virtual bool Evaluate(double const* const* parameters, double* residuals, double** jacobians) const;
     private:
         Eigen::Vector2d meas_;
+        double weight_;
 };

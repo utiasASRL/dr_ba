@@ -4,6 +4,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from utils import utils
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 
 
@@ -23,6 +24,9 @@ def main():
 
         print(f"Processing sequence {seq_id}...")
 
+        # Read the loops
+        loops = pd.read_csv(os.path.join("output", seq_id, "coarse_registrations.csv"))
+
 
         # Get the GT, odom and pogo radar poses
         gt_poses, gt_times = utils.getGTRadarPosesAndTimes(seq_id)
@@ -35,7 +39,7 @@ def main():
         odom_times = odom_times * 1e-6
         pogo_times = pogo_times * 1e-6
 
-        # Get the GT at the same times as odom
+        ## Get the GT at the same times as odom
         gt_poses_interp = np.zeros(odom_poses.shape)
         for i in range(len(odom_times)):
             gt_poses_interp[i,:,:] = utils.getInterpolatedPose(gt_poses, gt_times, odom_times[i])
@@ -54,13 +58,20 @@ def main():
         plt.plot(odom_poses[:,0,3], odom_poses[:,1,3], label='Odom', color='orange')
         plt.plot(pogo_poses[:,0,3], pogo_poses[:,1,3], 'b', label='Pogo')
         plt.plot(gt_poses_interp[:,0,3], gt_poses_interp[:,1,3], 'r--', label='GT')
+        for loop in loops.itertuples():
+            time_i = utils.nameToTime(loop.scan_i_name)
+            time_j = utils.nameToTime(loop.scan_j_name)
+            id_i = np.argmin(np.abs(odom_times - time_i))
+            id_j = np.argmin(np.abs(odom_times - time_j))
+            plt.plot([odom_poses[id_i, 0, 3], odom_poses[id_j, 0, 3]], [odom_poses[id_i, 1, 3], odom_poses[id_j, 1, 3]], 'g')
+
         plt.legend()
         plt.xlabel("X (m)")
         plt.ylabel("Y (m)")
         plt.axis('equal')
         plt.title(f"Trajectories for sequence {seq_id}")
         plt.savefig(os.path.join("output", seq_id, "trajectories.pdf"))
-        #plt.show()
+        plt.show()
 
         
         
