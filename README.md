@@ -8,8 +8,34 @@ All dependencies should be in `requirements.txt`. Please install them in you vir
 pip install -r requirements.txt
 ```
 
+For __pogo__ you will need Eigen3 and Ceres Solver:
+```bash
+sudo apt-get install libeigen3-dev
+sudo apt-get install libceres-dev
+```
 
-## Run DRO
+## Compile (pogo part)
+
+To compile pogo:
+```bash
+cd pogo
+mkdir -p build
+cd build
+cmake ..
+make -j8
+cd ../..
+```
+
+## Run the full pipeline
+
+You need to run the following steps in order:
+
+1. Run odometry (DRO)
+2. Run the loop closure detection (RaPlace)
+3. Run the coarse registration (Coarse Registration)
+4. Run the pose graph optimization (PoGO)
+
+### Run DRO
 First, download data from the Boreas dataset [here](https://www.boreas.utias.utoronto.ca/#/download). DRO generates local maps that accounts for motion distortion of the radar scans.
 
 Then copy the example config file `DRO/config_example.yaml` to `DRO/config.yaml` and modify the parameters as needed, especially the `data_path` as follows.
@@ -25,7 +51,7 @@ python dro/radar_gp_state_estimation.py
 
 It will output the local maps in the `output/<SEQ-NAME>/local_maps` folder, each names with the radar scan's first timestamp. 
 
-## Run RaPlace
+### Run RaPlace
 Simply run RaPlace as follows in the root of the repository (all the paths should be autonomatically using what was specified in the DRO config file):
 ```bash
 python raplace/raplace.py
@@ -40,7 +66,7 @@ Each row contains the following columns:
 - `score`: The score of the proposed loop closure as defined in RaPlace (not used)
 - `min_dist`: The minimum dist between the scores as defined in RaPlace (not used)
 
-## Run the feature-based coarse registration
+### Run the feature-based coarse registration
 
 In the root of the repository, run the following command:
 ```bash
@@ -53,10 +79,30 @@ Each row contains the following columns:
 - `scan_j_name`: Name of the second scan in the pair.
 - `x`, `y`, `theta`: The estimated transformation from scan i to scan j.
 
-## For paper and evaluation
+### Run PoGO
+
+You can modify the configuration file `pogo/config.yaml` to adjust the parameters for the pose graph optimization.
+To run, in the root of the repository, run the following command:
+```bash
+pogo/build/pogo
+```
+
+### For paper and evaluation
 
 To plot the coarse registration errors, run the following command:
 ```bash
 python script_for_paper/plot_coarse_registration_error.py
 ```
 
+To plot the trajectory estimates and get metrics:
+```bash
+python script_for_paper/eval.py
+```
+
+## Release TODOs
+
+
+- [ ] In `eval.py` need to add the ATE computation
+- [ ] Create a script to get the pogo parameters automatically from a calib sequence
+- [ ] Once the fine registration is done and get better loops: make a graph initialisation to prevent being too far from loop (or play iteratively with loss scale)
+ 
