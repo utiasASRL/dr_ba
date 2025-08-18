@@ -57,7 +57,7 @@ def main():
 
         # Get the data that is far enough from the query data in time, but close enough spatially
         mask = (times - times[query_idx]) <  -opts['min_time_diff']
-        max_relative_travelled_dist = (np.abs(distances - distances[query_idx]) * opts['max_odom_drift']) #+ max_local_map_range
+        max_relative_travelled_dist = (np.abs(distances - distances[query_idx]) * opts['max_odom_drift']) + max_local_map_range
         odom_dist = np.sqrt((odom_poses[:,0,3] - odom_poses[query_idx,0,3])**2 + (odom_poses[:,1,3] - odom_poses[query_idx,1,3])**2 + (odom_poses[:,2,3] - odom_poses[query_idx,2,3])**2)
         mask = np.logical_and(mask, odom_dist < max_relative_travelled_dist)
         if sum(mask) == 0:
