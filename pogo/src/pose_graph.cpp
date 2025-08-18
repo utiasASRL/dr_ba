@@ -10,7 +10,8 @@ PoseGraph::PoseGraph(const PoseGraphOpts& opts)
     : opts_(opts)
 {
     std::cout << "PoseGraph initialized with "
-              << "\n\tloss_scale_loop_pos: " << opts.loss_scale_loop_pos << " m, "
+              << "\n\tloss_scale_loop_pos_coarse: " << opts.loss_scale_loop_pos_coarse << " m, "
+              << "\n\tloss_scale_loop_pos_fine: " << opts.loss_scale_loop_pos_fine << " m, "
               << "\n\tloss_scale_loop_rot: " << opts.loss_scale_loop_rot << " rad, "
               << "\n\tstd_odom_pos: " << opts.odom_pos_std << " m, "
               << "\n\tstd_odom_rot: " << opts.odom_rot_std << " rad, "
@@ -18,10 +19,10 @@ PoseGraph::PoseGraph(const PoseGraphOpts& opts)
               << "\n\tstd_loop_rot: " << opts.loop_rot_std << " rad" << std::endl;
 
     // Initialize loss functions
-    loss_function_loop_pos_ = new ceres::CauchyLoss(opts.loss_scale_loop_pos / opts.loop_pos_std);
+    loss_function_loop_pos_ = new DynamicCauchyLoss(opts.loss_scale_loop_pos_coarse / opts.loop_pos_std);
     loss_function_loop_rot_ = new ceres::CauchyLoss(opts.loss_scale_loop_rot / opts.loop_rot_std);
-    loss_function_odom_pos_ = new ceres::CauchyLoss(10.0);
-    loss_function_odom_rot_ = new ceres::CauchyLoss(100.0);
+    //loss_function_odom_pos_ = new ceres::CauchyLoss(100.0);
+    //loss_function_odom_rot_ = new ceres::CauchyLoss(100.0);
             
 }
 
@@ -125,7 +126,7 @@ void PoseGraph::addLoopClosureEdge(const int64_t t0, const int64_t t1, std::arra
 void PoseGraph::optimize()
 {
     ceres::Solver::Options options;
-    options.minimizer_progress_to_stdout = true;
+    options.minimizer_progress_to_stdout = false;
     options.max_num_iterations = 1000;
     options.num_threads = 16;
     options.function_tolerance = 1e-8;
@@ -133,6 +134,14 @@ void PoseGraph::optimize()
     options.parameter_tolerance = 1e-8;
 
     ceres::Solver::Summary summary;
+    ceres::Solve(options, &problem_, &summary);
+    std::cout << summary.FullReport() << std::endl;
+
+    // Update the loss functions with the final scale
+    if (loss_function_loop_pos_) {
+        dynamic_cast<DynamicCauchyLoss*>(loss_function_loop_pos_)->setScale(opts_.loss_scale_loop_pos_fine / opts_.loop_pos_std);
+    }
+
     ceres::Solve(options, &problem_, &summary);
     std::cout << summary.FullReport() << std::endl;
 }

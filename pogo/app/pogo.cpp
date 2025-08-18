@@ -13,8 +13,11 @@ int main()
 
     // Read the config file
     YAML::Node config = YAML::LoadFile("pogo/config.yaml");
-    if (!config["loss_scale_loop_pos"]) {
-        throw std::runtime_error("Loss scale for loop position not found in config file.");
+    if (!config["loss_scale_loop_pos_coarse"]) {
+        throw std::runtime_error("Loss scale for loop position coarse not found in config file.");
+    }
+    if (!config["loss_scale_loop_pos_fine"]) {
+        throw std::runtime_error("Loss scale for loop position fine not found in config file.");
     }
     if (!config["loss_scale_loop_rot"]) {
         throw std::runtime_error("Loss scale for loop rotation not found in config file.");
@@ -38,7 +41,8 @@ int main()
 
     PoseGraphOpts opts;
 
-    opts.loss_scale_loop_pos = config["loss_scale_loop_pos"].as<double>();
+    opts.loss_scale_loop_pos_coarse = config["loss_scale_loop_pos_coarse"].as<double>();
+    opts.loss_scale_loop_pos_fine = config["loss_scale_loop_pos_fine"].as<double>();
     opts.loss_scale_loop_rot = config["loss_scale_loop_rot"].as<double>() * M_PI / 180.0;
     opts.odom_pos_std = config["odom_pos_std"].as<double>();
     opts.odom_rot_std = config["odom_rot_std"].as<double>() * M_PI / 180.0;

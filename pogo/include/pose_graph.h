@@ -10,7 +10,8 @@
 
 struct PoseGraphOpts
 {
-    double loss_scale_loop_pos = 1.0;  // in [m]
+    double loss_scale_loop_pos_coarse = 5.0;  // in [m]
+    double loss_scale_loop_pos_fine = 1.0;  // in [m]
     double loss_scale_loop_rot = 0.05;  // in [rad]
 
     double odom_pos_std = 0.025;    // in [m]
@@ -87,4 +88,32 @@ class RelativePosCostFunction : public ceres::SizedCostFunction<2, 3, 3>
     private:
         Eigen::Vector2d meas_;
         double weight_;
+};
+
+
+
+
+
+class DynamicCauchyLoss : public ceres::LossFunction {
+    public:
+        explicit DynamicCauchyLoss(double a) : a_(a) {}
+
+        // Setter function to update scale
+        void setScale(double new_scale) {
+            a_ = new_scale;
+        }
+
+        double getScale() const {
+            return a_;
+        }
+
+        void Evaluate(double s, double* rho) const override {
+            const double sum = 1.0 + s / (a_ * a_);
+            rho[0] = a_ * a_ * log(sum);           
+            rho[1] = 1.0 / sum;                   
+            rho[2] = -rho[1] / sum / (a_ * a_);   
+        }
+
+    private:
+        double a_;  // Mutable scale parameter
 };
