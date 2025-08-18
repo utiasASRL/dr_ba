@@ -7,6 +7,14 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
+kVizParams = {
+    'dro': {'color': 'orange', 'label': 'DRO'},
+    'pogo': {'color': 'blue', 'label': 'DR-PoGO'},
+    'gt': {'color': 'red', 'label': 'Groundtruth'},
+    'loop': {'color': 'green', 'label': 'Loop closure'}
+}
+
+
 
 def main():
     # Get the folders in the output directory
@@ -68,32 +76,74 @@ def main():
         odom_poses = inv_odom_first @ odom_poses
         pogo_poses = inv_pogo_first @ pogo_poses
 
+        # Compute the absolute trajectory errors
+        ate_odom = utils.get2dATE(
+                gt_poses_interp
+                , odom_poses
+                , save_fig=True
+                , est_colour=kVizParams['dro']['color']
+                , est_label=kVizParams['dro']['label']
+                , gt_colour=kVizParams['gt']['color']
+                , gt_label=kVizParams['gt']['label']
+                , path=os.path.join("output", seq_id, seq_id+"_odom_aligned.pdf")
+                )
+        ate_pogo = utils.get2dATE(
+                gt_poses_interp
+                , pogo_poses
+                , save_fig=True
+                , est_colour=kVizParams['pogo']['color']
+                , est_label=kVizParams['pogo']['label']
+                , gt_colour=kVizParams['gt']['color']
+                , gt_label=kVizParams['gt']['label']
+                , path=os.path.join("output", seq_id, seq_id+"_pogo_aligned.pdf")
+                )
+
+        print("2D Absolute Trajectory Error (RMSE ATE), odom:", ate_odom, "m, pogo:", ate_pogo, "m")
+
+        # Store the errors
+        seq_type = utils.getSeqType(seq_id)
+        if seq_type not in errors_per_type:
+            errors_per_type[seq_type] = {'odom': [], 'pogo': [], 'seq_id': []}
+        errors_per_type[seq_type]['odom'].append(ate_odom)
+        errors_per_type[seq_type]['pogo'].append(ate_pogo)
+        errors_per_type[seq_type]['seq_id'].append(seq_id)
+
+
         # Display the results trajectories
-        plt.figure(figsize=(8,8))
-        plt.plot(odom_poses[:,0,3], odom_poses[:,1,3], label='Odom', color='orange')
-        plt.plot(pogo_poses[:,0,3], pogo_poses[:,1,3], 'b', label='Pogo')
-        plt.plot(gt_poses_interp[:,0,3], gt_poses_interp[:,1,3], 'r--', label='GT')
+        plt.figure(figsize=(6,6))
+        plt.plot(odom_poses[:,0,3], odom_poses[:,1,3], label=kVizParams['dro']['label'], color=kVizParams['dro']['color'], linewidth=0.5)
+        plt.plot(pogo_poses[:,0,3], pogo_poses[:,1,3], label=kVizParams['pogo']['label'], color=kVizParams['pogo']['color'], linewidth=0.5)
+        plt.plot(gt_poses_interp[:,0,3], gt_poses_interp[:,1,3], label=kVizParams['gt']['label'], color=kVizParams['gt']['color'], linewidth=0.5)
         for loop in loops.itertuples():
             time_i = utils.nameToTime(loop.scan_i_name)
             time_j = utils.nameToTime(loop.scan_j_name)
             id_i = np.argmin(np.abs(odom_times - time_i))
             id_j = np.argmin(np.abs(odom_times - time_j))
-            plt.plot([odom_poses[id_i, 0, 3], odom_poses[id_j, 0, 3]], [odom_poses[id_i, 1, 3], odom_poses[id_j, 1, 3]], 'g')
+            # If that's the first loop in the sequence, add the label
+            if loop == loops.itertuples().__iter__().__next__():
+                plt.plot([odom_poses[id_i, 0, 3], odom_poses[id_j, 0, 3]], [odom_poses[id_i, 1, 3], odom_poses[id_j, 1, 3]], alpha=0.5, label=kVizParams['loop']['label'], linewidth=0.5, color=kVizParams['loop']['color'])
+            else:
+                plt.plot([odom_poses[id_i, 0, 3], odom_poses[id_j, 0, 3]], [odom_poses[id_i, 1, 3], odom_poses[id_j, 1, 3]], alpha=0.5, linewidth=0.5, color=kVizParams['loop']['color'])
 
-        plt.legend()
+        plt.legend(loc='upper left')
         plt.xlabel("X (m)")
         plt.ylabel("Y (m)")
         plt.axis('equal')
         plt.title(f"Trajectories for sequence {seq_id}")
-        plt.savefig(os.path.join("output", seq_id, "trajectories.pdf"))
-        plt.show()
-
-        
-        
+        plt.savefig(os.path.join("output", seq_id, seq_id + "_trajectories.pdf"))
+        #plt.show()
+        plt.close()
 
 
+    # Display all the errors avereage per type followed by per-sequence error
+    for seq_type, errors in errors_per_type.items():
+        print("\n\n\n\n==================\nSequence Type:", seq_type)
+        odom_avg_ate = np.round(np.mean(errors['odom']), 2)
+        pogo_avg_ate = np.round(np.mean(errors['pogo']), 2)
+        print("    Average 2D Absolute Trajectory Error (RMSE ATE), odom:", odom_avg_ate, "m, pogo:", pogo_avg_ate, "m")
+        for i in range(len(errors['seq_id'])):
+            print("      Sequence ID ", errors['seq_id'][i], ":", np.round(errors['odom'][i], 2), "m, pogo:", np.round(errors['pogo'][i], 2), "m")
 
-        
 
 
 if __name__ == "__main__":

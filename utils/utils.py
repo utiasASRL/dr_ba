@@ -5,6 +5,7 @@ import pandas as pd
 from pyboreas.utils import odometry
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
+import matplotlib.pyplot as plt
 
 
 
@@ -185,6 +186,63 @@ def nameToTime(name):
     time_str = name.split('.')[0]
     return float(time_str)*1e-6
 
+def get2dATE(gt_poses, est_poses, save_fig=False, est_colour='b', est_label='Estimated', gt_colour='orange', gt_label='Ground Truth', path=None):
+    if gt_poses is None or est_poses is None:
+        print("Invalid input poses.")
+        return None
+
+    if len(gt_poses) != len(est_poses):
+        print("Ground truth and estimated poses must have the same length.")
+        return None
+
+    # Align the trajectories (find the R and t that best aligns the trajectories)
+    gt_xy = gt_poses[:, :2, 3]
+    est_xy = est_poses[:, :2, 3]
+    gt_centroid = np.mean(gt_xy, axis=0)
+    est_centroid = np.mean(est_xy, axis=0)
+
+    # Center the trajectories
+    gt_xy_centered = gt_xy - gt_centroid
+    est_xy_centered = est_xy - est_centroid
+
+    # Compute the covariance matrix
+    H = gt_xy_centered.T @ est_xy_centered
+
+    # Compute the SVD
+    U, S, Vt = np.linalg.svd(H)
+
+    # Compute the rotation
+    R = Vt.T @ U.T
+
+    if np.linalg.det(R) < 0:
+        print("Reflection detected, correcting...")
+        Vt[-1, :] *= -1
+        R = Vt.T @ U.T
+
+    # Compute the translation
+    t = est_centroid - R @ gt_centroid
+
+    # Apply the transformation to the est_xy
+    est_xy_aligned = est_xy @ R - R.T@t
+
+    ate = np.sqrt(np.mean(np.sum((gt_xy - est_xy_aligned)**2, axis=1)))
+
+    #print("2D Absolute Trajectory Error (RMSE ATE):", ate)
+
+    if save_fig:
+        if path is None:
+            path = "output/ate_2d_trajectory.pdf"
+        plt.figure(figsize=(6, 6))
+        plt.plot(est_xy_aligned[:, 0], est_xy_aligned[:, 1], label=est_label, color=est_colour, linewidth=0.5)
+        plt.plot(gt_xy[:, 0], gt_xy[:, 1], label=gt_label, color=gt_colour, linewidth=0.5, linestyle='--')
+        plt.legend(loc='upper left')
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        plt.axis('equal')
+        plt.savefig(path)
+        plt.close()
+
+    return ate
 
 def getSeqType(seq_id):
 
