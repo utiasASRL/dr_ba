@@ -5,7 +5,7 @@ import time
 import numpy as np
 import pandas as pd
 import os
-import utils
+import dro_utils
 import cv2
 import matplotlib.pyplot as plt
 
@@ -207,7 +207,7 @@ def main():
             # Check the chirp up/down status to account for the
             # hardware problem of the doppler radar
             if doppler_radar:
-                chirp_up = utils.checkChirp(radar_frame)
+                chirp_up = dro_utils.checkChirp(radar_frame)
             
 
             # Display of the progress
