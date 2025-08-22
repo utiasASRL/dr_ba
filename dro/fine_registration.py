@@ -45,7 +45,7 @@ def main():
             print("Scan ", loop.scan_i_name, " registered to ", loop.scan_j_name, "results (init) : ", x, "(", loop.x, ")", y, "(", loop.y, ")", theta, "(", loop.theta, ")")
 
             #local_map_registrator.displayOverlay()
-
+            success = True
             if success:
                 fine_registrations.append({'scan_i_name': loop.scan_i_name, 'scan_j_name': loop.scan_j_name, 'x': x, 'y': y, 'theta': theta})
             else:
