@@ -1197,11 +1197,6 @@ class LocalMapRegistrator:
             if with_jac:
                 d_ids_dstate = gradient @ d_cartesian_coords_transformed_d_state
 
-            # DEBUG
-            #residuals = ids[:, :, 0, 0]
-            #gradient = d_ids_dstate[:,:, 0,:]
-            #residuals = cartesian_coords_transformed[:, :, 1, 0]
-            #gradient = d_cartesian_coords_transformed_d_state[:,:, 1,:]
 
             # Get the interpolated source image
             if with_jac:
@@ -1266,3 +1261,10 @@ class LocalMapRegistrator:
         axs[1].set_title('Source')
 
         plt.show()
+
+
+    def getRegistrationScore(self):
+        # Compute the registration
+        residuals = self.costFunctionAndJacobian(self.xytheta_init, with_jac=False)
+
+        return torch.sum(residuals) / torch.sum(self.target**2)

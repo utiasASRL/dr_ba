@@ -10,7 +10,7 @@ from scipy.spatial.transform import Rotation as R
 kTypeColors = { "Glenshield": "orange",
                 "Skyway": "blue"}
 
-kCoarseRegistration = True
+kCoarseRegistration = False
 
 def main():
     # Get the folders in the output directory
