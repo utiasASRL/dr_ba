@@ -10,7 +10,7 @@ from scipy.spatial.transform import Rotation as R
 kTypeColors = { "Glenshield": "orange",
                 "Skyway": "blue"}
 
-kCoarseRegistration = False
+kCoarseRegistration = False  # Set to True if you want to plot coarse registration errors, False for fine registration errors
 
 def main():
     # Get the folders in the output directory

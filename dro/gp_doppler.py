@@ -1032,11 +1032,12 @@ class LocalMapRegistrator:
 
 
     def cartToImageID_(self, xy):
-        out = torch.empty_like(xy, device=self.device)
-        out[:,:,0,0] = (xy[:,:,0,0] / (-self.res)) + (self.source.shape[0] // 2)
-        out[:,:,1,0] = (xy[:,:,1,0] / (self.res)) + (self.source.shape[1] // 2)
-        gradient = torch.tensor([[-1.0/self.res, 0], [0, 1.0/self.res]], device=self.device).reshape((1,1,2,2))
-        return out, gradient
+        with torch.no_grad():
+            out = torch.empty_like(xy, device=self.device)
+            out[:,:,0,0] = (xy[:,:,0,0] / (-self.res)) + (self.source.shape[0] // 2)
+            out[:,:,1,0] = (xy[:,:,1,0] / (self.res)) + (self.source.shape[1] // 2)
+            gradient = torch.tensor([[-1.0/self.res, 0], [0, 1.0/self.res]], device=self.device).reshape((1,1,2,2))
+            return out, gradient
 
 
     def transformSource_(self, xytheta):
@@ -1102,7 +1103,7 @@ class LocalMapRegistrator:
         
 
 
-
+    @torch.compile
     def register(self, nb_iter=20, cost_tol=1e-6, step_tol=1e-6, verbose=False, degraded=False):
         with torch.no_grad():
             # The gradient ascent keep track of the last increasing state and gradient
@@ -1171,9 +1172,8 @@ class LocalMapRegistrator:
             return state_np
 
 
-
+    @torch.compile
     def costFunctionAndJacobian(self, xytheta, with_jac=True):
-
         with torch.no_grad():
             # Get the rotation matrix
             c_rot = torch.cos(xytheta[2])
@@ -1263,8 +1263,27 @@ class LocalMapRegistrator:
         plt.show()
 
 
+    @torch.compile
     def getRegistrationScore(self):
         # Compute the registration
-        residuals = self.costFunctionAndJacobian(self.xytheta_init, with_jac=False)
-
-        return torch.sum(residuals) / torch.sum(self.target**2)
+        with torch.no_grad():
+            residuals = self.costFunctionAndJacobian(self.xytheta_init, with_jac=False)
+            return torch.sum(residuals) / torch.sum(self.target**2)
+    
+    @torch.compile
+    def gridSearchInitialization(self, search_ranges, nb_steps):
+        with torch.no_grad():
+            xs = torch.linspace(search_ranges[0][0], search_ranges[0][1], nb_steps, device=self.device) + self.xytheta_init[0]
+            ys = torch.linspace(search_ranges[1][0], search_ranges[1][1], nb_steps, device=self.device) + self.xytheta_init[1]
+            thetas = torch.linspace(search_ranges[2][0], search_ranges[2][1], nb_steps, device=self.device) + self.xytheta_init[2]
+            best_cost = -np.inf
+            best_state = self.xytheta_init.clone()
+            for x in xs:
+                for y in ys:
+                    for theta in thetas:
+                        cost = self.costFunctionAndJacobian(torch.tensor([x, y, theta], device=self.device), with_jac=False)
+                        cost = torch.sum(cost)
+                        if cost > best_cost:
+                            best_cost = cost
+                            best_state = torch.tensor([x, y, theta], device=self.device)
+            self.xytheta_init = best_state
