@@ -10,6 +10,7 @@ from scipy.spatial.transform import Rotation as R
 kTypeColors = { "Glenshield": "orange",
                 "Skyway": "blue"}
 
+kCoarseRegistration = True
 
 def main():
     # Get the folders in the output directory
@@ -17,6 +18,16 @@ def main():
 
     errors_per_type = {}
     errors_total = []
+
+
+    if kCoarseRegistration:
+        file_name = "coarse_registrations.csv"
+        output_file = "output/coarse_registration_errors.pdf"
+        title = "Coarse Registration Errors per Sequence Type"
+    else:
+        file_name = "fine_registrations.csv"
+        output_file = "output/fine_registration_errors.pdf"
+        title = "Fine Registration Errors per Sequence Type"
 
 
     for seq_id in output_paths:
@@ -27,7 +38,7 @@ def main():
 
         try:
             # Load the coarse registrations
-            loops = pd.read_csv(os.path.join("output", seq_id, "coarse_registrations.csv"))
+            loops = pd.read_csv(os.path.join("output", seq_id, file_name))
         except:
             print(f"Skipping sequence {seq_id} due to missing coarse registrations.")
             continue
@@ -70,7 +81,7 @@ def main():
                 "theta": theta_gt
             })
 
-        pd.DataFrame(DEBUG_gt_associations).to_csv(os.path.join("output", seq_id, "fine_registrations.csv"), index=False)
+        pd.DataFrame(DEBUG_gt_associations).to_csv(os.path.join("output", seq_id, "gt_registrations.csv"), index=False)
 
         if(seq_type not in errors_per_type):
             errors_per_type[seq_type] = []
@@ -110,9 +121,9 @@ def main():
 
     ax[0,0].set_ylabel("Rotation Error [deg]")
     ax[1,0].set_ylabel("Rotation Error [deg]")
-    fig.suptitle("Coarse Registration Errors per Sequence Type")
+    fig.suptitle(title)
     plt.tight_layout()
-    plt.savefig("output/coarse_registration_errors.pdf")
+    plt.savefig(output_file)
     plt.show()
 
 

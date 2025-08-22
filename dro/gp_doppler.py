@@ -1017,6 +1017,8 @@ class LocalMapRegistrator:
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+        self.optimisation_first_step = 0.1
+
         with torch.no_grad():
             self.source = torch.tensor(source, device=self.device).float()
             self.target = torch.tensor(target, device=self.device).float()
@@ -1037,6 +1039,26 @@ class LocalMapRegistrator:
         return out, gradient
 
 
+    def transformSource_(self, xytheta):
+        with torch.no_grad():
+            c_rot = torch.cos(xytheta[2])
+            s_rot = torch.sin(xytheta[2])
+            rot_mat_T = torch.tensor([[c_rot, -s_rot], [s_rot, c_rot]], device=self.device).T.reshape((1,1, 2, 2))
+            pos = xytheta[:2].reshape((1,1, 2, 1)).to(self.device)
+
+            # Transform the cartesian coordinates
+            cartesian_coords_transformed = rot_mat_T @ self.cartesian_coords - rot_mat_T @ pos
+
+            # Convert the cartesian coordinates to image coordinates
+            ids, gradient = self.cartToImageID_(cartesian_coords_transformed)
+
+            # Get the interpolated source image
+            source_interp = self.bilinearInterpolation_(self.source, ids.squeeze(), with_jac=False)
+
+            # Residuals
+            residuals = source_interp * self.source
+
+            return source_interp, residuals
 
 
     def bilinearInterpolation_(self, im, az_r, with_jac = False):
@@ -1081,13 +1103,76 @@ class LocalMapRegistrator:
 
 
 
-    def register(self):
-        # Implement the registration logic here
-        pass
+    def register(self, nb_iter=20, cost_tol=1e-6, step_tol=1e-6, verbose=False, degraded=False):
+        with torch.no_grad():
+            # The gradient ascent keep track of the last increasing state and gradient
+            # Thus, if the cost function decreases, we go back to the last increasing
+            # state and reduce the step size
+            state = self.xytheta_init.clone().to(self.device).float()
+            first_cost = torch.tensor(np.inf).to(self.device)
+            prev_cost = first_cost
+            first_quantum = self.optimisation_first_step
+            step_quantum = first_quantum
+            last_increasing_state = state.clone()
+            last_increasing_grad = torch.zeros_like(state)
+            for i in torch.arange(nb_iter, device=self.device):
+                
+                res, jac = self.costFunctionAndJacobian(state)
+
+                #grad = 3*torch.sum(res.flatten().unsqueeze(-1)**2 * jac.reshape((-1,jac.shape[-1])), 0)
+                #cost = torch.sum((res**3).flatten())
+                grad = torch.sum(jac, 0)
+                cost = torch.sum((res).flatten())
+
+                if i == 0:
+                    last_increasing_grad = grad.clone()
+                else:
+                    if cost < prev_cost:
+                        state = last_increasing_state.clone()
+                        grad = last_increasing_grad.clone()
+                        step_quantum = step_quantum / 2
+                    else:
+                        last_increasing_state = state.clone()
+                        last_increasing_grad = grad.clone()
+
+                grad_norm = torch.linalg.norm(grad)
+
+                if step_quantum < 1e-5:
+                    break
+
+
+                if grad_norm < 1e-9:
+                    break
+                step = (grad / grad_norm) * step_quantum
+                
+                state += step
+
+                step_norm = torch.linalg.norm(step)
+                cost_change = cost - prev_cost
+
+                if i == 0:
+                    first_cost = cost
+                
+                # Print iter cost step_norm cost_change with 3 decimals and scientific notation
+                if verbose:
+                    print("Iter: ", i, " - Cost: ", "{:.3e}".format(cost), " - Step norm: ", "{:.3e}".format(step_norm), " - Cost change: ", "{:.3e}".format(cost_change))
+
+                if step_norm < step_tol:
+                    break
+
+                if torch.abs(cost_change/cost) < cost_tol:
+                    break
+                prev_cost = cost
+
+            state_np = state.detach().cpu().numpy()
+
+            self.xytheta_init = state.clone()
+
+            return state_np
 
 
 
-    def costFunctionAndJacobian(self, xytheta):
+    def costFunctionAndJacobian(self, xytheta, with_jac=True):
 
         with torch.no_grad():
             # Get the rotation matrix
@@ -1099,16 +1184,18 @@ class LocalMapRegistrator:
             # Transform the cartesian coordinates
             cartesian_coords_transformed = rot_mat @ self.cartesian_coords
 
-            d_cartesian_coords_transformed_d_state = torch.zeros((self.cartesian_coords.shape[0], self.cartesian_coords.shape[1], 2, 3), device=self.device)
-            d_cartesian_coords_transformed_d_state[:,:,0, 0] = 1
-            d_cartesian_coords_transformed_d_state[:,:,1, 1] = 1
-            d_cartesian_coords_transformed_d_state[:,:,0, 2] = -cartesian_coords_transformed[:,:,1,0]
-            d_cartesian_coords_transformed_d_state[:,:,1, 2] = cartesian_coords_transformed[:,:,0,0]
+            if with_jac:
+                d_cartesian_coords_transformed_d_state = torch.zeros((self.cartesian_coords.shape[0], self.cartesian_coords.shape[1], 2, 3), device=self.device)
+                d_cartesian_coords_transformed_d_state[:,:,0, 0] = 1
+                d_cartesian_coords_transformed_d_state[:,:,1, 1] = 1
+                d_cartesian_coords_transformed_d_state[:,:,0, 2] = -cartesian_coords_transformed[:,:,1,0]
+                d_cartesian_coords_transformed_d_state[:,:,1, 2] = cartesian_coords_transformed[:,:,0,0]
             cartesian_coords_transformed += pos
 
             # Convert the cartesian coordinates to image coordinates
             ids, gradient = self.cartToImageID_(cartesian_coords_transformed)
-            d_ids_dstate = gradient @ d_cartesian_coords_transformed_d_state
+            if with_jac:
+                d_ids_dstate = gradient @ d_cartesian_coords_transformed_d_state
 
             # DEBUG
             #residuals = ids[:, :, 0, 0]
@@ -1117,14 +1204,19 @@ class LocalMapRegistrator:
             #gradient = d_cartesian_coords_transformed_d_state[:,:, 1,:]
 
             # Get the interpolated source image
-            source_interp, d_source_interp = self.bilinearInterpolation_(self.target, ids.squeeze(), with_jac=True)
-            d_source_interp = d_source_interp @ d_ids_dstate
+            if with_jac:
+                source_interp, d_source_interp = self.bilinearInterpolation_(self.target, ids.squeeze(), with_jac=True)
+                d_source_interp = d_source_interp @ d_ids_dstate
+            else:
+                source_interp = self.bilinearInterpolation_(self.target, ids.squeeze(), with_jac=False)
 
             # Residuals
             residuals = source_interp * self.source
-            gradient = self.source.unsqueeze(-1).unsqueeze(-1) @ d_source_interp
-
-            return residuals.flatten(), gradient.reshape((-1,3))
+            if with_jac:
+                gradient = self.source.unsqueeze(-1).unsqueeze(-1) @ d_source_interp
+                return residuals.flatten(), gradient.reshape((-1,3))
+            else:
+                return residuals.flatten()
 
 
     def testCostFunctionGrad(self):
@@ -1158,4 +1250,19 @@ class LocalMapRegistrator:
             axs[i,1].plot(grad_np[:, i] - grad_fd[:, i], label='Difference', linewidth=0.5)
             axs[i,1].legend()
             axs[i,1].set_title(f'Gradient difference {i}')
+        plt.show()
+
+
+    def displayOverlay(self):
+        # Display the overlay of the source and target images
+        source_interp, _ = self.transformSource_(self.xytheta_init)
+
+        import matplotlib.pyplot as plt
+        fig, axs = plt.subplots(1, 2)
+        axs[0].imshow(self.target.cpu().numpy(), cmap='gray')
+        axs[0].imshow(source_interp.cpu().numpy(), cmap='hot', alpha=0.5)
+        axs[0].set_title('Target and overlay')
+        axs[1].imshow(self.source.cpu().numpy(), cmap='gray')
+        axs[1].set_title('Source')
+
         plt.show()
