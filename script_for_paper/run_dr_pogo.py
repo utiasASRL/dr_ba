@@ -33,5 +33,5 @@ for seq in sequences:
     subprocess.call(["python3","dro/radar_gp_state_estimation.py"])
     subprocess.call(["python3","raplace/raplace.py"])
     subprocess.call(["python3","coarse_registration/coarse_registrations.py"])
-    subprocess.call(["pogo/build/pogo"])
     subprocess.call(["python3","dro/fine_registration.py"])
+    subprocess.call(["pogo/build/pogo"])
