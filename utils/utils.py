@@ -247,6 +247,12 @@ def get2dATE(gt_poses, est_poses, save_fig=False, est_colour='b', est_label='Est
 def getSeqType(seq_id):
 
     seqs = {
+        'boreas-2024-12-05-14-12': 'Commercial',
+        'boreas-2024-12-23-16-27': 'Commercial',
+        'boreas-2024-12-23-16-44': 'Commercial',
+        'boreas-2024-12-23-17-01': 'Commercial',
+        'boreas-2024-12-23-17-18': 'Commercial',
+
         'boreas-2024-12-03-10-24': 'Glenshield',
         'boreas-2024-12-03-12-54': 'Glenshield',
         'boreas-2025-01-08-10-59': 'Glenshield',
