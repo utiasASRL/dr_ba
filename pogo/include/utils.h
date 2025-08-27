@@ -76,6 +76,21 @@ inline std::vector<std::pair<int64_t, std::array<double, 3>>> readOdometry(const
     return odometry_data;
 }
 
+inline std::vector<double> readBiases(const std::string& file_path)
+{
+    std::vector<double> biases;
+    std::ifstream file(file_path);
+    if (!file.is_open()) {
+        throw std::runtime_error("Could not open biases file: " + file_path);
+    }
+
+    double bias;
+    while (file >> bias) {
+        biases.push_back(bias);
+    }
+    file.close();
+    return biases;
+}
 
 inline int64_t fileNameToTimestamp(const std::string& file_name)
 {

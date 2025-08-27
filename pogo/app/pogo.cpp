@@ -10,6 +10,7 @@ int main()
     auto seq_id = getSeqId();
     std::cout << "Sequence ID: " << seq_id << std::endl;
 
+    PoseGraphOpts opts;
 
     // Read the config file
     YAML::Node config = YAML::LoadFile("pogo/config.yaml");
@@ -34,12 +35,22 @@ int main()
     if (!config["loop_rot_std"]) {
         throw std::runtime_error("Loop rotation standard deviation not found in config file.");
     }
+    if (!config["estimate_bias"]) {
+        throw std::runtime_error("Estimate bias not found in config file.");
+    }
+    else
+    {
+        opts.estimate_bias = config["estimate_bias"].as<bool>();
+        if(!config["bias_walk_std"]){
+            throw std::runtime_error("Bias walk standard deviation not found in config file.");
+        }
+        opts.bias_std = config["bias_walk_std"].as<double>();
+    }
     bool use_coarse_registration = false;
     if (config["use_coarse_registration"]) {
         use_coarse_registration = config["use_coarse_registration"].as<bool>();
     }
 
-    PoseGraphOpts opts;
 
     opts.loss_scale_loop_pos_coarse = config["loss_scale_loop_pos_coarse"].as<double>();
     opts.loss_scale_loop_pos_fine = config["loss_scale_loop_pos_fine"].as<double>();
@@ -57,6 +68,10 @@ int main()
     std::cout << "Reading odometry data from: " << odometry_file << std::endl;
     std::vector<std::pair<int64_t, std::array<double, 3>>> odometry_data = readOdometry(odometry_file);
 
+    std::vector<double> bias_priors = readBiases("output/" + seq_id + "/other_log/gyro_bias.txt");
+
+    std::cout << "Read " << odometry_data.size() << " odometry entries." << std::endl;
+    std::cout << "Read " << bias_priors.size() << " bias entries." << std::endl;
 
     // Read the loop closure data
     std::string loop_closure_file = "output/" + seq_id + "/";
@@ -75,7 +90,7 @@ int main()
         const auto& [t1, next_pose] = odometry_data[i + 1];
 
         const auto relative_pose = relativePose(pose, next_pose);
-        pose_graph.addOdometryEdge(t0, t1, relative_pose);
+        pose_graph.addOdometryEdge(t0, t1, relative_pose, bias_priors[i]);
     }
 
 

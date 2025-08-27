@@ -28,7 +28,7 @@ PoseGraph::PoseGraph(const PoseGraphOpts& opts)
 
 
 
-void PoseGraph::addOdometryEdge(const int64_t t0, const int64_t t1, std::array<double, 3> relative_pose)
+void PoseGraph::addOdometryEdge(const int64_t t0, const int64_t t1, std::array<double, 3> relative_pose, double bias_prior)
 {
     if(node_indices_.size() == 0)
     {
@@ -51,31 +51,43 @@ void PoseGraph::addOdometryEdge(const int64_t t0, const int64_t t1, std::array<d
         throw std::runtime_error("Odometry edge t1 must be greater than t0.");
     }
 
+    // Add the bias
+    node_biases_.push_back(std::make_shared<double>(bias_prior));
+    bias_priors_.push_back(bias_prior);
+    problem_.AddParameterBlock(&(*(node_biases_.back())), 1);
+    if(!opts_.estimate_bias)
+    {
+        problem_.SetParameterBlockConstant(&(*(node_biases_.back())));
+    }
+
+
     // Add the new node
     node_indices_[t1] = node_poses_.size();
     node_times_.push_back(t1);
     std::array<double, 3> new_pose = combinePoses(*(node_poses_.back()), relative_pose);
     node_poses_.push_back(std::make_shared<std::array<double, 3>>(new_pose));
 
-    // Add noise
-    node_poses_.back()->at(0) += ((double)rand() / RAND_MAX - 0.5) * 0.1;
-    node_poses_.back()->at(1) += ((double)rand() / RAND_MAX - 0.5) * 0.1;
-    node_poses_.back()->at(2) += ((double)rand() / RAND_MAX - 0.5) * 0.1*M_PI/180.0;
 
     // Add the new pose as a parameter block
     problem_.AddParameterBlock(node_poses_.back()->data(), 3);
 
 
-    ceres::CostFunction* cost_function_pos = new RelativePosCostFunction(relative_pose, 1.0 / opts_.odom_pos_std);
-    problem_.AddResidualBlock(cost_function_pos, loss_function_odom_pos_, node_poses_[node_indices_[t0]]->data(), node_poses_[node_indices_[t1]]->data());
 
-    ceres::CostFunction* cost_function_rot = new RelativeRotCostFunction(relative_pose, 1.0 / opts_.odom_rot_std);
-    problem_.AddResidualBlock(cost_function_rot, nullptr, node_poses_[node_indices_[t0]]->data(), node_poses_[node_indices_[t1]]->data());
+   // Add the pose residual
+   ceres::CostFunction* cost_function_pose = new RelativePoseWithBiasCostFunction(relative_pose, 1.0 / opts_.odom_pos_std, 1.0 / opts_.odom_rot_std, bias_prior, (t1-t0)*1e-6);
+   problem_.AddResidualBlock(cost_function_pose, nullptr, node_poses_[node_indices_[t0]]->data(), node_poses_[node_indices_[t1]]->data(), &(*(node_biases_.back())));
+   //problem_.AddResidualBlock(cost_function_pose, nullptr, node_poses_[node_indices_[t0]]->data(), node_poses_[node_indices_[t1]]->data(), &(*(node_biases_.front())));
+
+
+    // Add the bias residual
+    if(node_biases_.size() > 1 && opts_.estimate_bias)
+    {
+
+        ceres::CostFunction* cost_function_bias = new BrownianMotionCostFunction(1.0/ opts_.bias_std, bias_priors_[bias_priors_.size()-2], bias_priors_.back());
+        problem_.AddResidualBlock(cost_function_bias, nullptr, &(*(node_biases_[node_biases_.size()-2])), &(*(node_biases_.back())));
+    }
+
 }
-
-
-
-
 
 void PoseGraph::addLoopClosureRotEdge(const int64_t t0, const int64_t t1, std::array<double, 3> relative_pose)
 {
@@ -132,6 +144,17 @@ void PoseGraph::optimize()
     options.function_tolerance = 1e-8;
     options.gradient_tolerance = 1e-8;
     options.parameter_tolerance = 1e-8;
+
+    // Set all the biases equal to the median bias
+    std::vector<double> biases;
+    for (const auto& bias : node_biases_) {
+        biases.push_back(*bias);
+    }
+    std::sort(biases.begin(), biases.end());
+    double median_bias = biases[biases.size() / 2];
+    for (auto& bias : node_biases_) {
+        *bias = median_bias;
+    }
 
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem_, &summary);
@@ -269,7 +292,8 @@ bool RelativePosCostFunction::Evaluate(double const* const* parameters, double* 
     if(jacobians)
     {
         // Compute the Jacobian
-        if (jacobians[0] != nullptr) {
+        if (jacobians[0] != nullptr)
+        {
             double s1 = std::sin(pose1[2]);
             double c1 = std::cos(pose1[2]);
             double dx = pose2[0] - pose1[0];
@@ -286,7 +310,8 @@ bool RelativePosCostFunction::Evaluate(double const* const* parameters, double* 
             jacobian1.block<2, 1>(0, 2) = temp;
             jacobian1 *= weight_;
         }
-        if (jacobians[1] != nullptr) {
+        if (jacobians[1] != nullptr)
+        {
             // Jacobian w.r.t. pose2
             Eigen::Map<Eigen::Matrix<double, 2, 3, Eigen::RowMajor>> jacobian2(jacobians[1]);
 
@@ -297,5 +322,113 @@ bool RelativePosCostFunction::Evaluate(double const* const* parameters, double* 
     }
 
 
+    return true;
+}
+
+
+
+
+RelativePoseWithBiasCostFunction::RelativePoseWithBiasCostFunction(const std::array<double, 3>& relative_pose, double pos_weight, double rot_weight, double bias_prior, double delta_t)
+    : pos_weight_(pos_weight), rot_weight_(rot_weight)
+{
+    relative_meas_ = relative_pose;
+    bias_prior_ = bias_prior;
+    delta_t_ = delta_t;
+}
+
+bool RelativePoseWithBiasCostFunction::Evaluate(double const* const* parameters, double* residuals, double** jacobians) const
+{
+    const std::array<double, 3> pose1 = {parameters[0][0], parameters[0][1], parameters[0][2]};
+    const std::array<double, 3> pose2 = {parameters[1][0], parameters[1][1], parameters[1][2]};
+    const double bias_correction = parameters[2][0] - bias_prior_;
+
+    Eigen::Matrix3d inv_mat1 = xyThetaToMat(pose1).inverse();
+    Eigen::Matrix3d mat2 = xyThetaToMat(pose2);
+
+    Eigen::Matrix3d relative_pose = inv_mat1 * mat2;
+    std::array<double, 3> relative_meas_bias = relative_meas_;
+    relative_meas_bias[2] -= bias_correction * delta_t_;
+    Eigen::Matrix3d inv_meas = xyThetaToMat(relative_meas_bias).inverse();
+
+    Eigen::Matrix3d delta = inv_meas * relative_pose;
+    residuals[0] = pos_weight_ * (relative_pose(0, 2) - relative_meas_[0]);
+    residuals[1] = pos_weight_ * (relative_pose(1, 2) - relative_meas_[1]);
+    residuals[2] = rot_weight_ * std::atan2(delta(1, 0), delta(0, 0));
+
+    if (jacobians)
+    {
+        // Compute the Jacobian
+        if (jacobians[0] != nullptr)
+        {
+            double s1 = std::sin(pose1[2]);
+            double c1 = std::cos(pose1[2]);
+            double dx = pose2[0] - pose1[0];
+            double dy = pose2[1] - pose1[1];
+
+            Eigen::Vector2d temp;
+            temp[0] = -s1 * dx + c1 * dy;
+            temp[1] = -c1 * dx - s1 * dy;
+
+            Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>> jacobian1(jacobians[0]);
+            jacobian1.setZero();
+            jacobian1.block<2, 2>(0, 0) = -inv_mat1.block<2, 2>(0, 0) * pos_weight_;
+            jacobian1.block<2, 1>(0, 2) = pos_weight_ * temp;
+            jacobian1(2, 2) = -rot_weight_;
+        }
+        if (jacobians[1] != nullptr) 
+        {
+            // Jacobian w.r.t. pose2
+            Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>> jacobian2(jacobians[1]);
+
+            jacobian2.setZero();
+            jacobian2.block<2, 2>(0, 0) = inv_mat1.block<2, 2>(0, 0) * pos_weight_;
+            jacobian2(2, 2) = rot_weight_;
+        }
+        if (jacobians[2] != nullptr)
+        {
+            // Jacobian w.r.t. bias
+            Eigen::Map<Eigen::Matrix<double, 3, 1>> jacobian3(jacobians[2]);
+
+            jacobian3.setZero();
+            jacobian3(2) = delta_t_ * rot_weight_;
+        }
+    }
+
+    return true;
+}
+
+
+
+
+
+
+
+
+
+
+
+BrownianMotionCostFunction::BrownianMotionCostFunction(double weight, double bias_prior_1, double bias_prior_2)
+    : weight_(weight), bias_prior_1_(bias_prior_1), bias_prior_2_(bias_prior_2)
+{
+}
+
+bool BrownianMotionCostFunction::Evaluate(double const* const* parameters, double* residuals, double** jacobians) const
+{
+    double b1 = bias_prior_1_ + parameters[0][0];
+    double b2 = bias_prior_2_ + parameters[1][0];
+
+    residuals[0] = weight_ * (b2 - b1);
+
+    if (jacobians)
+    {
+        if (jacobians[0] != nullptr)
+        {
+            jacobians[0][0] = -weight_;
+        }
+        if (jacobians[1] != nullptr)
+        {
+            jacobians[1][0] = weight_;
+        }
+    }
     return true;
 }
