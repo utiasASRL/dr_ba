@@ -280,6 +280,14 @@ def main():
 
 
 
+            # Store the biases
+            if use_gyro:
+                if gyro_bias_initialised:
+                    biases.append(gyro_bias)
+                else:
+                    biases.append(0.0)
+
+
             # Estimate the gyro bias when the velocity is null
             if estimate_gyro_bias and np.linalg.norm(velocity) < 0.05:
                 if previous_vel_null:
@@ -352,10 +360,6 @@ def main():
                     df_data_2d.to_csv(odom_2d_path, header=None, index=None, sep=' ')
                 else:
                     df_data_2d.to_csv(odom_2d_path, mode='a', header=None, index=None, sep=' ')
-
-            # Store the biases
-            if use_gyro:
-                biases.append(gyro_bias)
 
             # Visualisation and image saving
             if visualise or save_images:
