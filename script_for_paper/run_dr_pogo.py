@@ -8,24 +8,24 @@ import yaml
 
 
 sequences = [
-             #'boreas-2024-12-05-14-12', # Commercial
-             #'boreas-2024-12-23-16-27', # Commercial
-             #'boreas-2024-12-23-16-44', # Commercial
-             #'boreas-2024-12-23-17-01', # Commercial
-             #'boreas-2024-12-23-17-18', # Commercial
+             'boreas-2024-12-05-14-12', # Commercial
+             'boreas-2024-12-23-16-27', # Commercial
+             'boreas-2024-12-23-16-44', # Commercial
+             'boreas-2024-12-23-17-01', # Commercial
+             'boreas-2024-12-23-17-18', # Commercial
 
 
              'boreas-2024-12-03-10-24', # Glenshield
-             #'boreas-2024-12-03-12-54', # Glenshield
-             #'boreas-2025-01-08-10-59', # Glenshield
-             #'boreas-2025-01-08-11-22', # Glenshield
-             #'boreas-2025-01-08-12-28', # Glenshield
+             'boreas-2024-12-03-12-54', # Glenshield
+             'boreas-2025-01-08-10-59', # Glenshield
+             'boreas-2025-01-08-11-22', # Glenshield
+             'boreas-2025-01-08-12-28', # Glenshield
 
-             #'boreas-2024-12-04-11-45', # Skyway
-             #'boreas-2024-12-04-11-56', # Skyway
-             #'boreas-2024-12-04-12-08', # Skyway
-             #'boreas-2024-12-04-12-19', # Skyway
-             #'boreas-2024-12-04-12-34', # Skyway
+             'boreas-2024-12-04-11-45', # Skyway
+             'boreas-2024-12-04-11-56', # Skyway
+             'boreas-2024-12-04-12-08', # Skyway
+             'boreas-2024-12-04-12-19', # Skyway
+             'boreas-2024-12-04-12-34', # Skyway
             ]
 
 data_path = utils.getDataDir()

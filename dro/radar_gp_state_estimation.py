@@ -110,6 +110,8 @@ def main():
         gt_first_T_inv= None
         gt_xyz = []
         est_xyz = []
+
+        biases = []
         
 
         # If using the gyro, we need to load the IMU data
@@ -351,6 +353,10 @@ def main():
                 else:
                     df_data_2d.to_csv(odom_2d_path, mode='a', header=None, index=None, sep=' ')
 
+            # Store the biases
+            if use_gyro:
+                biases.append(gyro_bias)
+
             # Visualisation and image saving
             if visualise or save_images:
                 img = state_estimator.generateVisualisation(radar_frame, 500, radar_frame.resolution*radar_frame.polar.shape[1]/(250*np.sqrt(2)), inverted=True, text=True)
@@ -392,6 +398,10 @@ def main():
             time_sum += time_end - time_start
             time_counter += 1
 
+        # Save the biases
+        if use_gyro and estimate_gyro_bias:
+            biases = np.array(biases)
+            np.savetxt(other_log_path + '/gyro_bias.txt', biases)
 
     if visualise:
         cv2.destroyAllWindows()
