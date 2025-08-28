@@ -10,6 +10,7 @@ pip install -r requirements.txt
 
 For __pogo__ you will need Eigen3 and Ceres Solver:
 ```bash
+sudo apt-get install python3-tk
 sudo apt-get install python3-dev
 sudo apt-get install build-essential
 sudo apt-get install cmake

@@ -7,6 +7,10 @@ from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
 import matplotlib.pyplot as plt
 
+T_applanix_dmu = np.array([[9.99945620e-01, -1.03283308e-02, -1.44307407e-03, 0],
+                [-1.03287236e-02, -9.99946622e-01, -2.64973148e-04, 0],
+                [-1.44026031e-03,  2.79863852e-04, -9.99998924e-01, 0],
+                [0, 0, 0, 1]])
 
 
 def getOutputDataDir():
@@ -162,24 +166,109 @@ def getInterpolatedPose(poses, times, query_time):
             return poses[0]
         else:
             return poses[-1]
-    for i in range(len(times)-1):
-        if times[i] <= query_time <= times[i+1]:
-            t = (query_time - times[i]) / (times[i+1] - times[i])
-            pose1 = poses[i]
-            pose2 = poses[i+1]
-            # Interpolate the translation
-            delta_pos = (1 - t) * pose1[:3, 3] + t * pose2[:3, 3]
-            # Interpolate the rotation using slerp
-            rotations = R.from_matrix([pose1[:3, :3], pose2[:3, :3]])
-            r = Slerp([0, 1], rotations)(t)
-            delta_rot = r.as_matrix()
-            # Combine the translation and rotation into a pose
-            delta_pose = np.eye(4)
-            delta_pose[:3, :3] = delta_rot
-            delta_pose[:3, 3] = delta_pos
-            return delta_pose
-    return poses[-1]
+    # Find the right interval using searchsorted
+    idx = np.searchsorted(times, query_time)
+    if idx == 0:
+        i = 0
+    elif idx >= len(times):
+        return poses[-1]
+    else:
+        i = idx - 1
+    t0, t1 = times[i], times[i+1]
+    t = (query_time - t0) / (t1 - t0)
+    pose1 = poses[i]
+    pose2 = poses[i+1]
+    # Interpolate the translation
+    delta_pos = (1 - t) * pose1[:3, 3] + t * pose2[:3, 3]
+    # Interpolate the rotation using slerp
+    rotations = R.from_matrix([pose1[:3, :3], pose2[:3, :3]])
+    r = Slerp([0, 1], rotations)(t)
+    delta_rot = r.as_matrix()
+    # Combine the translation and rotation into a pose
+    delta_pose = np.eye(4)
+    delta_pose[:3, :3] = delta_rot
+    delta_pose[:3, 3] = delta_pos
+    return delta_pose
 
+def getInterpolatedTrajectory(poses, times, query_times):
+    interpolated_poses = np.zeros((len(query_times), 4, 4))
+    for i, query_time in enumerate(query_times):
+        interpolated_pose = getInterpolatedPose(poses, times, query_time)
+        interpolated_poses[i] = interpolated_pose
+    return interpolated_poses
+
+def readFastLio2DTraj(path, seq_id):
+    # Read the calibration
+    raw_data_path = os.path.join(getDataDir(), seq_id)
+    T_radar_lidar = np.loadtxt(os.path.join(raw_data_path, "calib", "T_radar_lidar.txt"))
+    T_applanix_lidar = np.loadtxt(os.path.join(raw_data_path, "calib", "T_applanix_lidar.txt"))
+    T_dmu_radar = np.linalg.inv(T_applanix_dmu) @ T_applanix_lidar @ np.linalg.inv(T_radar_lidar)
+
+
+    data = np.loadtxt(path, delimiter=',')
+
+    pos = data[:, 1:4]
+
+    # Fit a plane to the pos data and project points onto the plane
+    centroid = np.mean(pos, axis=0)
+    centered = pos - centroid
+    _, _, Vt = np.linalg.svd(centered)
+    normal = Vt[-1]
+    d = -centroid @ normal
+    print("Plane equation: {}x + {}y + {}z + {} = 0".format(*normal, d))
+
+    # Project points onto the plane so that z = 0
+    poses = np.zeros((len(pos), 4, 4))
+    for i in range(len(pos)):
+        poses[i, :3, 3] = pos[i]
+        poses[i, 3, 3] = 1
+        poses[i, :3, :3] = R.from_quat(data[i, 4:8]).as_matrix()
+
+        poses[i, :,:] = T_applanix_dmu @ poses[i, :,:] @ T_dmu_radar
+
+    # Project the poses onto the plane
+    poses = align3DPosesTo2D(poses)
+
+    plt.figure()
+    plt.plot(poses[:, 0], poses[:, 1])
+    plt.axis('equal')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.title('Projected 2D Poses')
+    plt.grid()
+    #plt.show()
+
+    return poses, data[:,0]
+
+def align3DPosesTo2D(poses):
+    # First get the plane equation
+    pts_3d = poses[:, :3, 3]
+    centroid = np.mean(pts_3d, axis=0)
+    centered_pts = pts_3d - centroid
+    _,_, Vt = np.linalg.svd(centered_pts)
+    normal = Vt[-1]
+    # Quick and dirty fix
+    if normal[2] < 0:
+        normal = -normal
+    d = -centroid @ normal
+
+    projected_pts = pts_3d - np.dot(centered_pts, normal)[:, np.newaxis] * normal
+
+    # Compute the rotation to align the normal to [0,0,1]
+    z_axis = np.array([0, 0, 1])
+    rotation_axis = np.cross(normal, z_axis)
+    rotation_angle = np.dot(normal, z_axis)
+    if np.allclose(rotation_axis, 0):
+        R_align = np.eye(3) if rotation_angle > 0 else -np.eye(3)
+    else:
+        R_align = R.from_rotvec(rotation_axis / np.linalg.norm(rotation_axis) * np.arccos(rotation_angle)).as_matrix()
+
+    projected_pts = projected_pts @ R_align.T
+    projected_poses = np.zeros_like(poses)
+    projected_poses[:, :3, 3] = projected_pts
+    projected_poses[:, 3, 3] = 1
+    projected_poses[:, :3, :3] = R_align @ poses[:, :3, :3]
+    return projected_poses
 
 def nameToTime(name):
     # Extract the timestamp from the filename
