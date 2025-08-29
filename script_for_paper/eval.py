@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('TkAgg')
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -60,9 +62,7 @@ def main():
 
         if compute_gt:
             gt_poses, gt_times = utils.getGTRadarPosesAndTimes(seq_id)
-            gt_poses_interp = np.zeros(odom_poses.shape)
-            for i in range(len(odom_times)):
-                gt_poses_interp[i,:,:] = utils.getInterpolatedPose(gt_poses, gt_times, odom_times[i])
+            gt_poses_interp = utils.getInterpolatedTrajectory(gt_poses, gt_times, odom_times)
             inv_gt_first = np.linalg.inv(gt_poses_interp[0]).reshape(1,4,4)
             gt_poses_interp = inv_gt_first @ gt_poses_interp
 
