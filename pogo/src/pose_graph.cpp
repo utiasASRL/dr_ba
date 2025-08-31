@@ -414,8 +414,8 @@ BrownianMotionCostFunction::BrownianMotionCostFunction(double weight, double bia
 
 bool BrownianMotionCostFunction::Evaluate(double const* const* parameters, double* residuals, double** jacobians) const
 {
-    double b1 = bias_prior_1_ + parameters[0][0];
-    double b2 = bias_prior_2_ + parameters[1][0];
+    double b1 = parameters[0][0];
+    double b2 = parameters[1][0];
 
     residuals[0] = weight_ * (b2 - b1);
 

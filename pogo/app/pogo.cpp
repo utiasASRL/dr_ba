@@ -68,7 +68,14 @@ int main()
     std::cout << "Reading odometry data from: " << odometry_file << std::endl;
     std::vector<std::pair<int64_t, std::array<double, 3>>> odometry_data = readOdometry(odometry_file);
 
-    std::vector<double> bias_priors = readBiases("output/" + seq_id + "/other_log/gyro_bias.txt");
+    std::vector<double> bias_priors;
+    if(opts.estimate_bias) {
+        bias_priors = readBiases("output/" + seq_id + "/other_log/gyro_bias.txt");
+    }
+    else
+    {
+        bias_priors = std::vector<double>(odometry_data.size() - 1, 0.0);
+    }
 
     std::cout << "Read " << odometry_data.size() << " odometry entries." << std::endl;
     std::cout << "Read " << bias_priors.size() << " bias entries." << std::endl;

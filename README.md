@@ -109,5 +109,4 @@ This will diplay the ATE errors and write to file different trajectory estimates
 
 
 - [ ] Create a script to get the pogo parameters automatically from a calib sequence
-- [ ] Try adding bias estimation?
- 
+- [ ] Check the "save local maps" option in DRO (seems to not be as wanted)
