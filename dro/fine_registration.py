@@ -14,9 +14,14 @@ def main():
 
     # Read the coarse registrations
     out_path = utils.getOutputDataDir()
-    coarse_registrations = pd.read_csv(os.path.join(out_path, "coarse_registrations.csv"))
-
     fine_registrations = []
+    try:
+        coarse_registrations = pd.read_csv(os.path.join(out_path, "coarse_registrations.csv"))
+    except:
+        print("No coarse registrations found. Exiting.")
+        pd.DataFrame(fine_registrations, columns=['scan_i_name', 'scan_j_name', 'x', 'y', 'theta']).to_csv(os.path.join(out_path, "fine_registrations.csv"), index=False)
+        return
+
 
     if coarse_registrations.empty:
         print("No coarse registrations found.")

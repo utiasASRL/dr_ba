@@ -391,6 +391,21 @@ def getSeqType(seq_id):
         'boreas-2024-12-04-12-08': 'Skyway',
         'boreas-2024-12-04-12-19': 'Skyway',
         'boreas-2024-12-04-12-34': 'Skyway',
+
+
+        'boreas-2020-11-26-13-58': 'Original_train',
+        'boreas-2020-12-18-13-44': 'Original_train',
+        'boreas-2021-01-26-11-22': 'Original_train',
+        'boreas-2021-02-02-14-07': 'Original_train',
+        'boreas-2021-03-02-13-38': 'Original_train',
+        'boreas-2021-03-30-14-23': 'Original_train',
+        'boreas-2021-04-20-14-11': 'Original_train',
+        'boreas-2021-05-13-16-11': 'Original_train',
+        'boreas-2021-07-20-17-33': 'Original_train',
+        'boreas-2021-09-02-11-42': 'Original_train',
+        'boreas-2021-10-15-12-35': 'Original_train',
+        'boreas-2021-11-14-09-47': 'Original_train',
+        'boreas-2021-11-23-14-27': 'Original_train',
     }
     if seq_id in seqs:
         return seqs[seq_id]
