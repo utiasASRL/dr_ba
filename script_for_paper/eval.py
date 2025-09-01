@@ -26,6 +26,7 @@ def main():
     output_paths.sort()
 
     errors_per_type = {}
+    epe_errors_per_type = {}
 
 
     for seq_id in output_paths:
@@ -104,10 +105,22 @@ def main():
         seq_type = utils.getSeqType(seq_id)
         if seq_type not in errors_per_type:
             errors_per_type[seq_type] = {'odom': [], 'pogo': [], 'seq_id': []}
+            epe_errors_per_type[seq_type] = {'odom': [], 'pogo': [], 'seq_id': []}
         errors_per_type[seq_type]['odom'].append(ate_odom)
         errors_per_type[seq_type]['pogo'].append(ate_pogo)
         errors_per_type[seq_type]['seq_id'].append(seq_id)
 
+
+        # Compute the transform between the first and last poses
+        odom_end_transform = np.linalg.inv(odom_poses[0]) @ odom_poses[-1]
+        pogo_end_transform = np.linalg.inv(pogo_poses[0]) @ pogo_poses[-1]
+        gt_end_transform = np.linalg.inv(gt_poses_interp[0]) @ gt_poses_interp[-1]
+
+        odom_epe = np.linalg.norm((np.linalg.inv(gt_end_transform) @ odom_end_transform)[:2, 3])
+        pogo_epe = np.linalg.norm((np.linalg.inv(gt_end_transform) @ pogo_end_transform)[:2, 3])
+        epe_errors_per_type[seq_type]['odom'].append(odom_epe)
+        epe_errors_per_type[seq_type]['pogo'].append(pogo_epe)
+        epe_errors_per_type[seq_type]['seq_id'].append(seq_id)
 
         # Display the results trajectories
         plt.figure(figsize=(6,6))
@@ -140,9 +153,12 @@ def main():
         print("\n\n\n\n==================\nSequence Type:", seq_type)
         odom_avg_ate = np.round(np.mean(errors['odom']), 2)
         pogo_avg_ate = np.round(np.mean(errors['pogo']), 2)
-        print("    Average 2D Absolute Trajectory Error (RMSE ATE), odom:", odom_avg_ate, "m, pogo:", pogo_avg_ate, "m")
+        odom_avg_epe = np.round(np.mean(epe_errors_per_type[seq_type]['odom']), 2)
+        pogo_avg_epe = np.round(np.mean(epe_errors_per_type[seq_type]['pogo']), 2)
+        print("    Average 2D Absolute Trajectory Error, RMSE ATE: odom", odom_avg_ate, "m, \tpogo:", pogo_avg_ate, "m")
+        print("    Average 2D Endpoint Error, EPE: odom", odom_avg_epe, "m, \tpogo:", pogo_avg_epe, "m")
         for i in range(len(errors['seq_id'])):
-            print("      Sequence ID ", errors['seq_id'][i], ":", np.round(errors['odom'][i], 2), "m, pogo:", np.round(errors['pogo'][i], 2), "m")
+            print("      Seq ID", errors['seq_id'][i], "ATE : odom", np.round(errors['odom'][i], 2), "m, \tpogo:", np.round(errors['pogo'][i], 2), "m, \tEPE: odom", np.round(epe_errors_per_type[seq_type]['odom'][i], 2), "m, \tpogo:", np.round(epe_errors_per_type[seq_type]['pogo'][i], 2), "m")
 
 
 

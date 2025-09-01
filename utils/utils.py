@@ -209,14 +209,6 @@ def readFastLio2DTraj(path, seq_id):
 
     pos = data[:, 1:4]
 
-    # Fit a plane to the pos data and project points onto the plane
-    centroid = np.mean(pos, axis=0)
-    centered = pos - centroid
-    _, _, Vt = np.linalg.svd(centered)
-    normal = Vt[-1]
-    d = -centroid @ normal
-    print("Plane equation: {}x + {}y + {}z + {} = 0".format(*normal, d))
-
     # Project points onto the plane so that z = 0
     poses = np.zeros((len(pos), 4, 4))
     for i in range(len(pos)):
@@ -236,9 +228,40 @@ def readFastLio2DTraj(path, seq_id):
     plt.ylabel('Y')
     plt.title('Projected 2D Poses')
     plt.grid()
-    #plt.show()
+    plt.show()
 
     return poses, data[:,0]
+
+def read2Fast2Lamaa2DTraj(path, seq_id):
+    raw_data_path = os.path.join(getDataDir(), seq_id)
+    T_radar_lidar = np.loadtxt(os.path.join(raw_data_path, "calib", "T_radar_lidar.txt"))
+    T_applanix_lidar = np.loadtxt(os.path.join(raw_data_path, "calib", "T_applanix_lidar.txt"))
+    T_dmu_radar = np.linalg.inv(T_applanix_dmu) @ T_applanix_lidar @ np.linalg.inv(T_radar_lidar)
+
+
+    data = np.loadtxt(path, delimiter=' ')
+
+    poses = np.zeros((len(data), 4, 4))
+    for i in range(len(data)):
+        temp_T = np.eye(4)
+        temp_T[:3, :] = data[i,1:].reshape(3, 4)
+        poses[i, :, :] = T_applanix_dmu @ np.linalg.inv(temp_T) @ T_dmu_radar
+
+
+    # Project the poses onto the plane
+    poses = align3DPosesTo2D(poses)
+
+    plt.figure()
+    plt.plot(poses[:, 0], poses[:, 1])
+    plt.axis('equal')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.title('Projected 2D Poses')
+    plt.grid()
+    plt.show()
+
+    return poses, data[:,0]*1e-6
+
 
 def align3DPosesTo2D(poses):
     # First get the plane equation
