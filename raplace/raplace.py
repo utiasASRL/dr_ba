@@ -20,6 +20,7 @@ import scipy.io as sio  # when the python file deal with .mat document
 import pandas as pd
 from utils import utils
 import yaml
+import time
 
 
 def main():
@@ -39,7 +40,7 @@ def main():
     down_shape = 0.6
 
     # Generate Radon Transforms (not all the data, only a subset based on a distance threshold)
-    data_sinofft, data_rowkeys, data_names, times, odom_poses, distances = generateRadon(seq_dir, down_shape, dist_thr=opts['dist_thr'], max_img_size=opts['max_img_size'])
+    data_sinofft, data_rowkeys, data_names, times, odom_poses, distances = generateRadon(seq_dir, down_shape, real_time=True, max_img_size=opts['max_img_size'])
 
     num_queries = len(data_names)
 
@@ -147,7 +148,7 @@ def osdir(path):
     return sorted(files, key=lambda fn: int(fn.split('.')[0]))
 
 # Perform radon transformation
-def generateRadon(data_dir, down_shape, dist_thr = 20, max_img_size=600):
+def generateRadon(data_dir, down_shape, real_time = True, max_img_size=600):
     
     # Get the local map paths
     local_map_dir = os.path.join(data_dir, 'local_maps')
@@ -191,21 +192,22 @@ def generateRadon(data_dir, down_shape, dist_thr = 20, max_img_size=600):
     times = []
 
     # Loop through the local maps
-    last_dist = -2*dist_thr
+    time_thr = utils.nameToTime(data_names[0]) - 1.0
     for data_idx in range(num_data):
 
-        # Only process the data that is far enough from the last processed data
-        if distances[data_idx] - last_dist < dist_thr:
+        time_data = utils.nameToTime(data_names[data_idx])
+        if real_time and (time_data < time_thr):
             continue
-        last_dist = distances[data_idx]
+
+        t0 = time.time()
+
 
         # Print the current processing status
         file_name = data_names[data_idx]
         print("\rDistance:", np.round(distances[data_idx], 2), " / ", np.round(distances[-1], 2), "   index: ", data_idx, " / ", num_data, "   file: ", file_name, end='          ')
 
         # Extract the timestamp from the file name
-        time_str = float(file_name.split('.')[0]) / 1e6  # Convert to seconds
-        times.append(time_str)
+        times.append(time_data)
 
         # Read the image
         data_path = os.path.join(local_map_dir, file_name)
@@ -230,8 +232,14 @@ def generateRadon(data_dir, down_shape, dist_thr = 20, max_img_size=600):
         sinoffts.append(sinofft)
         rowkeys.append(rowkey(R).flatten())
         data_names_kept.append(file_name)
-        distances_kept.append(last_dist)
+        distances_kept.append(distances[data_idx])
         odom_poses.append(poses[data_idx,:,:])
+
+        t1 = time.time()
+        if real_time:
+            time_thr = time_data + (t1 - t0)
+
+
 
     # Convert to numpy arrays
     rowkeys = np.array(rowkeys)
