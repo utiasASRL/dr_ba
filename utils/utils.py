@@ -232,6 +232,49 @@ def readFastLio2DTraj(path, seq_id):
 
     return poses, data[:,0]
 
+def readNavtechSLAM2DTraj(path):
+        # Read the calibration
+    data = np.loadtxt(path, delimiter=',', skiprows=1)
+
+    poses = np.zeros((len(data), 4, 4))
+    poses[:, 0, 0] = data[:,11]
+    poses[:, 0, 1] = data[:,12]
+    poses[:, 0, 2] = data[:,13]
+    poses[:, 0, 3] = data[:,14]
+    poses[:, 1, 0] = data[:,15]
+    poses[:, 1, 1] = data[:,16]
+    poses[:, 1, 2] = data[:,17]
+    poses[:, 1, 3] = data[:,18]
+    poses[:, 2, 0] = data[:,19]
+    poses[:, 2, 1] = data[:,20]
+    poses[:, 2, 2] = data[:,21]
+    poses[:, 2, 3] = data[:,22]
+    poses[:, 3, 0] = data[:,23]
+    poses[:, 3, 1] = data[:,24]
+    poses[:, 3, 2] = data[:,25]
+    poses[:, 3, 3] = data[:,26]
+
+    T_flip = np.array([[1, 0, 0, 0],
+                       [0, -1, 0, 0],
+                       [0, 0, -1, 0],
+                       [0, 0, 0, 1]])
+
+    poses = T_flip.reshape(1,4,4) @ poses
+
+    # Project the poses onto the plane
+    #poses = align3DPosesTo2D(poses)
+
+    plt.figure()
+    plt.plot(poses[:, 0], poses[:, 1])
+    plt.axis('equal')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.title('Projected 2D Poses')
+    plt.grid()
+    plt.show()
+
+    return poses, data[:,0]
+
 def read2Fast2Lamaa2DTraj(path, seq_id):
     raw_data_path = os.path.join(getDataDir(), seq_id)
     T_radar_lidar = np.loadtxt(os.path.join(raw_data_path, "calib", "T_radar_lidar.txt"))

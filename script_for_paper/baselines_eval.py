@@ -10,11 +10,12 @@ import pandas as pd
 
 
 kMethodsAndPath = {
+    'navtech_slam': 'output_navtech_slam',
     #'fast_lio': 'output_fast_lio',
-    '2fast_2lamaa': 'output_2fast_2lamaa'
+    #'2fast_2lamaa': 'output_2fast_2lamaa'
     }
 
-kSeqTypes = ['Glenshield', 'Skyway']
+kSeqTypes = ['Glenshield', 'Skyway', 'Original_train']
 
 
 def main():
@@ -30,6 +31,18 @@ def main():
             if not file.endswith('.csv') and not file.endswith('.txt'):
                 continue
             seq_id = file.split('.')[0]
+
+            # Read the trajectory
+            if method == 'fast_lio':
+                poses, times = utils.readFastLio2DTraj(os.path.join(path, file), seq_id)
+            elif method == '2fast_2lamaa':
+                poses, times = utils.read2Fast2Lamaa2DTraj(os.path.join(path, file), seq_id)
+            elif method == 'navtech_slam':
+                if not ('pgo' in seq_id):
+                    continue
+                seq_id = seq_id.replace('_pgo', '')
+                poses, times = utils.readNavtechSLAM2DTraj(os.path.join(path, file))
+
             seq_type = utils.getSeqType(seq_id)
             if seq_type not in kSeqTypes:
                 continue
@@ -37,13 +50,6 @@ def main():
 
 
             gt_poses, gt_times = utils.getGTRadarPosesAndTimes(seq_id)
-
-            # Read the trajectory
-            if method == 'fast_lio':
-                poses, times = utils.readFastLio2DTraj(os.path.join(path, file), seq_id)
-            elif method == '2fast_2lamaa':
-                poses, times = utils.read2Fast2Lamaa2DTraj(os.path.join(path, file), seq_id)
-
             gt_poses_interp = utils.getInterpolatedTrajectory(gt_poses, gt_times, times)
 
             # Compute the absolute trajectory errors
