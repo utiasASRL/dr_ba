@@ -122,6 +122,11 @@ def main():
         epe_errors_per_type[seq_type]['pogo'].append(pogo_epe)
         epe_errors_per_type[seq_type]['seq_id'].append(seq_id)
 
+        # Write the ATE and EPE to a text file
+        df = pd.DataFrame.from_dict({'ATE': ate_pogo, 'EPE': pogo_epe}, orient='index').T
+        df.to_csv(os.path.join("output", seq_id, seq_id + "_errors.csv"), index=False)
+
+
         # Display the results trajectories
         plt.figure(figsize=(6,6))
         plt.plot(odom_poses[:,0,3], odom_poses[:,1,3], label=kVizParams['dro']['label'], color=kVizParams['dro']['color'], linewidth=0.5)

@@ -1,0 +1,427 @@
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from utils import utils
+import numpy as np
+import pandas as pd
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+from scipy.spatial.transform import Rotation as R
+import seaborn as sns
+import pyboreas as pb
+import cv2
+import dirty_doppler as gp_doppler
+import torch
+
+kTypeColors = { 
+            "Commercial": "green",
+            "Glenshield": "orange",
+            "Skyway": "blue",
+            }
+kTypeLabels = {
+            "Commercial": "Commercial",
+            "Glenshield": "Suburbs",
+            "Skyway": "Skyway",
+            }
+
+kInlierPosThr = 1.5
+kInlierRotThr = 1.0
+
+def main():
+    os.makedirs('figures', exist_ok=True)
+    #plotLoopRegistrations()
+    #teaserDataSample(frame_id=1150)
+    #crossCorrelationExample()
+
+    plotPublicBoreas()
+
+
+def plotPublicBoreas():
+    pogo_path = "output_public"
+    methods = {
+        'Navtech-SLAM': 'output_navtech_slam',
+        'TBV-SLAM': 'output_tbv',
+        'Dr-PoGO': 'output_public',
+    }
+
+    paths = os.listdir(pogo_path)
+    paths.sort()
+    errors_ate = {}
+    errors_ete = {}
+    for method, path in methods.items():
+        errors_ate[method] = []
+        errors_ete[method] = []
+        for seq_id in paths:
+            if not seq_id.startswith('boreas-'):
+                continue
+            print(f"Processing sequence {seq_id} for method {method}...")
+
+            if method == 'Dr-PoGO':
+                error_path = os.path.join(path, seq_id, seq_id + "_errors.csv")
+            else:
+                error_path = os.path.join(path, seq_id + "_errors.csv")
+            errors_seq = np.loadtxt(error_path, delimiter=',', skiprows=1)
+            errors_ate[method].append(errors_seq[0])
+            errors_ete[method].append(errors_seq[1])
+
+    avg_ate = {method: np.mean(errors) for method, errors in errors_ate.items()}
+    avg_ete = {method: np.mean(errors) for method, errors in errors_ete.items()}
+
+    # Plot the errors for each type
+    fig, ax = plt.subplots(2, 1, figsize=(6, 5), sharex=True)
+    for method, errors in errors_ate.items():
+        ax[0].plot(errors, label=method + f" (Avg: {avg_ate[method]:.2f} m)")
+    #ax[0].set_xlabel("Sequence ID")
+    ax[0].set_ylabel("Absolute Trajectory Error [m]")
+    ax[0].legend(loc='upper right')
+    # Remove xtick labels for the first plot
+    ax[0].set_xticklabels([])
+    # Set x limits
+    ax[0].set_xlim(0, len(errors_ate[method]) - 1)
+    # Set y limits
+    ax[0].set_ylim(np.min([min(e) for e in errors_ate.values()]), np.max([max(e) for e in errors_ate.values()])+2500)
+
+    for method, errors in errors_ete.items():
+        ax[1].plot(errors, label=method + f" (Avg: {avg_ete[method]:.2f} m)")
+    ax[1].set_xlabel("Sequence ID")
+    ax[1].set_ylabel("End-Pose Error [m]")
+    ax[1].legend(loc='upper right')
+    ax[1].set_ylim(np.min([min(e) for e in errors_ete.values()]), np.max([max(e) for e in errors_ete.values()])+9000)
+    # Set x limits
+    ax[1].set_xlim(0, len(errors_ete[method]) - 1)
+    # Log scale for y axis
+    ax[0].set_yscale('log')
+    ax[0].grid(True, which="both", ls="--")
+    ax[1].set_yscale('log')
+    ax[1].grid(True, which="both", ls="--")
+    plt.tight_layout()
+    plt.savefig(f"figures/public_boreas_errors.pdf")
+    plt.show()
+
+
+def crossCorrelationExample():
+    seq_id = 'boreas-2024-12-04-11-56'
+    local_map_path = 'output_dr_pogo'
+
+    # Get list of files in local_map_path
+    files = os.listdir(os.path.join(local_map_path, seq_id, 'local_maps'))
+    files.sort()
+
+    res = utils.getPixelResolution()
+
+    
+
+    scan_high = 250#800#1100
+    scan_high_next = scan_high + 2
+    scan_low = 800#50
+    scan_low_next = scan_low + 2
+
+    high_img = cv2.imread(os.path.join(local_map_path, seq_id, 'local_maps', files[scan_high]), cv2.IMREAD_GRAYSCALE)
+    low_img = cv2.imread(os.path.join(local_map_path, seq_id, 'local_maps', files[scan_low]), cv2.IMREAD_GRAYSCALE)
+    high_img_next = cv2.imread(os.path.join(local_map_path, seq_id, 'local_maps', files[scan_high_next]), cv2.IMREAD_GRAYSCALE)
+    low_img_next = cv2.imread(os.path.join(local_map_path, seq_id, 'local_maps', files[scan_low_next]), cv2.IMREAD_GRAYSCALE)
+
+
+    t_high = utils.nameToTime(files[scan_high])
+    t_high_next = utils.nameToTime(files[scan_high_next])
+    t_low = utils.nameToTime(files[scan_low])
+    t_low_next = utils.nameToTime(files[scan_low_next])
+
+    gt_poses, gt_times = utils.getGTRadarPosesAndTimes(seq_id)
+    pose_high = utils.getInterpolatedPose(gt_poses, gt_times, t_high)
+    pose_high_next = utils.getInterpolatedPose(gt_poses, gt_times, t_high_next)
+    pose_low = utils.getInterpolatedPose(gt_poses, gt_times, t_low)
+    pose_low_next = utils.getInterpolatedPose(gt_poses, gt_times, t_low_next)
+
+    rel_pose_high = np.linalg.inv(pose_high) @ pose_high_next
+    rel_pose_low = np.linalg.inv(pose_low) @ pose_low_next
+
+    xy_high, theta_high = utils.poseToXYTheta(rel_pose_high)
+    xytheta_high = np.array([xy_high[0], xy_high[1], theta_high])
+    xy_low, theta_low = utils.poseToXYTheta(rel_pose_low)
+    xytheta_low = np.array([xy_low[0], xy_low[1], theta_low])
+
+    gp_doppler_low = gp_doppler.LocalMapRegistrator(low_img_next, low_img, res, xytheta_low)
+    overlay_low = gp_doppler_low.getOverlay()
+    low_score = gp_doppler_low.getRegistrationScore().detach().cpu().item()
+    low_cross_corr = np.sum(gp_doppler_low.costFunctionAndJacobian(torch.tensor(xytheta_low, device=gp_doppler_low.device).float(), with_jac=False).detach().cpu().numpy())
+
+    gp_doppler_high = gp_doppler.LocalMapRegistrator(high_img_next, high_img, res, xytheta_high)
+    overlay_high = gp_doppler_high.getOverlay()
+    high_score = gp_doppler_high.getRegistrationScore().detach().cpu().item()
+    high_cross_corr = np.sum(gp_doppler_high.costFunctionAndJacobian(torch.tensor(xytheta_high, device=gp_doppler_high.device).float(), with_jac=False).detach().cpu().numpy())
+    
+    gp_doppler_high_shifted = gp_doppler.LocalMapRegistrator(high_img_next, high_img, res, np.array([xy_high[0]+5.0, xy_high[1]+5.0, theta_high]))
+    shifted_overlay_high = gp_doppler_high_shifted.getOverlay()
+    shifted_high_score = gp_doppler_high_shifted.getRegistrationScore().detach().cpu().item()
+    shifted_high_cross_corr = np.sum(gp_doppler_high_shifted.costFunctionAndJacobian(torch.tensor(np.array([xy_high[0]+5.0, xy_high[1]+5.0, theta_high]), device=gp_doppler_high_shifted.device).float(), with_jac=False).detach().cpu().numpy())
+
+    kTextStep = 225
+    kTextX = 50
+    kTextY = 50
+    kFontSize = 14
+    kAlpha = 1.0
+
+    ncolors = 256
+    color_array = plt.get_cmap('hot')(range(ncolors))
+    color_array[:, -1] = np.linspace(0, 1, ncolors)
+    hot_alpha = matplotlib.colors.LinearSegmentedColormap.from_list('hot_alpha', color_array)
+    plt.colormaps.register(cmap=hot_alpha)
+
+    crop_ratio = 0.25
+    extent = (high_img.shape[1]*crop_ratio, high_img.shape[1]*(1-crop_ratio), high_img.shape[0]*crop_ratio, high_img.shape[0]*(1-crop_ratio))
+    kTextX = extent[0] + kTextX * 2*crop_ratio
+    kTextY = extent[2] + kTextY * 2*crop_ratio
+    kTextStep = kTextStep * 2*crop_ratio
+
+    print("High: score:", high_score, "cross-corr:", high_cross_corr)
+    print("Low: score:", low_score, "cross-corr:", low_cross_corr)
+    fig, ax = plt.subplots(1, 3, figsize=(9, 4))
+    ax[0].imshow(low_img, cmap='gray')
+    ax[0].imshow(overlay_low, cmap='hot_alpha', alpha=kAlpha)
+    ax[0].text(kTextX, kTextY, 'Scene A, good reg.', color='white', fontsize=kFontSize, va='top')
+    ax[0].set_xlim(extent[0], extent[1])
+    ax[0].set_ylim(extent[3], extent[2])
+    #ax[0].text(kTextX, kTextY + kTextStep, 'Good registration', color='lightgreen', fontsize=kFontSize, va='top')
+    ax[0].text(kTextX, kTextY + 1 * kTextStep, 'g=' + "{0:.2e}".format(low_cross_corr), color='white', fontsize=kFontSize, va='top')
+    ax[0].text(kTextX, kTextY + 2 * kTextStep, 's=' + str(np.round(low_score, 2)), color='lightgreen', fontsize=kFontSize, va='top')
+    ax[1].imshow(high_img, cmap='gray')
+    ax[1].imshow(overlay_high, cmap='hot_alpha', alpha=kAlpha)
+    ax[1].text(kTextX, kTextY, 'Scene B, good reg.', color='white', fontsize=kFontSize, va='top')
+    ax[1].set_xlim(extent[0], extent[1])
+    ax[1].set_ylim(extent[3], extent[2])
+    #ax[1].text(kTextX, kTextY + kTextStep, 'Good registration', color='lightgreen', fontsize=kFontSize, va='top')
+    ax[1].text(kTextX, kTextY + 1 * kTextStep, 'g=' + "{0:.2e}".format(high_cross_corr), color='white', fontsize=kFontSize, va='top')
+    ax[1].text(kTextX, kTextY + 2 * kTextStep, 's=' + str(np.round(high_score, 2)), color='lightgreen', fontsize=kFontSize, va='top')
+    ax[2].imshow(high_img, cmap='gray')
+    ax[2].imshow(shifted_overlay_high, cmap='hot_alpha', alpha=kAlpha)
+    ax[2].text(kTextX, kTextY, 'Scene B, poor reg.', color='white', fontsize=kFontSize, va='top')
+    #ax[2].text(kTextX, kTextY + kTextStep, 'Poor registration', color='lightcoral', fontsize=kFontSize, va='top')
+    ax[2].text(kTextX, kTextY + 1 * kTextStep, 'g=' + "{0:.2e}".format(shifted_high_cross_corr), color='white', fontsize=kFontSize, va='top')
+    ax[2].text(kTextX, kTextY + 2 * kTextStep, 's=' + str(np.round(shifted_high_score, 2)), color='lightcoral', fontsize=kFontSize, va='top')
+    ax[2].set_xlim(extent[0], extent[1])
+    ax[2].set_ylim(extent[3], extent[2])
+    # Remove the axis
+    ax[0].axis('off')
+    ax[1].axis('off')
+    ax[2].axis('off')
+    plt.tight_layout()
+    plt.savefig('figures/cross_correlation_score_example.pdf')
+    plt.show()
+    
+
+
+
+def teaserDataSample(frame_id=150):
+    seq_id = 'boreas-2024-12-03-10-24'
+    dataset = pb.BoreasDataset(utils.getDataDir(seq_id))
+    seq = dataset.get_seq_from_ID(seq_id)
+    radar_frame = seq.get_radar(frame_id)
+
+    # Save the polar data
+    cv2.imwrite('figures/teaser_radar_polar.png', (radar_frame.polar*255).astype(np.uint8))
+    # Convert to Cartesian
+    cart_img = pb.utils.radar.radar_polar_to_cartesian(radar_frame.azimuths, radar_frame.polar.astype(np.float32), radar_frame.resolution, 0.25, 800, False, True)
+    cv2.imwrite('figures/teaser_radar_cartesian.png', (cart_img*255).astype(np.uint8))
+
+
+
+
+def plotLoopRegistrations():
+    # Get the folders in the output directory
+    output_paths = os.listdir("output")
+
+    errors_coarse = {}
+    errors_fine = {}
+
+
+    for seq_id in output_paths:
+        if not seq_id.startswith('boreas-'):
+            continue
+
+        print(f"Processing sequence {seq_id}...")
+
+        try:
+            # Load the coarse registrations
+            loops_coarse = pd.read_csv(os.path.join("output", seq_id, "coarse_registrations.csv"))
+            loops_fine = pd.read_csv(os.path.join("output", seq_id, "fine_registrations.csv"))
+        except:
+            print(f"Skipping sequence {seq_id} due to missing coarse registrations.")
+            continue
+
+        # Get the GT radar poses
+        gt_poses, gt_times = utils.getGTRadarPosesAndTimes(seq_id)
+
+        seq_type =  utils.getSeqType(seq_id)
+
+
+        temp_errors_coarse = getRegistrationErrors(loops_coarse, gt_poses, gt_times)
+        temp_errors_fine = getRegistrationErrors(loops_fine, gt_poses, gt_times)
+        
+
+
+        if(seq_type not in errors_coarse):
+            errors_coarse[seq_type] = []
+            errors_fine[seq_type] = []
+        errors_coarse[seq_type].append({seq_id: temp_errors_coarse})
+        errors_fine[seq_type].append({seq_id: temp_errors_fine})
+
+
+
+    # Sort the sequences per alphabetical order
+    errors_coarse = {k: sorted(v, key=lambda x: list(x.keys())[0]) for k, v in errors_coarse.items()}
+    errors_fine = {k: sorted(v, key=lambda x: list(x.keys())[0]) for k, v in errors_fine.items()}
+
+
+    # Get the number of matches and inliers per type
+    for seq_type in errors_coarse.keys():
+        inlier_matches_coarse = []
+        for errors in errors_coarse[seq_type]:
+            for seq_id, err in errors.items():
+                for e in err:
+                    if e[0] < kInlierPosThr and e[1] < kInlierRotThr:
+                        inlier_matches_coarse.append(e)
+        inlier_matches_fine = []
+        for errors in errors_fine[seq_type]:
+            for seq_id, err in errors.items():
+                for e in err:
+                    if e[0] < kInlierPosThr and e[1] < kInlierRotThr:
+                        inlier_matches_fine.append(e)
+        num_seq = len(errors_coarse[seq_type])
+        num_inliers_coarse = len(inlier_matches_coarse)
+        num_inliers_fine = len(inlier_matches_fine)
+        num_coarse = 0
+        for errors in errors_coarse[seq_type]:
+            for seq_id, err in errors.items():
+                num_coarse += len(err)
+        num_fine = 0
+        for errors in errors_fine[seq_type]:
+            for seq_id, err in errors.items():
+                num_fine += len(err)
+        coarse_rmse_pos = np.sqrt(np.mean([e[0]**2 for e in inlier_matches_coarse]))
+        fine_rmse_pos = np.sqrt(np.mean([e[0]**2 for e in inlier_matches_fine]))
+        coarse_rmse_rot = np.sqrt(np.mean([e[1]**2 for e in inlier_matches_coarse]))
+        fine_rmse_rot = np.sqrt(np.mean([e[1]**2 for e in inlier_matches_fine]))
+        print("\n\n====== Sequence type", seq_type, "======")
+        print("    Coarse:")
+        print("        ", num_coarse / num_seq, "matches,", num_inliers_coarse / num_seq, "inliers ( ratio:", num_inliers_coarse / num_coarse, ")")
+        print("        RMSE (trans):", coarse_rmse_pos)
+        print("        RMSE (rot):", coarse_rmse_rot)
+        print("    Fine:")
+        print("        ", num_fine / num_seq, "matches,", num_inliers_fine / num_seq, "inliers ( ratio:", num_inliers_fine / num_fine, ")")
+        print("        RMSE (trans):", fine_rmse_pos)
+        print("        RMSE (rot):", fine_rmse_rot)
+
+    # Plot the errors for each type
+    fig, ax = plt.subplots(2, 2, figsize=(6, 4))
+    # Similar as before but with seaborn's stripplot
+    all_coarse_pos = []
+    all_coarse_rot = []
+    all_fine_pos = []
+    all_fine_rot = []
+    for seq_type in ['Glenshield', 'Commercial', 'Skyway']:
+        for errors in errors_coarse[seq_type]:
+            for seq_id, err in errors.items():
+                for e in err:
+                    all_coarse_pos.append({
+                        'seq_type': seq_type,
+                        'seq_id': seq_id,
+                        'trans_err': e[0],
+                        'rot_err': e[1]
+                    })
+                    all_coarse_rot.append({
+                        'seq_type': seq_type,
+                        'seq_id': seq_id,
+                        'rot_err': e[1]
+                    })
+        for errors in errors_fine[seq_type]:
+            for seq_id, err in errors.items():
+                for e in err:
+                    all_fine_pos.append({
+                        'seq_type': seq_type,
+                        'seq_id': seq_id,
+                        'trans_err': e[0],
+                        'rot_err': e[1]
+                    })
+                    all_fine_rot.append({
+                        'seq_type': seq_type,
+                        'seq_id': seq_id,
+                        'rot_err': e[1]
+                    })
+
+    # --- Plot with seaborn stripplot using hue for color ---
+    sns.stripplot(data=pd.DataFrame(all_coarse_pos), x='seq_id', y='trans_err', hue='seq_type',
+                  palette=kTypeColors, dodge=True, ax=ax[0, 0], alpha=0.5)
+    sns.stripplot(data=pd.DataFrame(all_coarse_rot), x='seq_id', y='rot_err', hue='seq_type',
+                  palette=kTypeColors, dodge=True, ax=ax[0, 1], alpha=0.5)
+    sns.stripplot(data=pd.DataFrame(all_fine_pos), x='seq_id', y='trans_err', hue='seq_type',
+                  palette=kTypeColors, dodge=True, ax=ax[1, 0], alpha=0.5)
+    sns.stripplot(data=pd.DataFrame(all_fine_rot), x='seq_id', y='rot_err', hue='seq_type',
+                  palette=kTypeColors, dodge=True, ax=ax[1, 1], alpha=0.5)
+    seq_types = ['Glenshield', 'Commercial', 'Skyway']
+    # Replace with the labels
+    seqs_per_type = [len(errors_coarse[stype]) for stype in seq_types]
+    seq_types = [kTypeLabels[stype] for stype in seq_types]
+
+    # Compute the center position for each group
+    group_centers = np.cumsum([0] + seqs_per_type)[:-1] + np.array(seqs_per_type) / 2 - 0.5
+
+    # Set the x-ticks at the group centers and label them with the sequence type
+    ax[0, 0].set_xticks(group_centers)
+    ax[0, 0].set_xticklabels(seq_types, fontsize=9)
+    ax[0, 1].set_xticks(group_centers)
+    ax[0, 1].set_xticklabels(seq_types, fontsize=9)
+    ax[1, 0].set_xticks(group_centers)
+    ax[1, 0].set_xticklabels(seq_types, fontsize=9)
+    ax[1, 1].set_xticks(group_centers)
+    ax[1, 1].set_xticklabels(seq_types, fontsize=9)
+
+    # Remove the legends
+    ax[0, 0].legend_.remove()
+    ax[0, 1].legend_.remove()
+    ax[1, 0].legend_.remove()
+    ax[1, 1].legend_.remove()
+
+    ax[0, 0].set_title('Coarse reg. - Pos. error', {'fontweight': 'bold'})
+    ax[0, 1].set_title('Coarse reg. - Rot. error', {'fontweight': 'bold'})
+    ax[1, 0].set_title('Fine reg. - Pos. error', {'fontweight': 'bold'})
+    ax[1, 1].set_title('Fine reg. - Rot. error', {'fontweight': 'bold'})
+    ax[0, 0].set_ylabel('Pos. Error [m]')
+    ax[0, 1].set_ylabel('Rot. Error [deg]')
+    ax[1, 0].set_ylabel('Pos. Error [m]')
+    ax[1, 1].set_ylabel('Rot. Error [deg]')
+    ax[0, 0].set_xlabel('')
+    ax[0, 1].set_xlabel('')
+    ax[1, 0].set_xlabel('')
+    ax[1, 1].set_xlabel('')
+    plt.tight_layout()
+    plt.savefig('figures/registration_errors_per_sequence.pdf')
+    plt.show()
+
+
+def getRegistrationErrors(loops, gt_poses, gt_times):
+    errors = []
+    for loop in loops.itertuples():
+        time_i = utils.nameToTime(loop.scan_i_name)
+        time_j = utils.nameToTime(loop.scan_j_name)
+
+        pose_i = utils.getInterpolatedPose(gt_poses, gt_times, time_i)
+        pose_j = utils.getInterpolatedPose(gt_poses, gt_times, time_j)
+
+        # Compute the relative pose
+        rel_pose_gt = np.linalg.inv(pose_i) @ pose_j
+        xy = np.array([loop.x, loop.y])
+        theta = loop.theta
+        rel_pose_est = utils.XYThetaToPose(xy, theta)
+
+        # Compute the error
+        rel_pose_err = np.linalg.inv(rel_pose_est) @ rel_pose_gt
+        trans_err = np.linalg.norm(rel_pose_err[:2, 3])
+        rot_err = np.linalg.norm(R.from_matrix(rel_pose_err[:3, :3]).as_rotvec())*180.0/np.pi  # Convert to degrees
+        errors.append((trans_err, rot_err))
+    return errors
+
+
+if __name__ == "__main__":
+    main()
