@@ -217,6 +217,7 @@ def main():
                 print("Frame " + str(i-start_id+1) + " / " + str(end_id-start_id), end='\r')
             else:
                 print("Frame " + str(i-start_id+1) + " / " + str(end_id-start_id) + " - Avg. opti: " + str(round(opti_time_sum/time_counter,3)) + "s, time left (including visualisation): " + str(round((end_id-i)*time_sum/time_counter/60, 3)) + "min    ", end='\r')
+                np.savetxt(other_log_path + '/avg_time.txt', np.array([round(opti_time_sum/time_counter,3)]), fmt='%.3f', header='Avg. time per frame (s)')
 
 
 

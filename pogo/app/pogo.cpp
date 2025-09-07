@@ -1,6 +1,8 @@
 #include "pose_graph.h"
 #include "utils.h"
 #include <yaml-cpp/yaml.h>
+#include <iostream>
+#include <chrono>
 
 
 
@@ -91,6 +93,9 @@ int main()
     std::vector<std::tuple<int64_t, int64_t, std::array<double, 3>>> loop_closures = readLoopClosures(loop_closure_file);
 
 
+    // Record time
+    auto start_time = std::chrono::high_resolution_clock::now();
+
     // Add odometry edges to the pose graph
     for(size_t i = 0; i < odometry_data.size() - 1; ++i) {
         const auto& [t0, pose] = odometry_data[i];
@@ -110,6 +115,19 @@ int main()
     }
 
     pose_graph.optimize();
+    auto end_time = std::chrono::high_resolution_clock::now();
+
+    // Write optimization time to file
+    std::chrono::duration<double> optimization_duration = end_time - start_time;
+    std::cout << "Optimization took " << optimization_duration.count() << " seconds." << std::endl;
+    std::ofstream time_file("output/" + seq_id + "/pogo_time.txt");
+    if (time_file.is_open()) {
+        time_file << optimization_duration.count() << std::endl;
+        time_file.close();
+    } else {
+        std::cerr << "Unable to open file to write optimization time." << std::endl;
+    }
+    
     pose_graph.printLastPose();
 
     pose_graph.writeToFile("output/" + seq_id + "/pose_graph_traj.txt");
