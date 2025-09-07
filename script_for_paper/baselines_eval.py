@@ -31,6 +31,8 @@ def main():
         output_files.sort()
         errors[method] = {}
         for file in output_files:
+            if "_errors.csv" in file:
+                continue
             if 'tbv' in method:
                 if file == 'boreas':
                     continue
