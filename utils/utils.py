@@ -12,6 +12,18 @@ T_applanix_dmu = np.array([[9.99945620e-01, -1.03283308e-02, -1.44307407e-03, 0]
                 [-1.44026031e-03,  2.79863852e-04, -9.99998924e-01, 0],
                 [0, 0, 0, 1]])
 
+kDataPaths = [
+    "/media/ced/Extreme Pro/data/boreas/rss/test",
+    "/media/ced/Extreme Pro/data/boreas/original_train",
+    "/home/ced/Documents/data/boreas/rss/test",
+    "/home/ced/Documents/data/boreas/original_train",
+    "/home/ced/Documents/data/boreas/for_tbv/rss/boreas",
+    "/home/ced/Documents/data/boreas/for_tbv/original_train/boreas",
+
+]
+
+kUpgradeTime = 1632182400
+kRatioAfterUpgrade = 0.04381 / 0.0596 
 
 def getOutputDataDir():
     # Fetch the sequence ID from the DRO config file
@@ -29,20 +41,27 @@ def getOutputDataDir():
     return data_dir
 
 
-def getDataDir():
-    # Fetch the sequence ID from the DRO config file
-    with open(os.path.join("dro", "config.yaml"), 'r') as f:
-        opts = yaml.safe_load(f)
-    if opts['data']['multi_sequence']:
-        raise ValueError("This script is not designed for multi-sequence data.")
-    data_dir = opts['data']['data_path']
-    if data_dir.endswith('/'):
-        data_dir = data_dir[:-1]
-    # Get the sequence ID
-    sequence_id = data_dir.split('/')[:-1]
-    # Combine to get the full data path
-    data_dir = '/'.join(sequence_id)
-    return data_dir
+def getDataDir(seq_id=None):
+    if seq_id is None:
+        # Fetch the sequence ID from the DRO config file
+        with open(os.path.join("dro", "config.yaml"), 'r') as f:
+            opts = yaml.safe_load(f)
+        if opts['data']['multi_sequence']:
+            raise ValueError("This script is not designed for multi-sequence data.")
+        data_dir = opts['data']['data_path']
+        if data_dir.endswith('/'):
+            data_dir = data_dir[:-1]
+        # Get the sequence ID
+        sequence_id = data_dir.split('/')[:-1]
+        # Combine to get the full data path
+        data_dir = '/'.join(sequence_id)
+        return data_dir
+    else:
+        for path in kDataPaths:
+            if os.path.exists(path):
+                if os.path.exists(os.path.join(path, seq_id)):
+                    return path
+        raise ValueError(f"Data path for sequence ID {seq_id} not found in predefined paths.")
 
 
 
@@ -69,6 +88,27 @@ def affineToPoseAndScale(affine_matrix, pix_res, img_shape):
     # Convert the pose to the local map frame
     pose = T_local_map_cv @ pose @ T_cv_local_map
     return pose, scale
+
+def poseToAffine(pose, pix_res, img_shape):
+    # Transform to convert the opencv frame to the local map frame
+    T_cv_local_map = np.array([[0, 1, 0, pix_res*img_shape[1]/2],
+                               [-1, 0, 0, pix_res*img_shape[0]/2],
+                               [0, 0, 1, 0],
+                               [0, 0, 0, 1]])
+    T_local_map_cv = np.linalg.inv(T_cv_local_map)
+
+    # Convert the pose to the cv frame
+    pose_cv = T_cv_local_map @ pose @ T_local_map_cv
+
+    # Get the affine matrix from the pose
+    affine_matrix = np.eye(2, 3)
+    affine_matrix[0, 0] = pose_cv[0, 0]
+    affine_matrix[0, 1] = pose_cv[0, 1]
+    affine_matrix[0, 2] = pose_cv[0, 3] / pix_res
+    affine_matrix[1, 0] = pose_cv[1, 0]
+    affine_matrix[1, 1] = pose_cv[1, 1]
+    affine_matrix[1, 2] = pose_cv[1, 3] / pix_res
+    return affine_matrix
 
 
 
@@ -108,7 +148,7 @@ def XYThetaToPose(xy, theta):
 
 def getGTRadarPosesAndTimes(seq_id):
     # Get the data path
-    data_path = os.path.join(getDataDir(), seq_id)
+    data_path = os.path.join(getDataDir(seq_id), seq_id)
 
     # Get the gps poses
     gt_path = os.path.join(data_path, "applanix", "gps_post_process.csv")
@@ -199,7 +239,7 @@ def getInterpolatedTrajectory(poses, times, query_times):
 
 def readFastLio2DTraj(path, seq_id):
     # Read the calibration
-    raw_data_path = os.path.join(getDataDir(), seq_id)
+    raw_data_path = os.path.join(getDataDir(seq_id), seq_id)
     T_radar_lidar = np.loadtxt(os.path.join(raw_data_path, "calib", "T_radar_lidar.txt"))
     T_applanix_lidar = np.loadtxt(os.path.join(raw_data_path, "calib", "T_applanix_lidar.txt"))
     T_dmu_radar = np.linalg.inv(T_applanix_dmu) @ T_applanix_lidar @ np.linalg.inv(T_radar_lidar)
@@ -221,19 +261,18 @@ def readFastLio2DTraj(path, seq_id):
     # Project the poses onto the plane
     poses = align3DPosesTo2D(poses)
 
-    plt.figure()
-    plt.plot(poses[:, 0], poses[:, 1])
-    plt.axis('equal')
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.title('Projected 2D Poses')
-    plt.grid()
-    plt.show()
+    #plt.figure()
+    #plt.plot(poses[:, 0, 3], poses[:, 1, 3])
+    #plt.plot(pos[:, 0], pos[:, 1], '--')
+    #plt.axis('equal')
+    #plt.xlabel('X')
+    #plt.ylabel('Y')
+    #plt.title('Projected 2D Poses' + seq_id)
+    #plt.show()
 
     return poses, data[:,0]
 
 def readNavtechSLAM2DTraj(path):
-        # Read the calibration
     data = np.loadtxt(path, delimiter=',', skiprows=1)
 
     poses = np.zeros((len(data), 4, 4))
@@ -261,22 +300,23 @@ def readNavtechSLAM2DTraj(path):
 
     poses = T_flip.reshape(1,4,4) @ poses
 
+    if data[0,0] > kUpgradeTime:
+        poses[:, :3, 3] *= kRatioAfterUpgrade
     # Project the poses onto the plane
     #poses = align3DPosesTo2D(poses)
 
-    plt.figure()
-    plt.plot(poses[:, 0], poses[:, 1])
-    plt.axis('equal')
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.title('Projected 2D Poses')
-    plt.grid()
-    plt.show()
+    #plt.figure()
+    #plt.plot(poses[:, 0], poses[:, 1])
+    #plt.axis('equal')
+    #plt.xlabel('X')
+    #plt.ylabel('Y')
+    #plt.title('Projected 2D Poses')
+    #plt.show()
 
     return poses, data[:,0]
 
 def read2Fast2Lamaa2DTraj(path, seq_id):
-    raw_data_path = os.path.join(getDataDir(), seq_id)
+    raw_data_path = os.path.join(getDataDir(seq_id), seq_id)
     T_radar_lidar = np.loadtxt(os.path.join(raw_data_path, "calib", "T_radar_lidar.txt"))
     T_applanix_lidar = np.loadtxt(os.path.join(raw_data_path, "calib", "T_applanix_lidar.txt"))
     T_dmu_radar = np.linalg.inv(T_applanix_dmu) @ T_applanix_lidar @ np.linalg.inv(T_radar_lidar)
@@ -294,16 +334,61 @@ def read2Fast2Lamaa2DTraj(path, seq_id):
     # Project the poses onto the plane
     poses = align3DPosesTo2D(poses)
 
-    plt.figure()
-    plt.plot(poses[:, 0], poses[:, 1])
-    plt.axis('equal')
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.title('Projected 2D Poses')
-    plt.grid()
-    plt.show()
+    #plt.figure()
+    #plt.plot(poses[:, 0], poses[:, 1])
+    #plt.axis('equal')
+    #plt.xlabel('X')
+    #plt.ylabel('Y')
+    #plt.title('Projected 2D Poses')
+    #plt.show()
 
     return poses, data[:,0]*1e-6
+
+def readTBV2DTraj(path):
+    # paramers path 
+    param_path = os.path.join(path, "pars.txt")
+    # Read line by line to find the sequence ID
+    with open(param_path, 'r') as f:
+        lines = f.readlines()
+    seq_id = None
+    for line in lines:
+        if line.startswith("sequence, "):
+            seq_id = line.split(",")[1].strip()
+            break
+    if seq_id is None:
+        raise ValueError("Sequence ID not found in pars.txt")
+    
+    graph_path = os.path.join(path, "graph.txt")
+    # Read the graph file
+    with open(graph_path, 'r') as f:
+        lines = f.readlines()
+    times = []
+    poses = []
+    for line in lines:
+        if line.strip() == "":
+            continue
+        parts = line.split()
+        times.append(int(parts[-1]))
+        pose = np.eye(4)
+        pose[:3, :] = np.array(parts[:-1], dtype=float).reshape(3, 4)
+        poses.append(pose)
+    
+    poses = np.array(poses)
+
+    if times[0]*1e-9 > kUpgradeTime:
+        poses[:, :3, 3] *= kRatioAfterUpgrade
+
+    #plt.figure()
+    #plt.plot(poses[:, 0, 3], poses[:, 1, 3])
+    #plt.axis('equal')
+    #plt.xlabel('X')
+    #plt.ylabel('Y')
+    #plt.title('Projected 2D Poses')
+    #plt.show()
+
+    return poses, np.array(times)*1e-9, seq_id
+
+    
 
 
 def align3DPosesTo2D(poses):
