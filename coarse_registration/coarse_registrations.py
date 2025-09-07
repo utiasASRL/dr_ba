@@ -7,6 +7,7 @@ import yaml
 import numpy as np
 import pandas as pd
 import cv2
+import time
 
 
 def main():
@@ -35,6 +36,8 @@ def main():
     # nfeatures=0 means no limit (default), set to a specific number to limit features
     sift_extractor = cv2.SIFT_create(nfeatures=0, contrastThreshold=0.02, edgeThreshold=20, sigma=2.5)
     sift_matcher = cv2.BFMatcher()
+
+    time_start = time.time()
 
     # Loop through the matches
     for index, row in raw_loops.iterrows():
@@ -124,6 +127,9 @@ def main():
             cv2.imshow("Match", np.hstack((img1_reg, img2)))
             cv2.waitKey(0)
         
+    time_end = time.time()
+    np.savetxt(output_path + '/coarse_registration_time.txt', np.array([round(time_end - time_start, 2), len(raw_loops), len(valid_matches)]), fmt='%.2f', header='Total time (s), Number of queries, Number of valid matches')
+
     if opts['visualize']:
         # Close the OpenCV windows
         cv2.destroyAllWindows()

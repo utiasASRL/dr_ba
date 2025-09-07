@@ -22,6 +22,7 @@ def main():
         pd.DataFrame(fine_registrations, columns=['scan_i_name', 'scan_j_name', 'x', 'y', 'theta']).to_csv(os.path.join(out_path, "fine_registrations.csv"), index=False)
         return
 
+    time_start = time.time()
 
     if coarse_registrations.empty:
         print("No coarse registrations found.")
@@ -76,6 +77,9 @@ def main():
 
             t1 = time.time()
             print("Fine registration took", np.round(t1 - t0, 3), "seconds.")
+
+    time_end = time.time()
+    np.savetxt(out_path + '/fine_registration_time.txt', np.array([round(time_end - time_start, 2), len(coarse_registrations), len(fine_registrations)]), fmt='%.2f', header='Total time (s), Number of queries, Number of valid fine registrations')
 
     # Save the fine registrations to a CSV file
     fine_registrations = pd.DataFrame(fine_registrations, columns=['scan_i_name', 'scan_j_name', 'x', 'y', 'theta'])

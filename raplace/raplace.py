@@ -39,6 +39,8 @@ def main():
 
     down_shape = 0.6
 
+    time_start = time.time()
+
     # Generate Radon Transforms (not all the data, only a subset based on a distance threshold)
     data_sinofft, data_rowkeys, data_names, times, odom_poses, distances = generateRadon(seq_dir, down_shape, real_time=True, max_img_size=opts['max_img_size'])
 
@@ -98,6 +100,8 @@ def main():
         })    
 
 
+    time_end = time.time()
+    np.savetxt(seq_dir + '/raplace_time.txt', np.array([round(time_end - time_start, 2), num_queries]), fmt='%.2f', header='Total time (s), Number of queries')
 
     df = pd.DataFrame(loop_records)
     df.to_csv(seq_dir + '/raplace_loops.csv', index=False)
