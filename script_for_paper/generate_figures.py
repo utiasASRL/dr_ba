@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 from scipy.spatial.transform import Rotation as R
 import seaborn as sns
 import pyboreas as pb
@@ -33,9 +34,131 @@ def main():
     #plotLoopRegistrations()
     #teaserDataSample(frame_id=1150)
     #crossCorrelationExample()
+    #plotPublicBoreas()
 
-    plotPublicBoreas()
+    plottrajectories()
 
+def plottrajectories():
+    sequences = ['boreas-2024-12-03-12-54', 'boreas-2024-12-23-17-18', 'boreas-2024-12-04-12-08']
+    labels = ['Suburbs', 'Commercial', 'Skyway']
+    rotations = [0, -60, 20] # Degrees
+    zoom_regions = [(-150, 150, -150, 200), (-100, 100, -100, 100), (-200, 400, -100, 800)]
+    insert_positions = [(0.05, 0.05, 0.35), (0.64, 0.45, 0.35), (0.6, 0.1, 0.35)]
+    insert_locs = [(1,3), (1,3), (2,3)] # loc1, loc2 for mark_inset
+
+    fig, ax = plt.subplots(3, 1, figsize=(5, 13))
+    for i, seq_id in enumerate(sequences):
+        # Load the estimated poses
+        dro_traj, times = utils.getDroPosesAndTimes(seq_id, ouput_path='output_dr_pogo')
+        pogo_traj, times = utils.getPogoPosesAndTimes(seq_id, ouput_path='output_dr_pogo')
+
+        navtech_traj, navtech_times = utils.readNavtechSLAM2DTraj(searchNavtechPath(seq_id))
+        navtech_traj = np.linalg.inv(navtech_traj[0,:,:]) @ navtech_traj
+        tbv_traj, tbv_times, _ = utils.readTBV2DTraj(searchTBVPath(seq_id))
+        tbv_traj = np.linalg.inv(tbv_traj[0,:,:]) @ tbv_traj
+        tbv_traj = np.array([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]]) @ tbv_traj
+
+
+        gt_traj, gt_times = utils.getGTRadarPosesAndTimes(seq_id)
+        gt_traj = np.linalg.inv(gt_traj[0,:,:]) @ gt_traj
+        times = times * 1e-6
+
+        ang_rot = np.deg2rad(rotations[i])
+        rot_mat = np.array([[np.cos(ang_rot), -np.sin(ang_rot), 0, 0],
+                            [np.sin(ang_rot), np.cos(ang_rot), 0, 0],
+                            [0, 0, 1, 0],
+                            [0, 0, 0, 1]])
+        gt_traj = rot_mat @ gt_traj
+
+
+        dro_aligned, _ ,_ = utils.align2DTrajectories(gt_traj, gt_times, dro_traj, times)
+        pogo_aligned, _ ,_ = utils.align2DTrajectories(gt_traj, gt_times, pogo_traj, times)
+        navtech_aligned, _ ,_ = utils.align2DTrajectories(gt_traj, gt_times, navtech_traj, navtech_times)
+        tbv_aligned, _ ,_ = utils.align2DTrajectories(gt_traj, gt_times, tbv_traj, tbv_times)
+
+        ax[i].plot(navtech_aligned[:, 0], -navtech_aligned[:, 1], 'lightgreen', label='Navtech-SLAM', linewidth=1)
+        ax[i].plot(dro_aligned[:, 0], -dro_aligned[:, 1], 'orange', label='DRO', linewidth=1)
+        ax[i].plot(tbv_aligned[:, 0], -tbv_aligned[:, 1], 'fuchsia', label='TBV-SLAM', linewidth=1)
+        ax[i].plot(pogo_aligned[:, 0], -pogo_aligned[:, 1], 'blue', label='PoGO', linewidth=1)
+        ax[i].plot(gt_traj[:, 0, 3], -gt_traj[:, 1, 3], 'r--', label='Groundtruth', linewidth=1)
+
+        ## Insert a zoomed-in region
+        #x_min, x_max, y_min, y_max = zoom_regions[i]
+        #axin = ax[i].inset_axes(insert_positions[i], xlim=(x_min, x_max), ylim=(y_min, y_max))
+        ##axin.plot(navtech_aligned[:, 0], -navtech_aligned[:, 1], 'lightgreen', linewidth=1)
+        ##axin.plot(dro_aligned[:, 0], -dro_aligned[:, 1], 'orange', linewidth=1)
+        ##axin.plot(tbv_aligned[:, 0], -tbv_aligned[:, 1], 'fuchsia', linewidth=1)
+        ##axin.plot(pogo_aligned[:, 0], -pogo_aligned[:, 1], 'blue', linewidth=1)
+        ##axin.plot(gt_traj[:, 0, 3], -gt_traj[:, 1, 3], 'r--', linewidth=1)
+        #axin.axis('equal')
+        #axin.set_xticks([])
+        #axin.set_yticks([])
+        #ax[i].indicate_inset_zoom(axin, edgecolor="black")
+
+        #axin = inset_axes(ax[i], width="35%", height="35%", loc='upper right')
+        ratio_x = zoom_regions[i][1] - zoom_regions[i][0]
+        ratio_y = zoom_regions[i][3] - zoom_regions[i][2]
+        axin = ax[i].inset_axes([insert_positions[i][0], insert_positions[i][1], insert_positions[i][2], insert_positions[i][2]*ratio_y/ratio_x])
+        axin.plot(navtech_aligned[:, 0], -navtech_aligned[:, 1], 'lightgreen', linewidth=1)
+        axin.plot(dro_aligned[:, 0], -dro_aligned[:, 1], 'orange', linewidth=1)
+        axin.plot(tbv_aligned[:, 0], -tbv_aligned[:, 1], 'fuchsia', linewidth=1)
+        axin.plot(pogo_aligned[:, 0], -pogo_aligned[:, 1], 'blue', linewidth=1)
+        axin.plot(gt_traj[:, 0, 3], -gt_traj[:, 1, 3], 'r--', linewidth=1)
+        x_min, x_max, y_min, y_max = zoom_regions[i]
+        axin.set_xlim(x_min, x_max)
+        axin.set_ylim(y_min, y_max)
+        axin.set_xticks([])
+        axin.set_yticks([])
+
+        mark_inset(ax[i], axin, loc1=insert_locs[i][0], loc2=insert_locs[i][1], fc="none", ec="0.5", ls='--')
+        #ax[i].indicate_inset_zoom(axin, edgecolor="black")
+
+
+        ax[i].set_title(labels[i], {'fontweight': 'bold'})
+        ax[i].set_ylabel('Y [m]')
+        ax[i].axis('equal')
+
+    ax[-1].set_xlabel('X [m]')
+    ax[0].legend(loc='upper left')
+    plt.tight_layout()
+    plt.savefig('figures/trajectories_examples.pdf')
+    plt.show()
+
+
+def searchTBVPath(seq_id):
+    base_path = '/home/ced/Documents/data/boreas/for_tbv/rss/TBV_Eval'
+    list_of_dirs = os.listdir(base_path)
+    path = None
+    for dir_name in list_of_dirs:
+        param_path = os.path.join(base_path, dir_name, "job_0/pars.txt")
+        if not os.path.exists(param_path):
+            continue
+        # Read line by line to find the sequence ID
+        with open(param_path, 'r') as f:
+            lines = f.readlines()
+        for line in lines:
+            if line.startswith("sequence, "):
+                parts = line.split(", ")
+                if len(parts) >= 2 and seq_id in parts[1]:
+                    path = os.path.join(base_path, dir_name, "job_0")
+                    break
+
+    if path is None:
+        raise ValueError(f"Could not find TBV path for sequence {seq_id}")
+    return path
+
+def searchNavtechPath(seq_id):
+    base_path = 'output_navtech_slam_rss'
+    list_of_files = os.listdir(base_path)
+    path = None
+    for file_name in list_of_files:
+        if file_name.startswith(seq_id) and file_name.endswith('_pgo.csv'):
+            path = os.path.join(base_path, file_name)
+            break
+
+    if path is None:
+        raise ValueError(f"Could not find Navtech path for sequence {seq_id}")
+    return path
 
 def plotPublicBoreas():
     pogo_path = "output_public"
