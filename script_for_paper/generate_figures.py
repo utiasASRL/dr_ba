@@ -6,6 +6,9 @@ import numpy as np
 import pandas as pd
 import matplotlib
 matplotlib.use('TkAgg')
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+matplotlib.rcParams['font.family'] = 'DejaVu Sans'
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 from scipy.spatial.transform import Rotation as R
@@ -38,13 +41,89 @@ def main():
 
     plottrajectories()
 
+    #timing()
+
+
+def timing():
+    result_folder = "output_dr_pogo_incremental"
+
+    list_of_dirs = os.listdir(result_folder)
+
+    dro_total_time = 0
+    total_nb_frames = 0
+    raplace_total_time = 0
+    raplace_nb_queries = 0
+    coarse_total_time = 0
+    coarse_nb_queries = 0
+    fine_total_time = []
+    fine_nb_queries = []
+    pogo_total_time = 0
+    pogo_nb_queries = 0
+
+    for dir_name in list_of_dirs:
+        nb_frames = len(os.listdir(os.path.join(result_folder, dir_name, "local_maps")))
+        total_nb_frames += nb_frames
+
+        # Read the DRO time
+        dro_time = np.loadtxt(os.path.join(result_folder, dir_name, "other_log/avg_time.txt"), delimiter=',', skiprows=1)
+        dro_total_time += dro_time * nb_frames
+
+        # Read the raplace time
+        raplace_time_raw = np.loadtxt(os.path.join(result_folder, dir_name, "raplace_time.txt"), delimiter=',', skiprows=1)
+        raplace_total_time += raplace_time_raw[0]
+        raplace_nb_queries += raplace_time_raw[1]
+
+        # Read the coarse registration time
+        coarse_time_raw = np.loadtxt(os.path.join(result_folder, dir_name, "coarse_registration_time.txt"), delimiter=',', skiprows=1)
+        coarse_total_time += coarse_time_raw[0]
+        coarse_nb_queries += coarse_time_raw[1]
+
+        # Read the fine registration time
+        fine_time_raw = np.loadtxt(os.path.join(result_folder, dir_name, "fine_registration_time.txt"), delimiter=',', skiprows=1)
+        fine_total_time.append(fine_time_raw[0])
+        fine_nb_queries.append(fine_time_raw[1])
+
+        # Read the pogo time
+        pogo_time_raw = np.loadtxt(os.path.join(result_folder, dir_name, "pogo_time.txt"), delimiter=',')
+        pogo_total_time += pogo_time_raw
+        pogo_nb_queries += fine_time_raw[2]
+
+
+    print("DRO average time per frame:", dro_total_time / total_nb_frames, "s")
+    print("Raplace average time per query:", raplace_total_time / raplace_nb_queries, "s,   per frame:", raplace_total_time / total_nb_frames, "s")
+    print("Coarse registration average time per query:", coarse_total_time / coarse_nb_queries, "s,   per frame:", coarse_total_time / total_nb_frames, "s")
+
+    X = np.zeros((len(fine_total_time),2))
+    b = np.zeros((len(fine_total_time),1))
+
+    X[:,0] = np.array(fine_nb_queries)
+    X[:,1] = 1
+    b[:,0] = np.array(fine_total_time)
+
+    w, _, _, _ = np.linalg.lstsq(X, b, rcond=None)
+    print("Fine registration average time per query:", w[0,0], "s,   overhead:", w[1,0], "s,   per frame:", np.sum(fine_total_time) / total_nb_frames, "s")
+
+    print("PoGO average time per query:", pogo_total_time / pogo_nb_queries, "s,   per frame:", pogo_total_time / total_nb_frames, "s")
+
+
+
+
+
+
+
+
+
+
 def plottrajectories():
     sequences = ['boreas-2024-12-03-12-54', 'boreas-2024-12-23-17-18', 'boreas-2024-12-04-12-08']
     labels = ['Suburbs', 'Commercial', 'Skyway']
     rotations = [0, -60, 20] # Degrees
     zoom_regions = [(-150, 150, -150, 200), (-100, 100, -100, 100), (-200, 400, -100, 800)]
+    zoom_regions_2 = [(-350, -100, 2050, 2300), (-520, -460, -1300, -1220), (3300, 3450, 3900, 4100)]
     insert_positions = [(0.05, 0.05, 0.35), (0.64, 0.45, 0.35), (0.6, 0.1, 0.35)]
+    insert_positions_2 = [(0.65, 0.65, 0.3), (0.01, 0.01, 0.3), (0.01, 0.55, 0.3)]
     insert_locs = [(1,3), (1,3), (2,3)] # loc1, loc2 for mark_inset
+    insert_locs_2 = [(1,3), (1,4), (2,4)] # loc1, loc2 for mark_inset
 
     fig, ax = plt.subplots(3, 1, figsize=(5, 13))
     for i, seq_id in enumerate(sequences):
@@ -112,6 +191,22 @@ def plottrajectories():
 
         mark_inset(ax[i], axin, loc1=insert_locs[i][0], loc2=insert_locs[i][1], fc="none", ec="0.5", ls='--')
         #ax[i].indicate_inset_zoom(axin, edgecolor="black")
+
+        ratio_x = zoom_regions_2[i][1] - zoom_regions_2[i][0]
+        ratio_y = zoom_regions_2[i][3] - zoom_regions_2[i][2]
+        axin2 = ax[i].inset_axes([insert_positions_2[i][0], insert_positions_2[i][1], insert_positions_2[i][2], insert_positions_2[i][2]*ratio_y/ratio_x])
+        axin2.plot(navtech_aligned[:, 0], -navtech_aligned[:, 1], 'lightgreen', linewidth=1)
+        axin2.plot(dro_aligned[:, 0], -dro_aligned[:, 1], 'orange', linewidth=1)
+        axin2.plot(tbv_aligned[:, 0], -tbv_aligned[:, 1], 'fuchsia', linewidth=1)
+        axin2.plot(pogo_aligned[:, 0], -pogo_aligned[:, 1], 'blue', linewidth=1)
+        axin2.plot(gt_traj[:, 0, 3], -gt_traj[:, 1, 3], 'r--', linewidth=1)
+        x_min, x_max, y_min, y_max = zoom_regions_2[i]
+        axin2.set_xlim(x_min, x_max)
+        axin2.set_ylim(y_min, y_max)
+        axin2.set_xticks([])
+        axin2.set_yticks([])
+        mark_inset(ax[i], axin2, loc1=insert_locs_2[i][0], loc2=insert_locs_2[i][1], fc="none", ec="0.5", ls='--')
+
 
 
         ax[i].set_title(labels[i], {'fontweight': 'bold'})
@@ -303,26 +398,26 @@ def crossCorrelationExample():
     fig, ax = plt.subplots(1, 3, figsize=(9, 4))
     ax[0].imshow(low_img, cmap='gray')
     ax[0].imshow(overlay_low, cmap='hot_alpha', alpha=kAlpha)
-    ax[0].text(kTextX, kTextY, 'Scene A, good reg.', color='white', fontsize=kFontSize, va='top')
+    #ax[0].text(kTextX, kTextY, 'Scene A, good reg.', color='white', fontsize=kFontSize, va='top', fontname='DejaVu Sans')
     ax[0].set_xlim(extent[0], extent[1])
     ax[0].set_ylim(extent[3], extent[2])
     #ax[0].text(kTextX, kTextY + kTextStep, 'Good registration', color='lightgreen', fontsize=kFontSize, va='top')
-    ax[0].text(kTextX, kTextY + 1 * kTextStep, 'g=' + "{0:.2e}".format(low_cross_corr), color='white', fontsize=kFontSize, va='top')
-    ax[0].text(kTextX, kTextY + 2 * kTextStep, 's=' + str(np.round(low_score, 2)), color='lightgreen', fontsize=kFontSize, va='top')
+    #ax[0].text(kTextX, kTextY + 1 * kTextStep, 'g=' + "{0:.2e}".format(low_cross_corr), color='white', fontsize=kFontSize, va='top', fontname='DejaVu Sans')
+    #ax[0].text(kTextX, kTextY + 2 * kTextStep, 's=' + str(np.round(low_score, 2)), color='lightgreen', fontsize=kFontSize, va='top', fontname='DejaVu Sans')
     ax[1].imshow(high_img, cmap='gray')
     ax[1].imshow(overlay_high, cmap='hot_alpha', alpha=kAlpha)
-    ax[1].text(kTextX, kTextY, 'Scene B, good reg.', color='white', fontsize=kFontSize, va='top')
+    #ax[1].text(kTextX, kTextY, 'Scene B, good reg.', color='white', fontsize=kFontSize, va='top', fontname='DejaVu Sans')
     ax[1].set_xlim(extent[0], extent[1])
     ax[1].set_ylim(extent[3], extent[2])
     #ax[1].text(kTextX, kTextY + kTextStep, 'Good registration', color='lightgreen', fontsize=kFontSize, va='top')
-    ax[1].text(kTextX, kTextY + 1 * kTextStep, 'g=' + "{0:.2e}".format(high_cross_corr), color='white', fontsize=kFontSize, va='top')
-    ax[1].text(kTextX, kTextY + 2 * kTextStep, 's=' + str(np.round(high_score, 2)), color='lightgreen', fontsize=kFontSize, va='top')
+    #ax[1].text(kTextX, kTextY + 1 * kTextStep, 'g=' + "{0:.2e}".format(high_cross_corr), color='white', fontsize=kFontSize, va='top', fontname='DejaVu Sans')
+    #ax[1].text(kTextX, kTextY + 2 * kTextStep, 's=' + str(np.round(high_score, 2)), color='lightgreen', fontsize=kFontSize, va='top', fontname='DejaVu Sans')
     ax[2].imshow(high_img, cmap='gray')
     ax[2].imshow(shifted_overlay_high, cmap='hot_alpha', alpha=kAlpha)
-    ax[2].text(kTextX, kTextY, 'Scene B, poor reg.', color='white', fontsize=kFontSize, va='top')
+    #ax[2].text(kTextX, kTextY, 'Scene B, poor reg.', color='white', fontsize=kFontSize, va='top', fontname='DejaVu Sans')
     #ax[2].text(kTextX, kTextY + kTextStep, 'Poor registration', color='lightcoral', fontsize=kFontSize, va='top')
-    ax[2].text(kTextX, kTextY + 1 * kTextStep, 'g=' + "{0:.2e}".format(shifted_high_cross_corr), color='white', fontsize=kFontSize, va='top')
-    ax[2].text(kTextX, kTextY + 2 * kTextStep, 's=' + str(np.round(shifted_high_score, 2)), color='lightcoral', fontsize=kFontSize, va='top')
+    #ax[2].text(kTextX, kTextY + 1 * kTextStep, 'g=' + "{0:.2e}".format(shifted_high_cross_corr), color='white', fontsize=kFontSize, va='top', fontname='DejaVu Sans')
+    #ax[2].text(kTextX, kTextY + 2 * kTextStep, 's=' + str(np.round(shifted_high_score, 2)), color='lightcoral', fontsize=kFontSize, va='top', fontname='DejaVu Sans')
     ax[2].set_xlim(extent[0], extent[1])
     ax[2].set_ylim(extent[3], extent[2])
     # Remove the axis
