@@ -162,9 +162,9 @@ def getGTRadarPosesAndTimes(seq_id):
     gt_poses = np.array(poses)
     return gt_poses, gt_times
 
-def getPogoPosesAndTimes(seq_id):
+def getPogoPosesAndTimes(seq_id, ouput_path='output'):
     # Get the results path
-    data_path = os.path.join("output", seq_id, "pose_graph_traj.txt")
+    data_path = os.path.join(ouput_path, seq_id, "pose_graph_traj.txt")
     if not os.path.exists(data_path):
         print(f"Skipping sequence {seq_id} due to missing results.")
         return None, None
@@ -180,9 +180,9 @@ def getPogoPosesAndTimes(seq_id):
     poses = np.array(poses)
     return poses, times
 
-def getDroPosesAndTimes(seq_id):
+def getDroPosesAndTimes(seq_id, ouput_path='output'):
     # Get the results path
-    data_path = os.path.join("output", seq_id, "odometry_2d", seq_id + ".txt")
+    data_path = os.path.join(ouput_path, seq_id, "odometry_2d", seq_id + ".txt")
     if not os.path.exists(data_path):
         print(f"Skipping sequence {seq_id} due to missing results.")
         return None, None
@@ -425,6 +425,37 @@ def nameToTime(name):
     # Extract the timestamp from the filename
     time_str = name.split('.')[0]
     return float(time_str)*1e-6
+
+def align2DTrajectories(gt_poses, gt_times, est_poses, est_times):
+    gt_interp_poses = getInterpolatedTrajectory(gt_poses, gt_times, est_times)
+
+    gt_xy = gt_interp_poses[:, :2, 3]
+    est_xy = est_poses[:, :2, 3]
+    gt_centroid = np.mean(gt_xy, axis=0)
+    est_centroid = np.mean(est_xy, axis=0)
+
+    # Center the trajectories
+    gt_xy_centered = gt_xy - gt_centroid
+    est_xy_centered = est_xy - est_centroid
+
+    # Compute the covariance matrix
+    H = gt_xy_centered.T @ est_xy_centered
+    # Compute the SVD
+    U, S, Vt = np.linalg.svd(H)
+    # Compute the rotation
+    R = Vt.T @ U.T
+    if np.linalg.det(R) < 0:
+        print("Reflection detected, correcting...")
+        Vt[-1, :] *= -1
+        R = Vt.T @ U.T
+    # Compute the translation
+    t = est_centroid - R @ gt_centroid
+    # Apply the transformation to the est_xy
+    est_xy_aligned = est_xy @ R - R.T@t
+
+    return est_xy_aligned, R, t
+
+
 
 def get2dATE(gt_poses, est_poses, save_fig=False, est_colour='b', est_label='Estimated', gt_colour='orange', gt_label='Ground Truth', path=None):
     if gt_poses is None or est_poses is None:
