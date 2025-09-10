@@ -112,9 +112,9 @@ int main()
     // Add loop closure edges to the pose graph
     for(const auto& [t0, t1, relative_pose] : loop_closures) {
         pose_graph.addLoopClosureEdge(t0, t1, relative_pose);
+        pose_graph.optimize();
     }
 
-    pose_graph.optimize();
     auto end_time = std::chrono::high_resolution_clock::now();
 
     // Write optimization time to file
@@ -127,7 +127,7 @@ int main()
     } else {
         std::cerr << "Unable to open file to write optimization time." << std::endl;
     }
-    
+
     pose_graph.printLastPose();
 
     pose_graph.writeToFile("output/" + seq_id + "/pose_graph_traj.txt");

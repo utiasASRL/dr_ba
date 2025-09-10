@@ -140,7 +140,7 @@ void PoseGraph::optimize()
     ceres::Solver::Options options;
     options.minimizer_progress_to_stdout = false;
     options.max_num_iterations = 1000;
-    options.num_threads = 16;
+    options.num_threads = 1;
     options.function_tolerance = 1e-8;
     options.gradient_tolerance = 1e-8;
     options.parameter_tolerance = 1e-8;
