@@ -27,7 +27,11 @@ def main():
 
     for method, path in kMethodsAndPath.items():
         # Get the list of files in output directory
-        output_files = os.listdir(path)
+        try:
+            output_files = os.listdir(path)
+        except Exception as e:
+            print(f"Error reading directory {path}: {e}")
+            continue
         output_files.sort()
         errors[method] = {}
         for file in output_files:
