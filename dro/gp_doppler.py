@@ -148,8 +148,14 @@ class GPStateEstimator:
                 self.one_minus_alpha = torch.tensor(1 - local_map_update_alpha).to(self.device)
                 self.alpha = torch.tensor(local_map_update_alpha).to(self.device)
 
-                self.save_local_maps = opts['log']['save_images']
+                self.save_local_maps = opts['log']['save_local_maps']
+                self.save_scans = opts['log']['save_scans']
                 self.local_map_path  = opts['log']['local_map_path']
+                if self.save_scans and ('max_scan_bins' in opts['log']):
+                    self.max_scan_bins = int(opts['log']['max_scan_bins'])
+                    self.scan_path  = opts['log']['scan_path']
+                else:
+                    self.max_scan_bins = 100000000
 
                 # Doppler shift to range
                 self.shift_to_range = torch.tensor(radar_res / 2.0).to(self.device)
@@ -498,6 +504,27 @@ class GPStateEstimator:
 
             return cart, d_cart_d_rot, d_cart_d_shift
 
+    def getCartesianCoordinates(self, pos, rot):
+        with torch.no_grad():
+            # Get the polar coordinates of the image
+            polar_coord = self.polar_coord_raw_gp_infered
+
+            c_az = torch.cos(polar_coord[:, :, 0])
+            s_az = torch.sin(polar_coord[:, :, 0])
+            x = c_az * polar_coord[:, :, 1]
+            y = s_az * polar_coord[:, :, 1]
+
+            # Rotate the coordinates
+            c_rot = torch.cos(rot)
+            s_rot = torch.sin(rot)
+            x_rot = x * c_rot - y * s_rot
+            y_rot = x * s_rot + y * c_rot
+
+            # Translate the coordinates
+            x_trans = x_rot+pos[:, 0]
+            y_trans = y_rot+pos[:, 1]
+
+            return x_trans, y_trans
 
     # Correcting the scan polar coordinates to cartesian coordinates based on the per azimuth poses
     # (used for scan undistortion before updating the local map)
@@ -731,6 +758,16 @@ class GPStateEstimator:
                         # Please note that this is a "approximation" of the undistortion
                         # (the "proper undistortion" with a continous motion during the
                         # scan is not a trivial task)
+                        if self.save_scans:
+                            x, y = self.getCartesianCoordinates(pos, rot)
+                            if x.shape[1] > self.max_scan_bins:
+                                x = x[:, :self.max_scan_bins]
+                                y = y[:, :self.max_scan_bins]
+                            scan_to_save = np.concatenate((x.detach().cpu().numpy().reshape((1,-1)), y.detach().cpu().numpy().reshape((1,-1)), prev_shifted[:, :x.shape[1]].detach().cpu().numpy().reshape((1,-1))), axis=0).T
+                            np.save(self.scan_path + "/" + str(timestamps[0]) + ".npy", scan_to_save)
+                            
+
+
                         polar_coord_corrected = self.polarCoordCorrection_(pos, rot)
                         polar_coord_corrected[:,:,0] -= (self.azimuths[0])
                         polar_coord_corrected[polar_coord_corrected[:,:,0]<0] = polar_coord_corrected[polar_coord_corrected[:,:,0]<0] + torch.tensor((2*torch.pi, 0)).to(self.device)

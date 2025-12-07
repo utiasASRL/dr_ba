@@ -99,10 +99,13 @@ def main():
     for seq in sequences:
 
         opts['log']['local_map_path'] = os.path.join('output', seq.ID, 'local_maps')
+        opts['log']['scan_path'] = os.path.join('output', seq.ID, 'scans')
 
         # Create the GP model
         temp_radar_frame = seq.get_radar(0)
         res = temp_radar_frame.resolution
+
+        opts['log']['max_scan_bins'] = config['log']['max_scan_range'] / res
         state_estimator = gpd.GPStateEstimator(opts, res)
         temp_radar_frame.unload_data()
 
@@ -176,6 +179,11 @@ def main():
             if os.path.exists(local_map_output_path):
                 os.system('rm -r ' + local_map_output_path)
             os.makedirs(local_map_output_path, exist_ok=True)
+        if config['log']['save_scans']:
+            scan_output_path = opts['log']['scan_path']
+            if os.path.exists(scan_output_path):
+                os.system('rm -r ' + scan_output_path)
+            os.makedirs(scan_output_path, exist_ok=True)
 
         # Variables to log the time
         time_sum = 0

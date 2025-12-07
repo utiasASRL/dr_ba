@@ -1,6 +1,6 @@
 data:
-  data_path: /home/ced/Documents/data/boreas/doppler/rss/all/boreas-2024-12-04-12-34
-  multi_sequence: false
+  data_path: /home/ced/Documents/data/boreas/doppler/rss/all
+  multi_sequence: true
 direct:
   local_map_res: 0.1
   local_map_update_alpha: 0.1
@@ -45,8 +45,10 @@ imu:
 log:
   display: false
   save_images: true
-  save_local_maps: false
+  save_local_maps: true
   verbose: true
+  save_scans: true
+  max_scan_range: 120.0
 radar:
   beta_corr_fact: 0.944
   del_f: 893.0E6
