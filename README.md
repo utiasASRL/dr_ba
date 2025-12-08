@@ -115,7 +115,7 @@ Each row contains the following columns:
 You can modify the configuration file `pogo/config.yaml` to adjust the parameters for the pose graph optimization.
 To run, in the root of the repository, run the following command:
 ```bash
-pogo/build/pogo
+python pogo/pogo.py
 ```
 
 ### For paper and evaluation
