@@ -38,7 +38,8 @@ You need to run the following steps in order:
 1. Run odometry (DRO)
 2. Run the loop closure detection (RaPlace)
 3. Run the coarse registration (Coarse Registration)
-4. Run the pose graph optimization (PoGO)
+4. Run the pose refinement (Fine Registration)
+5. Run the pose graph optimization (PoGO)
 
 __Every script should be run from the root of the repository.__
 
@@ -96,6 +97,19 @@ Each row contains the following columns:
 - `scan_j_name`: Name of the second scan in the pair.
 - `x`, `y`, `theta`: The estimated transformation from scan i to scan j.
 
+### Run the pose refinement
+
+In the root of the repository, run the following command:
+```bash
+python dro/fine_registration.py
+```
+
+It will generate a CSV of fine registration results in the `output/<SEQ-NAME>/fine_registration.csv` folder.
+Each row contains the following columns:
+- `scan_i_name`: Name of the first scan in the pair.
+- `scan_j_name`: Name of the second scan in the pair.
+- `x`, `y`, `theta`: The estimated transformation from scan i to scan j.
+
 ### Run PoGO
 
 You can modify the configuration file `pogo/config.yaml` to adjust the parameters for the pose graph optimization.
@@ -105,6 +119,8 @@ pogo/build/pogo
 ```
 
 ### For paper and evaluation
+
+__If you want to run some evaluation scripts, you need to add the root of your boreas repository to the `kDataPaths` list at the top of `utils/utils.py`.__ If you don't remove the other paths, it is OK to commit your append change.
 
 To plot the coarse registration errors, run the following command:
 ```bash

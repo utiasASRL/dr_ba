@@ -10,9 +10,8 @@ import cv2
 import time
 
 
-def main():
+def main(output_path):
     # Get the data directory
-    output_path = utils.getOutputDataDir()
     local_map_path = os.path.join(output_path, "local_maps")
 
     # Load coarse registrations parameters
@@ -141,4 +140,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if utils.isMultiSequence():
+        seq_list = utils.getOutputDataDirs()
+    else:
+        seq_list = [utils.getOutputDataDir()]
+    for output_path in seq_list:
+        main(output_path)
