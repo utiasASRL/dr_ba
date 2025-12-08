@@ -128,7 +128,7 @@ def main():
             # Need to account for the IMU type
             # (in original Boreas, there is no independent IMU)
             if config['imu']['type'] == 'applanix':
-                imu_path = os.path.join(seq.seq_root, 'applanix', 'imu_raw.csv')
+                imu_path = os.path.join(seq.seq_root, 'imu', 'imu_raw.csv')
                 imu_data = np.loadtxt(imu_path, delimiter=',', skiprows=1)
                 imu_time = imu_data[:, 0]
                 imu_gyro = np.stack((imu_data[:, 3], imu_data[:, 2], imu_data[:, 1]), axis=1)
@@ -136,7 +136,7 @@ def main():
                 imu_gyro = imu_gyro @ T_applanix_radar[:3, :3]
                 imu_yaw = -imu_gyro[:, 2]
             elif config['imu']['type'] == 'dmu':
-                imu_path = os.path.join(seq.seq_root, 'applanix', 'dmu_imu.csv')
+                imu_path = os.path.join(seq.seq_root, 'imu', 'dmu_imu.csv')
                 imu_data = np.loadtxt(imu_path, delimiter=',', skiprows=1)
                 imu_time = imu_data[:, 0] * 1e-9
                 imu_yaw = imu_data[:, 9]
