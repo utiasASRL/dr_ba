@@ -56,10 +56,10 @@ def getOutputDataDirs():
 
 
 def getDataDir(seq_id=None):
+    with open(os.path.join("dro", "config.yaml"), 'r') as f:
+        opts = yaml.safe_load(f)
     if seq_id is None:
         # Fetch the sequence ID from the DRO config file
-        with open(os.path.join("dro", "config.yaml"), 'r') as f:
-            opts = yaml.safe_load(f)
         if opts['data']['multi_sequence']:
             raise ValueError("This script is not designed for multi-sequence data.")
         data_dir = opts['data']['data_path']
@@ -71,7 +71,16 @@ def getDataDir(seq_id=None):
         data_dir = '/'.join(sequence_id)
         return data_dir
     else:
-        for path in kDataPaths:
+        temp_paths = kDataPaths.copy()
+        path_from_config = opts['data']['data_path']
+        if not isMultiSequence():
+            # Add the output paths to the search paths
+            if path_from_config.endswith('/'):
+                path_from_config = path_from_config[:-1]
+            path_from_config = '/'.join(path_from_config.split('/')[:-1])
+        temp_paths.append(path_from_config)
+            
+        for path in temp_paths:
             if os.path.exists(path):
                 if os.path.exists(os.path.join(path, seq_id)):
                     return path

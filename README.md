@@ -120,8 +120,6 @@ python pogo/pogo.py
 
 ### For paper and evaluation
 
-__If you want to run some evaluation scripts, you need to add the root of your boreas repository to the `kDataPaths` list at the top of `utils/utils.py`.__ If you don't remove the other paths, it is OK to commit your append change.
-
 To plot the coarse registration errors, run the following command:
 ```bash
 python script_for_paper/plot_coarse_registration_error.py
