@@ -174,7 +174,7 @@ def main():
         odom_2d_path = odom_2d_path + '/' + seq.ID + '.txt'
         other_log_path = seq_output_path + '/other_log'
         os.makedirs(other_log_path, exist_ok=True)
-        if save_images:
+        if config['log']['save_local_maps']:
             local_map_output_path = opts['log']['local_map_path']
             if os.path.exists(local_map_output_path):
                 os.system('rm -r ' + local_map_output_path)
