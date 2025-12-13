@@ -2,7 +2,7 @@ import numpy as np
 import os
 import polyscope as ps
 
-kSeqId = 'boreas-2024-12-03-10-24'
+kSeqId = 'boreas-2024-12-03-12-54'
 
 
 def main(seq_id, iter = 10):
@@ -36,13 +36,6 @@ def main(seq_id, iter = 10):
 
         # Clear all the scene
         ps.remove_all_structures()
-        
-        
-    
-    
-
-
-
 
 if __name__ == "__main__":
     main(kSeqId)

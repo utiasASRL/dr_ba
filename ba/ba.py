@@ -129,13 +129,15 @@ def main(seq_id):
     os.makedirs(voxel_img_output_path, exist_ok=True)
 
     sample_every_n = 20
-    max_sample = 10
+    max_sample = 2
 
     # Form map
     frame_0_pose = None
     vox_map = Map(res=0.2)
 
     for idx, scan in enumerate(sorted(os.listdir(scan_path))):
+        if idx < 160:
+            continue
         if not scan.endswith('.npy'):
             continue
         if idx % sample_every_n != 0:
