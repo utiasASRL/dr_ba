@@ -3,7 +3,7 @@ import os.path as osp
 import numpy as np
 import matplotlib.pyplot as plt
 from pyboreas import BoreasDataset
-
+from utils import utils
 
 kSeqId = 'boreas-2024-12-03-12-54'
 
@@ -52,9 +52,6 @@ class Map:
     def get_intensity(self, x, y):
         idx = self.index(x, y)
         return self.voxels.get(idx, 0)
-
-
-
 
     def plot(self, save_path=None):
         if not self.voxels:
@@ -120,57 +117,75 @@ def main(seq_id):
     # Get the list of npy files in output/<seq_id>/scans
     scan_path = f'output/{seq_id}/scans/'
     data_path = '/home/dl/Documents/phd/data/boreas/'
-    dataset = BoreasDataset(data_path, split=[[seq_id]])
-    seq = dataset.sequences[0]  # Get the first sequence in the dataset
+    # dataset = BoreasDataset(data_path, split=[[seq_id]])
+    # seq = dataset.sequences[0]  # Get the first sequence in the dataset
+
+    # Load in gt
+    gt_poses, gt_times = utils.getGTRadarPosesAndTimes(kSeqId)
+
+    print("Loaded GT poses:", len(gt_poses))
 
     voxel_img_output_path = f'output/{seq_id}/voxel_maps/'
     os.makedirs(voxel_img_output_path, exist_ok=True)
 
-    sample_every_n = 15
+    sample_every_n = 20
     max_sample = 10
 
     # Form map
-    frame_0_pose = seq.radar_frames[0].pose
+    frame_0_pose = None
     vox_map = Map(res=0.2)
 
-    for idx, radar_frame in enumerate(seq.radar_frames):
+    for idx, scan in enumerate(sorted(os.listdir(scan_path))):
+        if not scan.endswith('.npy'):
+            continue
         if idx % sample_every_n != 0:
             continue
         if idx // sample_every_n >= max_sample:
             break
 
-        print(f'Processing frame {idx} / {len(seq.radar_frames)}')
+        print(f'Processing frame {idx} / {len(os.listdir(scan_path))}')
 
-        radar_frame.load_data()
-        timestamp = radar_frame.timestamp_micro
-        # TODO: should use same scan naming notation ideally... need to change DRO tho
-        timestamp_scan = radar_frame.timestamps[0][0]
-        radar_frame.unload_data()
-
-        scan_file = f'{timestamp_scan}.npy'
-        if not osp.exists(osp.join(scan_path, scan_file)):
-            print(f'Scan file {scan_file} does not exist, skipping.')
+        timestamp_scan = int(scan[:-4])/1e6  # convert to seconds
+        interp_pose = utils.getInterpolatedPose(gt_poses, gt_times, timestamp_scan)
+        if frame_0_pose is None:
+            frame_0_pose = interp_pose
             continue
-
-        scan = np.load(osp.join(scan_path, f'{timestamp_scan}.npy'))
-
         # Transform scan to frame_0
-        scan_pose = radar_frame.pose
-        rel_pose = np.linalg.inv(frame_0_pose) @ scan_pose
-        # print('Relative pose:\n', rel_pose)
-        scan_hom = np.hstack((scan[:, :2], np.zeros((scan.shape[0], 1)), np.ones((scan.shape[0], 1)))).T  # (4, N)
+        rel_pose = np.linalg.inv(frame_0_pose) @ interp_pose
+        scan_data = np.load(osp.join(scan_path, scan))
+        scan_hom = np.hstack((scan_data[:, :2], np.zeros((scan_data.shape[0], 1)), np.ones((scan_data.shape[0], 1)))).T  # (4, N)
         scan_transformed = (rel_pose @ scan_hom).T  # (N, 4)
+
         # Trim off fourth dimension
         scan_transformed = scan_transformed[:, :3]
-        # Reload in intensities
-        scan_transformed[:, 2] = scan[:, 2]
+
+        # Reload in intens
+        scan_transformed[:, 2] = scan_data[:, 2]
 
         for x, y, intensity in scan_transformed:
             if intensity > 0:
                 vox_map.add_voxel(x, y, intensity)
 
-        save_path = osp.join(voxel_img_output_path, f'{idx}.png')
+        save_path = osp.join(voxel_img_output_path, f'timestamp_scan.png')
         vox_map.plot(save_path)
+
+
+    # # Plot all_points
+    # fig = plt.figure(facecolor="black")
+    # plt.scatter(all_points[:, 0], all_points[:, 1], c=all_points[:, 2], cmap='viridis', s=1)
+    # plt.xlim(-100, 200)
+    # plt.ylim(-100, 150)
+    # plt.title('All Points', color='white')
+    # plt.xlabel('X', color='white')
+    # plt.ylabel('Y', color='white')
+    # plt.gca().set_facecolor("black")
+    # plt.gca().tick_params(colors='white')
+    # cbar = plt.colorbar()
+    # cbar.set_label('Intensity', color='white')
+    # cbar.ax.yaxis.set_tick_params(color='white')
+    # plt.setp(cbar.ax.get_yticklabels(), color='white')
+    # plt.show()
+    # plt.close(fig)
 
     vox_map.plot()
 
