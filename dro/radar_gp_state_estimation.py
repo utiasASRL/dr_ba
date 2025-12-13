@@ -139,7 +139,7 @@ def main():
                 imu_path = os.path.join(seq.seq_root, 'imu', 'dmu_imu.csv')
                 imu_data = np.loadtxt(imu_path, delimiter=',', skiprows=1)
                 imu_time = imu_data[:, 0] * 1e-9
-                imu_yaw = imu_data[:, 9]
+                imu_yaw = imu_data[:, 3]
             else:
                 print("Unknown IMU type")
                 return
