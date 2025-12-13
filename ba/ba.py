@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pyboreas import BoreasDataset
 from utils import utils
+from pylgmath import se3op
 
 kSeqId = 'boreas-2024-12-03-12-54'
 
@@ -22,7 +23,9 @@ class Map:
         idx = self.index(x, y)
         if idx not in self.voxels:
             self.voxels[idx] = intensity
-            self.size += 1
+        else:
+            self.voxels[idx] = (self.voxels[idx]*self.size + intensity) / (self.size + 1)
+        self.size += 1
 
     def bilinear_interpolate(self, x, y):
         # Get voxel indices
@@ -116,9 +119,6 @@ def main(seq_id):
 
     # Get the list of npy files in output/<seq_id>/scans
     scan_path = f'output/{seq_id}/scans/'
-    data_path = '/home/dl/Documents/phd/data/boreas/'
-    # dataset = BoreasDataset(data_path, split=[[seq_id]])
-    # seq = dataset.sequences[0]  # Get the first sequence in the dataset
 
     # Load in gt
     gt_poses, gt_times = utils.getGTRadarPosesAndTimes(kSeqId)
@@ -128,24 +128,41 @@ def main(seq_id):
     voxel_img_output_path = f'output/{seq_id}/voxel_maps/'
     os.makedirs(voxel_img_output_path, exist_ok=True)
 
-    sample_every_n = 20
-    max_sample = 2
+
+    # Distance-based keyframing
+    max_translation = 20.0  # meters
+    max_rotation = np.deg2rad(30.0)  # radians
+    max_sample = 10
 
     # Form map
     frame_0_pose = None
+    prev_keyframe_pose = None
     vox_map = Map(res=0.2)
-
+    num_frames = 0
+    num_scans = len(os.listdir(scan_path))
     for idx, scan in enumerate(sorted(os.listdir(scan_path))):
-        if idx < 160:
-            continue
         if not scan.endswith('.npy'):
             continue
-        if idx % sample_every_n != 0:
-            continue
-        if idx // sample_every_n >= max_sample:
+        if num_frames >= max_sample:
             break
 
-        print(f'Processing frame {idx} / {len(os.listdir(scan_path))}')
+        # Load in scan pose
+        timestamp_scan = int(scan[:-4])/1e6  # convert to seconds
+        interp_pose = utils.getInterpolatedPose(gt_poses, gt_times, timestamp_scan)
+
+        if prev_keyframe_pose is not None:
+            # Compute change since prev keyframe
+            delta_pose = np.linalg.inv(interp_pose) @ prev_keyframe_pose
+            delta_pose_vec = se3op.tran2vec(delta_pose)
+            translation_mag = np.linalg.norm(delta_pose_vec[:2])
+            rotation_mag = np.abs(delta_pose_vec[5])  # yaw change
+
+            if translation_mag < max_translation and rotation_mag < max_rotation:
+                continue  # skip this frame
+
+        print(f'Processing frame {idx} / {num_scans}')
+        num_frames += 1
+        prev_keyframe_pose = interp_pose
 
         timestamp_scan = int(scan[:-4])/1e6  # convert to seconds
         interp_pose = utils.getInterpolatedPose(gt_poses, gt_times, timestamp_scan)
@@ -170,24 +187,6 @@ def main(seq_id):
 
         save_path = osp.join(voxel_img_output_path, f'timestamp_scan.png')
         vox_map.plot(save_path)
-
-
-    # # Plot all_points
-    # fig = plt.figure(facecolor="black")
-    # plt.scatter(all_points[:, 0], all_points[:, 1], c=all_points[:, 2], cmap='viridis', s=1)
-    # plt.xlim(-100, 200)
-    # plt.ylim(-100, 150)
-    # plt.title('All Points', color='white')
-    # plt.xlabel('X', color='white')
-    # plt.ylabel('Y', color='white')
-    # plt.gca().set_facecolor("black")
-    # plt.gca().tick_params(colors='white')
-    # cbar = plt.colorbar()
-    # cbar.set_label('Intensity', color='white')
-    # cbar.ax.yaxis.set_tick_params(color='white')
-    # plt.setp(cbar.ax.get_yticklabels(), color='white')
-    # plt.show()
-    # plt.close(fig)
 
     vox_map.plot()
 
