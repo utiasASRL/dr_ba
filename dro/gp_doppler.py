@@ -759,11 +759,14 @@ class GPStateEstimator:
                         # (the "proper undistortion" with a continous motion during the
                         # scan is not a trivial task)
                         if self.save_scans:
-                            x, y = self.getCartesianCoordinates(pos, rot)
+                            kSkipFirstLastRows = 2
+                            temp_pos = -rot_mats_transposed @ pos
+                            temp_rot = -rot
+                            x, y = self.getCartesianCoordinates(temp_pos, temp_rot)
                             if x.shape[1] > self.max_scan_bins:
-                                x = x[:, :self.max_scan_bins]
-                                y = y[:, :self.max_scan_bins]
-                            scan_to_save = np.concatenate((x.detach().cpu().numpy().reshape((1,-1)), y.detach().cpu().numpy().reshape((1,-1)), prev_shifted[:, :x.shape[1]].detach().cpu().numpy().reshape((1,-1))), axis=0).T
+                                x = x[kSkipFirstLastRows:-kSkipFirstLastRows, :self.max_scan_bins]
+                                y = y[kSkipFirstLastRows:-kSkipFirstLastRows, :self.max_scan_bins]
+                            scan_to_save = np.concatenate((x.detach().cpu().numpy().reshape((1,-1)), y.detach().cpu().numpy().reshape((1,-1)), prev_shifted[kSkipFirstLastRows:-kSkipFirstLastRows, :x.shape[1]].detach().cpu().numpy().reshape((1,-1))), axis=0).T
                             np.save(self.scan_path + "/" + str(timestamps[0]) + ".npy", scan_to_save)
                             
 
