@@ -427,6 +427,27 @@ def plot_cost_history(cost_history, path=None):
         plt.show()
     plt.close()
 
+def plot_pose_errors(trans_errors, rot_errors, path=None):
+    fig, ax1 = plt.subplots()
+
+    color = 'tab:blue'
+    ax1.set_xlabel('Iteration')
+    ax1.set_ylabel('Translational Error (m)', color=color)
+    ax1.plot(trans_errors, marker='o', color=color)
+    ax1.tick_params(axis='y', labelcolor=color)
+    ax1.grid()
+    ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+    color = 'tab:red'
+    ax2.set_ylabel('Rotational Error (deg)', color=color)  # we already handled the x-label with ax1
+    ax2.plot(rot_errors, marker='o', color=color)
+    ax2.tick_params(axis='y', labelcolor=color)
+    fig.tight_layout()  # otherwise the right y-label is slightly clipped
+    if path is not None:
+        plt.savefig(path, dpi=300, bbox_inches="tight")
+    else:
+        plt.show()
+    plt.close()
+
 def main(seq_id):
     # Map parameters
     map_res = 0.5  # meters
@@ -435,29 +456,29 @@ def main(seq_id):
     max_dist = 80.0  # meters
 
     # Downsample control
-    num_init_iter = 5
+    num_init_iter = 30
     init_downsample = 0.1
     refine_downsample = 1.0
 
     # Distance-based keyframing
-    max_translation = 30.0  # meters
+    max_translation = 15.0  # meters
     max_rotation = np.deg2rad(30.0)  # radians
-    max_sample = 3
+    max_sample = 50
 
     # Init error parameters
-    translation_std = 0.5  # meters
+    translation_std = 1.0  # meters
     rotation_std = np.deg2rad(5.0)  # radians
 
     # Optimization parameters
-    max_iter = 100
-    tol = 1e-4
+    max_iter = 200
+    tol = 1e-3
 
     # Input type
     input_type = 'local_map' # 'scan' or 'local_map'
     img_res = 0.1  # meters per pixel
 
     # Weights
-    prior_map_std = 0.5
+    prior_map_std = 1.0
     measurement_std = 1.0
 
     # Get the list of npy files in output/<seq_id>/scans
@@ -559,6 +580,8 @@ def main(seq_id):
     num_states = len(sorted_pose_keys)
     print("Number of states:", num_states)
     print("Initial poses:\n")
+    trans_errors = []
+    rot_errors = []
     avg_rotational_err = 0.0
     avg_translational_err = 0.0
     for scan_id in sorted_pose_keys:
@@ -567,11 +590,13 @@ def main(seq_id):
         # Compute initial error
         gt_pose = gt_poses[scan_id]
         pose_err = se3op.tran2vec(np.linalg.inv(scan_loader.get_scan(scan_id).pose) @ gt_pose).flatten()
-        print("Initial pose error (x,y,yaw):", pose_err[0], pose_err[1], np.rad2deg(pose_err[5]))
+        # print("Initial pose error (x,y,yaw):", pose_err[0], pose_err[1], np.rad2deg(pose_err[5]))
         avg_translational_err += np.linalg.norm(pose_err[0:2])
         avg_rotational_err += np.abs(pose_err[5])
     avg_translational_err /= (num_states - 1)
     avg_rotational_err /= (num_states - 1)
+    trans_errors.append(avg_translational_err)
+    rot_errors.append(np.rad2deg(avg_rotational_err))
     print("Average initial translational error (m): {:.4f}, Average initial rotational error (deg): {:.2f}".format(
         avg_translational_err, np.rad2deg(avg_rotational_err)
     ))
@@ -683,17 +708,20 @@ def main(seq_id):
             # print("Updated pose for state {}:\n{}".format(s_idx+1, new_scan_pose))
             gt_pose = gt_poses[scan_id]
             pose_err = se3op.tran2vec(np.linalg.inv(new_scan_pose) @ gt_pose).flatten()
-            print("Pose error for state {}: x,y,yaw: {:.4f}, {:.4f}, {:.2f} deg".format(
-                s_idx+1, pose_err[0], pose_err[1], np.rad2deg(pose_err[5])
-            ))
+            # print("Pose error for state {}: x,y,yaw: {:.4f}, {:.4f}, {:.2f} deg".format(
+            #     s_idx+1, pose_err[0], pose_err[1], np.rad2deg(pose_err[5])
+            # ))
             avg_translational_err += np.linalg.norm(pose_err[0:2])
             avg_rotational_err += np.abs(pose_err[5])
         
         avg_translational_err /= (num_states - 1)
         avg_rotational_err /= (num_states - 1)
+        trans_errors.append(avg_translational_err)
+        rot_errors.append(np.rad2deg(avg_rotational_err))
         print("Average translational error (m): {:.4f}, Average rotational error (deg): {:.2f}".format(
             avg_translational_err, np.rad2deg(avg_rotational_err)
         ))
+        plot_pose_errors(trans_errors, rot_errors, path=osp.join(voxel_img_output_path, 'pose_errors.png'))
 
         # Update map
         for vox_key in sorted_map_keys:
@@ -723,7 +751,7 @@ def main(seq_id):
     print("Final states:")
     for scan_id in sorted_pose_keys:
         s_idx = pose_key_to_idx[scan_id]
-        print(f"State {s_idx}:\n", scan_loader.get_scan(scan_id).pose)
+        # print(f"State {s_idx}:\n", scan_loader.get_scan(scan_id).pose)
         gt_pose = gt_poses[scan_id]
         pose_err = se3op.tran2vec(np.linalg.inv(scan_loader.get_scan(scan_id).pose) @ gt_pose)
         print("Final pose error (x,y,yaw):", pose_err[0], pose_err[1], np.rad2deg(pose_err[5]))
