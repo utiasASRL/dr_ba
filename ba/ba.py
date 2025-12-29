@@ -9,7 +9,7 @@ from scipy.sparse import lil_matrix
 from sksparse.cholmod import cholesky
 from scipy.spatial import Delaunay
 from math import nan
-
+import random
 
 kSeqId = 'boreas-2024-12-03-12-54'
 
@@ -101,8 +101,116 @@ class ScanLoader:
             grad = dI_dpij @ d_pij_d_T  # (1,2) @ (2,3) -> (1,3)
             return I, grad
 
-class Map:
+class LocalMapLoader:
+    def __init__(self, seq_id):
+        self.seq_id = seq_id
+        self.scans = []
+        self.scan_ids = []
 
+    def add_scan(self, pose, scan, res, id):
+        self.scans.append(self.Scan(pose, scan, res, id))
+        self.scan_ids.append(id)
+
+    def get_scan(self, id):
+        idx = self.scan_ids.index(id)
+        return self.scans[idx]
+
+    class Scan:
+        def __init__(self, pose, img, res, id):
+            self.pose = pose
+            self.pose_2d = np.eye(3)
+            self.pose_2d[0:2, 0:2] = pose[0:2, 0:2]
+            self.pose_2d[0:2, 2] = pose[0:2, 3]
+            self.id = id
+            self.res = res  # meters per pixel
+            self.pixels = np.array(img)  # 2D numpy array
+            self.img_height, self.img_width = self.pixels.shape
+
+        def update_pose(self, new_pose):
+            self.pose = new_pose
+            self.pose_2d = np.eye(3)
+            self.pose_2d[0:2, 0:2] = new_pose[0:2, 0:2]
+            self.pose_2d[0:2, 2] = new_pose[0:2, 3]
+
+        def coord_to_pixel(self, x, y, jac=False):
+            # Convert world frame coordinates to pixel coordinates
+            D = np.array([[0, 1/self.res, 0], [-1/self.res, 0, 0]])
+            p = D @ np.linalg.inv(self.pose_2d) @ np.array([[x], [y], [1]]) + 0.5 * np.array([[self.img_width], [self.img_height]])
+
+            if jac:
+                return p[0, 0], p[1, 0], D @ np.linalg.inv(self.pose_2d) @ circle_dot_operator(np.array([[x], [y]]))
+
+            return p[0, 0], p[1, 0]
+
+        def get_root_pixel_coords(self, x, y):
+            # Convert world frame coordinates to pixel coordinates
+            u, v = self.coord_to_pixel(x, y)
+            return int(np.floor(u)), int(np.floor(v))
+
+        def check_covarage_at_point(self, x, y):
+            # Check if the four pixels surrounding (x, y) are within image bounds
+            a, b = self.get_root_pixel_coords(x, y)
+
+            return (a >= 0 and a < self.img_width - 1 and
+                    b >= 0 and b < self.img_height - 1)
+
+        def interpolate(self, x, y, jac=False):
+            if not self.check_covarage_at_point(x, y):
+                if jac:
+                    return nan, nan
+                return nan
+
+            # Get pixel coordinates
+            u, v, d_g_d_T = self.coord_to_pixel(x, y, jac=True)
+            a, b = self.get_root_pixel_coords(x, y)
+
+            # Get intensities at the four corners
+            int_ab = self.pixels[b, a]
+            int_ab1 = self.pixels[b + 1, a]
+            int_a1b = self.pixels[b, a + 1]
+            int_a1b1 = self.pixels[b + 1, a + 1]
+
+            # Get weights (measure offsets in meters within the voxel)
+            u_tilde = u - a
+            v_tilde = v - b
+            w0 = (1 - u_tilde) * (1 - v_tilde)
+            w1 = (1 - u_tilde) * v_tilde
+            w2 = u_tilde * (1 - v_tilde)
+            w3 = u_tilde * v_tilde
+
+            # Bilinear interpolation
+            int_xy = (w0 * int_ab + w1 * int_ab1 + w2 * int_a1b + w3 * int_a1b1)
+
+            if jac:
+                # Compute Jacobian
+                d_B_d_u = (1 - v_tilde) * (int_a1b - int_ab) + v_tilde * (int_a1b1 - int_ab1)
+                d_B_d_v = (1 - u_tilde) * (int_ab1 - int_ab) + u_tilde * (int_a1b1 - int_a1b)
+                d_B_d_g = np.array([[d_B_d_u, d_B_d_v]])  # 1x2
+                d_B_d_T = d_B_d_g @ d_g_d_T  # 1x3
+                return int_xy, d_B_d_T
+
+            return int_xy
+
+        def visualize(self):
+            plt.imshow(self.pixels, cmap='gray', origin='upper')
+            plt.title(f"Scan ID: {self.id}")
+            plt.xlabel("u (pixels)")
+            plt.ylabel("v (pixels)")
+            plt.colorbar(label="Intensity")
+            plt.show()
+
+        def visualize_with_xy(self, x, y):
+            u, v = self.coord_to_pixel(x, y)
+            print(f"World coords (x={x:.2f}, y={y:.2f}) -> Pixel coords (u={u:.2f}, v={v:.2f})")
+            plt.plot(u, v, 'ro')
+            plt.imshow(self.pixels, cmap='gray', origin='upper')
+            plt.title(f"Scan ID: {self.id}")
+            plt.xlabel("u (pixels)")
+            plt.ylabel("v (pixels)")
+            plt.colorbar(label="Intensity")
+            plt.show()
+
+class Map:
     class Voxel:
         def __init__(self, intensity=0.0):
             self.intensity = intensity
@@ -160,8 +268,21 @@ class Map:
         a1b1 = (ab[0] + 1, ab[1] + 1)
         return (ab in self.voxels) and (a1b in self.voxels) and (ab1 in self.voxels) and (a1b1 in self.voxels)
 
-    def get_sorted_voxels(self):
-        return sorted(self.voxels.keys(), key=lambda k: (k[0], k[1]))
+    # def get_sorted_voxels(self):
+    #     return sorted(self.voxels.keys(), key=lambda k: (k[0], k[1]))
+
+    def get_sorted_voxels(self, downsample_factor=1.0):
+        """
+        downsample_factor: float in (0, 1], fraction of keys to keep.
+                        1.0 keeps all keys.
+        """
+        keys = list(self.voxels.keys())
+
+        if downsample_factor < 1.0:
+            n_keep = max(1, int(len(keys) * downsample_factor))
+            keys = random.sample(keys, n_keep)
+
+        return sorted(keys, key=lambda k: (k[0], k[1]))
 
     def init_map(self, pose, max_dist):
         # Initialize empty voxels within max_dist of the pose
@@ -211,7 +332,7 @@ class Map:
         idx = self.index(x, y)
         return self.voxels.get(idx, 0)
 
-    def plot(self, save_path=None):
+    def plot(self, save_path=None, iter=None):
         if not self.voxels:
             return
 
@@ -267,7 +388,10 @@ class Map:
         ax.set_xlim(ix_min * self.res, (ix_max + 1) * self.res)
         ax.set_ylim(iy_min * self.res, (iy_max + 1) * self.res)
 
-        ax.set_title("Voxel Map", color="white")
+        if iter is not None:
+            ax.set_title(f"Voxel Map - Iteration {iter}", color="white")
+        else:
+            ax.set_title("Voxel Map", color="white")
         ax.set_xlabel("X", color="white")
         ax.set_ylabel("Y", color="white")
         ax.tick_params(colors="white")
@@ -305,27 +429,42 @@ def plot_cost_history(cost_history, path=None):
 
 def main(seq_id):
     # Map parameters
-    map_res = 0.2  # meters
+    map_res = 0.5  # meters
 
     # Raw measurement parameters
     max_dist = 80.0  # meters
-    downsample_factor = 10
+
+    # Downsample control
+    num_init_iter = 5
+    init_downsample = 0.1
+    refine_downsample = 1.0
 
     # Distance-based keyframing
     max_translation = 30.0  # meters
     max_rotation = np.deg2rad(30.0)  # radians
     max_sample = 3
 
+    # Init error parameters
+    translation_std = 0.5  # meters
+    rotation_std = np.deg2rad(5.0)  # radians
+
     # Optimization parameters
     max_iter = 100
     tol = 1e-4
+
+    # Input type
+    input_type = 'local_map' # 'scan' or 'local_map'
+    img_res = 0.1  # meters per pixel
 
     # Weights
     prior_map_std = 0.5
     measurement_std = 1.0
 
     # Get the list of npy files in output/<seq_id>/scans
-    scan_path = f'output/{seq_id}/scans/'
+    if input_type == 'local_map':
+        scan_path = f'output/{seq_id}/local_maps/'
+    else:
+        scan_path = f'output/{seq_id}/scans/'
 
     # Output paths
     voxel_img_output_path = f'output/{seq_id}/voxel_maps/'
@@ -342,7 +481,10 @@ def main(seq_id):
     vox_map = Map(res=map_res)
 
     # Form scan loader
-    scan_loader = ScanLoader(seq_id)
+    if input_type == 'local_map':
+        scan_loader = LocalMapLoader(seq_id)
+    else:
+        scan_loader = ScanLoader(seq_id)
 
     # Initialize looping through trajectory
     frame_0_pose = None
@@ -354,8 +496,6 @@ def main(seq_id):
     num_frames = 0
     gt_poses = {}
     for idx, scan in enumerate(sorted(os.listdir(scan_path))):
-        if not scan.endswith('.npy'):
-            continue
         if num_frames >= max_sample:
             break
 
@@ -386,8 +526,8 @@ def main(seq_id):
         # Save initial guess for pose
         if idx != 0:
             vec_noise = np.zeros((6,1))
-            vec_noise[0:2] = np.random.uniform(-0.2, 0.2, (2,1))  # 0.5 m std dev
-            vec_noise[5] = np.random.uniform(-np.deg2rad(1.0), np.deg2rad(1.0), (1,1))  # 5 deg std dev
+            vec_noise[0:2] = np.random.uniform(-translation_std, translation_std, (2,1))  # 0.5 m std dev
+            vec_noise[5] = np.random.uniform(-rotation_std, rotation_std, (1,1))  # 5 deg std dev
             # vec_noise[5] = np.deg2rad(-5.0)
             # vec_noise[0] = 0.2
             # vec_noise[1] = 0.2
@@ -395,8 +535,12 @@ def main(seq_id):
             rel_pose = rel_pose @ noise_T
 
         # Populate voxels based on scan
-        scan_data = np.load(osp.join(scan_path, scan))
-        scan_loader.add_scan(rel_pose, scan_data, idx)
+        if input_type == 'local_map':
+            scan_data = plt.imread(osp.join(scan_path, scan))
+            scan_loader.add_scan(rel_pose, scan_data, img_res, idx)
+        else:
+            scan_data = np.load(osp.join(scan_path, scan))
+            scan_loader.add_scan(rel_pose, scan_data, idx)
         vox_map.init_map(rel_pose, max_dist)
 
     # Set up optimization
@@ -405,18 +549,6 @@ def main(seq_id):
     # Form pose state order
     sorted_pose_keys = sorted(scan_loader.scan_ids)
     pose_key_to_idx = {key: i for i, key in enumerate(sorted_pose_keys)}
-    # Form map state order
-    sorted_map_keys = vox_map.get_sorted_voxels()
-    map_key_to_idx = {key: i for i, key in enumerate(sorted_map_keys)}
-
-    num_measurements = 0
-    for vox_key in sorted_map_keys:
-        vox = vox_map.voxels[vox_key]
-        num_measurements += len(vox.scan_ids) 
-    num_voxels = vox_map.size()
-
-    print("Number of measurements:", num_measurements)
-    print("Number of voxels:", num_voxels)
 
     # Set up constant covariances
     Q_meas_sqrt = 1/measurement_std
@@ -447,6 +579,16 @@ def main(seq_id):
     scan_by_id = {scan.id: scan for scan in scan_loader.scans}
     for iter in range(max_iter):
         print(f"\n--- Iteration {iter} ---")
+        if iter < num_init_iter:
+            downsample_factor = init_downsample
+        else:
+            downsample_factor = refine_downsample
+
+        # Form map state order
+        sorted_map_keys = vox_map.get_sorted_voxels(downsample_factor=downsample_factor)
+        map_key_to_idx = {key: i for i, key in enumerate(sorted_map_keys)}
+        num_voxels = len(sorted_map_keys)
+        print("Number of voxels:", num_voxels)
 
         # Construct necessary matrices. We're trying to avoid ever forming a matrix
         # with rows/columns corresponding to num measurements
@@ -574,7 +716,7 @@ def main(seq_id):
         cost_history.append(cost)
 
         print("Updated voxel map:")
-        vox_map.plot(save_path=osp.join(voxel_img_output_path, f'voxel_map_iter_{iter}.png'))
+        vox_map.plot(save_path=osp.join(voxel_img_output_path, f'voxel_map_iter_{iter}.png'), iter=iter)
         # Plot cost history
         plot_cost_history(cost_history, path=osp.join(voxel_img_output_path, 'cost_history.png'))
 
