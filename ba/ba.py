@@ -57,7 +57,7 @@ def main(seq_id):
     max_dist = 80.0  # meters
 
     # Downsample control
-    num_init_iter = 30
+    num_init_iter = 1
     init_downsample = 0.1
     refine_downsample = 1.0
 
@@ -75,6 +75,7 @@ def main(seq_id):
     tol = 1e-3
 
     # Input type
+    init_poses = 'pogo'  # 'gt' or 'pogo'
     input_type = 'local_map' # 'scan' or 'local_map'
     img_res = 0.1  # meters per pixel
 
@@ -99,6 +100,10 @@ def main(seq_id):
     all_gt_poses, gt_times = utils.getGTRadarPosesAndTimes(kSeqId)
     print("Loaded GT poses:", len(all_gt_poses))
 
+    # Load in pogo
+    all_pogo_poses, pogo_times = utils.getPogoPosesAndTimes(kSeqId)
+    pogo_times = pogo_times / 1e6  # convert to seconds
+
     # Form map
     vox_map = Map(res=map_res)
 
@@ -106,7 +111,8 @@ def main(seq_id):
     scan_loader = ScanLoader(seq_id)
 
     # Initialize looping through trajectory
-    frame_0_pose = None
+    frame_0_gt_pose = None
+    frame_0_est_pose = None
     prev_keyframe_pose = None
 
     # Load in all data once
@@ -120,11 +126,16 @@ def main(seq_id):
 
         # Load in scan pose
         timestamp_scan = int(scan[:-4])/1e6  # convert to seconds
-        interp_pose = utils.getInterpolatedPose(all_gt_poses, gt_times, timestamp_scan)
+        interp_gt_pose = utils.getInterpolatedPose(all_gt_poses, gt_times, timestamp_scan)
+        if frame_0_gt_pose is None:
+            frame_0_gt_pose = interp_gt_pose
+        # Compute and store gt pose relative to frame 0
+        gt_rel_pose = np.linalg.inv(frame_0_gt_pose) @ interp_gt_pose
+        gt_poses[idx] = gt_rel_pose
 
         if prev_keyframe_pose is not None:
             # Compute change since prev keyframe
-            delta_pose = np.linalg.inv(interp_pose) @ prev_keyframe_pose
+            delta_pose = np.linalg.inv(interp_gt_pose) @ prev_keyframe_pose
             delta_pose_vec = se3op.tran2vec(delta_pose)
             translation_mag = np.linalg.norm(delta_pose_vec[:2])
             rotation_mag = np.abs(delta_pose_vec[5])  # yaw change
@@ -134,24 +145,28 @@ def main(seq_id):
 
         print(f'Processing frame {idx} / {num_scans}')
         num_frames += 1
-        prev_keyframe_pose = interp_pose
+        prev_keyframe_pose = interp_gt_pose
 
-        if frame_0_pose is None:
-            frame_0_pose = interp_pose
         # Transform scan to frame_0
-        rel_pose = np.linalg.inv(frame_0_pose) @ interp_pose
-        gt_poses[idx] = rel_pose
+        if init_poses == 'gt':
+            if frame_0_est_pose is None:
+                frame_0_est_pose = interp_gt_pose
+            rel_pose = np.linalg.inv(frame_0_est_pose) @ interp_gt_pose
 
-        # Save initial guess for pose
-        if idx != 0:
-            vec_noise = np.zeros((6,1))
-            vec_noise[0:2] = np.random.uniform(-translation_std, translation_std, (2,1))  # 0.5 m std dev
-            vec_noise[5] = np.random.uniform(-rotation_std, rotation_std, (1,1))  # 5 deg std dev
-            # vec_noise[5] = np.deg2rad(-5.0)
-            # vec_noise[0] = 0.2
-            # vec_noise[1] = 0.2
-            noise_T = se3op.vec2tran(vec_noise)
-            rel_pose = rel_pose @ noise_T
+            # Save initial guess for pose
+            if idx != 0:
+                vec_noise = np.zeros((6,1))
+                vec_noise[0:2] = np.random.uniform(-translation_std, translation_std, (2,1))  # 0.5 m std dev
+                vec_noise[5] = np.random.uniform(-rotation_std, rotation_std, (1,1))  # 5 deg std dev
+                noise_T = se3op.vec2tran(vec_noise)
+                rel_pose = rel_pose @ noise_T
+        elif init_poses == 'pogo':
+            interp_pogo_pose = utils.getInterpolatedPose(all_pogo_poses, pogo_times, timestamp_scan)
+            if frame_0_est_pose is None:
+                frame_0_est_pose = interp_pogo_pose
+            rel_pose = np.linalg.inv(frame_0_est_pose) @ interp_pogo_pose
+        else:
+            raise ValueError("init_poses must be 'gt' or 'pogo'")
 
         # Populate voxels based on scan
         if input_type == 'local_map':
