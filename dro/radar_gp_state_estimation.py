@@ -99,6 +99,7 @@ def main():
     for seq in sequences:
 
         opts['log']['local_map_path'] = os.path.join('output', seq.ID, 'local_maps')
+        opts['log']['cumulated_returns_path'] = os.path.join('output', seq.ID, 'cumulated_returns')
         opts['log']['scan_path'] = os.path.join('output', seq.ID, 'scans')
 
         # Create the GP model
@@ -179,6 +180,9 @@ def main():
             if os.path.exists(local_map_output_path):
                 os.system('rm -r ' + local_map_output_path)
             os.makedirs(local_map_output_path, exist_ok=True)
+            if os.path.exists(opts['log']['cumulated_returns_path']):
+                os.system('rm -r ' + opts['log']['cumulated_returns_path'])
+            os.makedirs(opts['log']['cumulated_returns_path'], exist_ok=True)
         if config['log']['save_scans']:
             scan_output_path = opts['log']['scan_path']
             if os.path.exists(scan_output_path):

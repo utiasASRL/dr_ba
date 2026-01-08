@@ -151,6 +151,7 @@ class GPStateEstimator:
                 self.save_local_maps = opts['log']['save_local_maps']
                 self.save_scans = opts['log']['save_scans']
                 self.local_map_path  = opts['log']['local_map_path']
+                self.cumulated_returns_path  = opts['log']['cumulated_returns_path']
                 if self.save_scans and ('max_scan_bins' in opts['log']):
                     self.max_scan_bins = int(opts['log']['max_scan_bins'])
                     self.scan_path  = opts['log']['scan_path']
@@ -770,7 +771,6 @@ class GPStateEstimator:
                             np.save(self.scan_path + "/" + str(timestamps[0]) + ".npy", scan_to_save)
                             
 
-
                         polar_coord_corrected = self.polarCoordCorrection_(pos, rot)
                         polar_coord_corrected[:,:,0] -= (self.azimuths[0])
                         polar_coord_corrected[polar_coord_corrected[:,:,0]<0] = polar_coord_corrected[polar_coord_corrected[:,:,0]<0] + torch.tensor((2*torch.pi, 0)).to(self.device)
@@ -778,7 +778,9 @@ class GPStateEstimator:
                         polar_coord_corrected[:,:,1] -= (self.radar_res/2.0)
                         polar_coord_corrected[:,:,1] /= self.radar_res
                         prev_shifted = torch.concatenate((prev_shifted, prev_shifted[0,:].unsqueeze(0)), dim=0)
+                        prev_shifted_cumulative = torch.cumsum(prev_shifted, dim=1)
                         polar_target = self.bilinearInterpolation_(prev_shifted, polar_coord_corrected, with_jac=False)
+                        polar_target_cumulative = self.bilinearInterpolation_(prev_shifted_cumulative, polar_coord_corrected, with_jac=False)
 
                         # Get the coordinates of the local map in the undistorted polar image
                         temp_polar_to_interp = self.local_map_polar.clone()
@@ -788,7 +790,9 @@ class GPStateEstimator:
                         temp_polar_to_interp[:,:,1] -= (self.radar_res/2.0)
                         temp_polar_to_interp[:,:,1] /= self.radar_res
                         polar_target = torch.concatenate((polar_target, polar_target[0,:].unsqueeze(0)), dim=0)
+                        polar_target_cumulative = torch.concatenate((polar_target_cumulative, polar_target_cumulative[0,:].unsqueeze(0)), dim=0)
                         local_map_update = self.bilinearInterpolation_(polar_target, temp_polar_to_interp, with_jac=False)
+                        local_map_update_cumulative = self.bilinearInterpolation_(polar_target_cumulative, temp_polar_to_interp, with_jac=False)
 
                         # Update the local map
                         if self.step_counter == 1:
@@ -802,6 +806,11 @@ class GPStateEstimator:
                             # Remove the resize entirely
                             lm = (self.local_map.detach().cpu().numpy().clip(0, 1) * 255).astype('uint8')
                             cv2.imwrite(self.local_map_path + "/" + str(timestamps[0]) + ".png", lm)
+                            print("Max cumulated return: ", torch.max(local_map_update_cumulative))
+                            lm = (local_map_update_cumulative.detach().cpu().numpy()).clip(0,255).astype('uint8')
+                            cv2.imwrite(self.cumulated_returns_path + "/" + str(timestamps[0]) + ".png", lm)
+
+
 
                         # Blur and normalise the local map
                         self.local_map_blurred = torchvision.transforms.functional.gaussian_blur(self.local_map.unsqueeze(0).unsqueeze(0), 3).squeeze()
