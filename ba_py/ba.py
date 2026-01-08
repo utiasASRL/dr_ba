@@ -9,10 +9,10 @@ from scipy.sparse import lil_matrix
 from sksparse.cholmod import cholesky
 from scipy.ndimage import gaussian_filter
 
-from ba.scans.loader import ScanLoader
-from ba.scans.point_scan import PointScan
-from ba.scans.local_map_scan import LocalMapScan
-from ba.map.voxel_map import Map
+from ba_py.scans.loader import ScanLoader
+from ba_py.scans.point_scan import PointScan
+from ba_py.scans.local_map_scan import LocalMapScan
+from ba_py.map.voxel_map import Map
 
 kSeqId = 'boreas-2024-12-03-12-54'
 
