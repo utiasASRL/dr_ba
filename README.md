@@ -70,7 +70,7 @@ The file name is the timestamp of the reference frame used to project the data.
 The scans are stored as numpy arrays of shape (N, 3) where N is the number of points, and each point has (x, y, intensity). A script for random visualization of the point clouds is available in `debug_scripts/visualize_point_clouds.py`.
 
 ### Run RaPlace
-Simply run RaPlace as follows in the root of the repository (all the paths should be autonomatically using what was specified in the DRO config file):
+Simply run RaPlace as follows in the root of the repository (all the paths should be automatically using what was specified in the DRO config file):
 ```bash
 python raplace/raplace.py
 ```

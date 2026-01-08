@@ -4,7 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from utils import utils
 from pylgmath import se3op
-import matplotlib.pyplot as plt
 from scipy.sparse import lil_matrix
 from sksparse.cholmod import cholesky
 from scipy.ndimage import gaussian_filter
@@ -370,8 +369,6 @@ def main(seq_id):
 
     print("Final states:")
     for scan_id in sorted_pose_keys:
-        s_idx = pose_key_to_idx[scan_id]
-        # print(f"State {s_idx}:\n", scan_loader.get_scan(scan_id).pose)
         gt_pose = gt_poses[scan_id]
         pose_err = se3op.tran2vec(np.linalg.inv(scan_loader.get_scan(scan_id).pose) @ gt_pose)
         print("Final pose error (x,y,yaw):", pose_err[0], pose_err[1], np.rad2deg(pose_err[5]))
