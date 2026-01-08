@@ -13,6 +13,7 @@ T_applanix_dmu = np.array([[9.99945620e-01, -1.03283308e-02, -1.44307407e-03, 0]
                 [0, 0, 0, 1]])
 
 kDataPaths = [
+    "/media/ced/Extreme Pro/data/boreas/rss/ba",
     "/media/ced/Extreme Pro/data/boreas/rss/test",
     "/media/ced/Extreme Pro/data/boreas/original_train",
     "/home/ced/Documents/data/boreas/rss/test",
@@ -40,12 +41,25 @@ def getOutputDataDir():
     data_dir = os.path.join("output", sequence_id)
     return data_dir
 
+def isMultiSequence():
+    # Fetch the multi_sequence flag from the DRO config file
+    with open(os.path.join("dro", "config.yaml"), 'r') as f:
+        opts = yaml.safe_load(f)
+    return opts['data']['multi_sequence']
+
+def getOutputDataDirs():
+    # Get the folders in the output directory that start with 'boreas-'
+    output_path = "output"
+    seq_dirs = [os.path.join(output_path, d) for d in os.listdir(output_path) if os.path.isdir(os.path.join(output_path, d)) and d.startswith('boreas-')]
+    return seq_dirs
+
+
 
 def getDataDir(seq_id=None):
+    with open(os.path.join("dro", "config.yaml"), 'r') as f:
+        opts = yaml.safe_load(f)
     if seq_id is None:
         # Fetch the sequence ID from the DRO config file
-        with open(os.path.join("dro", "config.yaml"), 'r') as f:
-            opts = yaml.safe_load(f)
         if opts['data']['multi_sequence']:
             raise ValueError("This script is not designed for multi-sequence data.")
         data_dir = opts['data']['data_path']
@@ -57,7 +71,16 @@ def getDataDir(seq_id=None):
         data_dir = '/'.join(sequence_id)
         return data_dir
     else:
-        for path in kDataPaths:
+        temp_paths = kDataPaths.copy()
+        path_from_config = opts['data']['data_path']
+        if not isMultiSequence():
+            # Add the output paths to the search paths
+            if path_from_config.endswith('/'):
+                path_from_config = path_from_config[:-1]
+            path_from_config = '/'.join(path_from_config.split('/')[:-1])
+        temp_paths.append(path_from_config)
+            
+        for path in temp_paths:
             if os.path.exists(path):
                 if os.path.exists(os.path.join(path, seq_id)):
                     return path

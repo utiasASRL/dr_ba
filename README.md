@@ -38,15 +38,25 @@ You need to run the following steps in order:
 1. Run odometry (DRO)
 2. Run the loop closure detection (RaPlace)
 3. Run the coarse registration (Coarse Registration)
-4. Run the pose graph optimization (PoGO)
+4. Run the pose refinement (Fine Registration)
+5. Run the pose graph optimization (PoGO)
+
+__Every script should be run from the root of the repository.__
 
 ### Run DRO
 First, download data from the Boreas dataset [here](https://www.boreas.utias.utoronto.ca/#/download). DRO generates local maps that accounts for motion distortion of the radar scans.
 
-Then copy the example config file `DRO/config_example.yaml` to `DRO/config.yaml` and modify the parameters as needed, especially the `data_path` as follows.
+Then copy the example config file `DRO/config_dro_dg.yaml` to `DRO/config.yaml` and modify the parameters as needed, especially the `data_path` with the root path to the Boreas dataset on your machine:
 ```yaml
   data:
-    data_path: /absolute/path/to/Boreas/<sequence>
+    data_path: /absolute/path/to/Boreas
+```
+
+If you want to run only a specific sequence, you can give the sequence path and change the `multi_sequence` parameter to `false`:
+```yaml
+  data:
+    data_path: /absolute/path/to/Boreas/<seq-name>
+    multi_sequence: false
 ```
 
 In the root of the repository, run the following command to generate local maps:
@@ -54,10 +64,13 @@ In the root of the repository, run the following command to generate local maps:
 python dro/radar_gp_state_estimation.py
 ```
 
-It will output the local maps in the `output/<SEQ-NAME>/local_maps` folder, each names with the radar scan's first timestamp. 
+It will output the local maps and scans in the `output/<SEQ-NAME>/local_maps` and `output/<SEQ-NAME>/scans` folders.
+The file name is the timestamp of the reference frame used to project the data.
+
+The scans are stored as numpy arrays of shape (N, 3) where N is the number of points, and each point has (x, y, intensity). A script for random visualization of the point clouds is available in `debug_scripts/visualize_point_clouds.py`.
 
 ### Run RaPlace
-Simply run RaPlace as follows in the root of the repository (all the paths should be autonomatically using what was specified in the DRO config file):
+Simply run RaPlace as follows in the root of the repository (all the paths should be automatically using what was specified in the DRO config file):
 ```bash
 python raplace/raplace.py
 ```
@@ -84,12 +97,25 @@ Each row contains the following columns:
 - `scan_j_name`: Name of the second scan in the pair.
 - `x`, `y`, `theta`: The estimated transformation from scan i to scan j.
 
+### Run the pose refinement
+
+In the root of the repository, run the following command:
+```bash
+python dro/fine_registration.py
+```
+
+It will generate a CSV of fine registration results in the `output/<SEQ-NAME>/fine_registration.csv` folder.
+Each row contains the following columns:
+- `scan_i_name`: Name of the first scan in the pair.
+- `scan_j_name`: Name of the second scan in the pair.
+- `x`, `y`, `theta`: The estimated transformation from scan i to scan j.
+
 ### Run PoGO
 
 You can modify the configuration file `pogo/config.yaml` to adjust the parameters for the pose graph optimization.
 To run, in the root of the repository, run the following command:
 ```bash
-pogo/build/pogo
+python pogo/pogo.py
 ```
 
 ### For paper and evaluation
@@ -109,4 +135,3 @@ This will diplay the ATE errors and write to file different trajectory estimates
 
 
 - [ ] Create a script to get the pogo parameters automatically from a calib sequence
-- [ ] Check the "save local maps" option in DRO (seems to not be as wanted)

@@ -10,10 +10,9 @@ import math
 import time
 
 
-def main():
+def main(output_path):
 
     # Read the coarse registrations
-    out_path = utils.getOutputDataDir()
     fine_registrations = []
     try:
         coarse_registrations = pd.read_csv(os.path.join(out_path, "coarse_registrations.csv"))
@@ -96,7 +95,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if utils.isMultiSequence():
+        out_paths = utils.getOutputDataDirs()
+    else:
+        out_paths = [utils.getOutputDataDir()]
+    
+    for out_path in out_paths:
+        main(out_path)
 
     
     

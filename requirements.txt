@@ -9,4 +9,6 @@ torchvision
 asrl-pyboreas
 pyyaml
 pandas
+polyscope
+scikit-sparse
 git+https://github.com/utiasASRL/pyboreas.git

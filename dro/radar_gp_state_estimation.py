@@ -24,8 +24,8 @@ def main():
         if path[-1] == '/':
             path = path[:-1]
         base_path = '/'.join(path.split('/')[:-1])
-        db = pb.BoreasDataset(base_path)
         sequence_id = config['data']['data_path'].split('/')[-1]
+        db = pb.BoreasDataset(base_path, split=[[sequence_id]])
         sequences = []
         sequences.append(db.get_seq_from_ID(sequence_id))
         
@@ -99,10 +99,14 @@ def main():
     for seq in sequences:
 
         opts['log']['local_map_path'] = os.path.join('output', seq.ID, 'local_maps')
+        opts['log']['cumulated_returns_path'] = os.path.join('output', seq.ID, 'cumulated_returns')
+        opts['log']['scan_path'] = os.path.join('output', seq.ID, 'scans')
 
         # Create the GP model
         temp_radar_frame = seq.get_radar(0)
         res = temp_radar_frame.resolution
+
+        opts['log']['max_scan_bins'] = config['log']['max_scan_range'] / res
         state_estimator = gpd.GPStateEstimator(opts, res)
         temp_radar_frame.unload_data()
 
@@ -125,7 +129,7 @@ def main():
             # Need to account for the IMU type
             # (in original Boreas, there is no independent IMU)
             if config['imu']['type'] == 'applanix':
-                imu_path = os.path.join(seq.seq_root, 'applanix', 'imu_raw.csv')
+                imu_path = os.path.join(seq.seq_root, 'imu', 'imu_raw.csv')
                 imu_data = np.loadtxt(imu_path, delimiter=',', skiprows=1)
                 imu_time = imu_data[:, 0]
                 imu_gyro = np.stack((imu_data[:, 3], imu_data[:, 2], imu_data[:, 1]), axis=1)
@@ -133,10 +137,10 @@ def main():
                 imu_gyro = imu_gyro @ T_applanix_radar[:3, :3]
                 imu_yaw = -imu_gyro[:, 2]
             elif config['imu']['type'] == 'dmu':
-                imu_path = os.path.join(seq.seq_root, 'applanix', 'dmu_imu.csv')
+                imu_path = os.path.join(seq.seq_root, 'imu', 'dmu_imu.csv')
                 imu_data = np.loadtxt(imu_path, delimiter=',', skiprows=1)
                 imu_time = imu_data[:, 0] * 1e-9
-                imu_yaw = imu_data[:, 9]
+                imu_yaw = imu_data[:, 3]
             else:
                 print("Unknown IMU type")
                 return
@@ -171,11 +175,19 @@ def main():
         odom_2d_path = odom_2d_path + '/' + seq.ID + '.txt'
         other_log_path = seq_output_path + '/other_log'
         os.makedirs(other_log_path, exist_ok=True)
-        if save_images:
+        if config['log']['save_local_maps']:
             local_map_output_path = opts['log']['local_map_path']
             if os.path.exists(local_map_output_path):
                 os.system('rm -r ' + local_map_output_path)
             os.makedirs(local_map_output_path, exist_ok=True)
+            if os.path.exists(opts['log']['cumulated_returns_path']):
+                os.system('rm -r ' + opts['log']['cumulated_returns_path'])
+            os.makedirs(opts['log']['cumulated_returns_path'], exist_ok=True)
+        if config['log']['save_scans']:
+            scan_output_path = opts['log']['scan_path']
+            if os.path.exists(scan_output_path):
+                os.system('rm -r ' + scan_output_path)
+            os.makedirs(scan_output_path, exist_ok=True)
 
         # Variables to log the time
         time_sum = 0

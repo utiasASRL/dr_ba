@@ -23,10 +23,7 @@ import yaml
 import time
 
 
-def main():
-
-    # Get the data directory from the DRO config file
-    seq_dir = utils.getOutputDataDir()
+def main(seq_dir):
 
 
     # Get the maximum local map range
@@ -256,4 +253,12 @@ def generateRadon(data_dir, down_shape, real_time = True, max_img_size=600):
 
 
 if __name__ == "__main__":
-    main()
+    # Get the data directory from the DRO config file
+    if( utils.isMultiSequence() ):
+        seqs = utils.getOutputDataDirs()
+    else:
+        seq_dir = utils.getOutputDataDir()
+        seqs = [seq_dir]
+
+    for seq_dir in seqs:
+        main(seq_dir)

@@ -9,13 +9,13 @@
 
 int main()
 {
-    auto seq_id = getSeqId();
-    std::cout << "Sequence ID: " << seq_id << std::endl;
+    //auto seq_id = getSeqId();
+    //std::cout << "Sequence ID: " << seq_id << std::endl;
 
     PoseGraphOpts opts;
 
     // Read the config file
-    YAML::Node config = YAML::LoadFile("pogo/config.yaml");
+    YAML::Node config = YAML::LoadFile("pogo/config_temp.yaml");
     if (!config["loss_scale_loop_pos_coarse"]) {
         throw std::runtime_error("Loss scale for loop position coarse not found in config file.");
     }
@@ -52,6 +52,9 @@ int main()
     if (config["use_coarse_registration"]) {
         use_coarse_registration = config["use_coarse_registration"].as<bool>();
     }
+    if (!config["seq_id"]) {
+        throw std::runtime_error("Seq id not found in the config file");
+    }
 
 
     opts.loss_scale_loop_pos_coarse = config["loss_scale_loop_pos_coarse"].as<double>();
@@ -61,6 +64,8 @@ int main()
     opts.odom_rot_std = config["odom_rot_std"].as<double>() * M_PI / 180.0;
     opts.loop_pos_std = config["loop_pos_std"].as<double>();
     opts.loop_rot_std = config["loop_rot_std"].as<double>() * M_PI / 180.0;
+
+    std::string seq_id = config["seq_id"].as<std::string>();
 
     // Initialize the pose graph
     PoseGraph pose_graph(opts);
