@@ -7,6 +7,7 @@ from pylgmath import se3op
 import matplotlib.pyplot as plt
 from scipy.sparse import lil_matrix
 from sksparse.cholmod import cholesky
+from scipy.ndimage import gaussian_filter
 
 from ba.scans.loader import ScanLoader
 from ba.scans.point_scan import PointScan
@@ -15,7 +16,7 @@ from ba.map.voxel_map import Map
 
 kSeqId = 'boreas-2024-12-03-12-54'
 
-def plot_cost_history(cost_history, path=None):
+def plot_cost_history(cost_history, path=None, show=False):
     plt.figure()
     plt.plot(cost_history, marker='o')
     plt.xlabel('Iteration')
@@ -24,11 +25,12 @@ def plot_cost_history(cost_history, path=None):
     plt.grid()
     if path is not None:
         plt.savefig(path, dpi=300, bbox_inches="tight")
-    else:
+        plt.close()
+    elif show:
         plt.show()
-    plt.close()
+        plt.close()
 
-def plot_pose_errors(trans_errors, rot_errors, path=None):
+def plot_pose_errors(trans_errors, rot_errors, path=None, show=False):
     fig, ax1 = plt.subplots()
 
     color = 'tab:blue'
@@ -45,30 +47,32 @@ def plot_pose_errors(trans_errors, rot_errors, path=None):
     fig.tight_layout()  # otherwise the right y-label is slightly clipped
     if path is not None:
         plt.savefig(path, dpi=300, bbox_inches="tight")
-    else:
+        plt.close()
+    elif show:
         plt.show()
-    plt.close()
+        plt.close()
 
 def main(seq_id):
     # Map parameters
-    map_res = 0.5  # meters
+    map_res = 0.2  # meters
 
     # Raw measurement parameters
     max_dist = 80.0  # meters
+    gauss_blur_sigma = 2.0  # pixels
 
     # Downsample control
-    num_init_iter = 1
-    init_downsample = 0.1
+    num_init_iter = 0
+    init_downsample = 0.2
     refine_downsample = 1.0
 
     # Distance-based keyframing
-    max_translation = 0.0  # meters
-    max_rotation = np.deg2rad(30.0)  # radians
+    max_translation = 15.0  # meters
+    max_rotation = np.deg2rad(15.0)  # radians
     max_sample = 2
 
     # Init error parameters
-    translation_std = 1.0  # meters
-    rotation_std = np.deg2rad(5.0)  # radians
+    translation_std = 0.0  # meters
+    rotation_std = np.deg2rad(0.0)  # radians
 
     # Optimization parameters
     max_iter = 200
@@ -80,7 +84,7 @@ def main(seq_id):
     img_res = 0.1  # meters per pixel
 
     # Weights
-    prior_map_std = 1.0
+    prior_map_std = 0.0001
     measurement_std = 1.0
 
     # Get the list of npy files in output/<seq_id>/scans
@@ -120,10 +124,7 @@ def main(seq_id):
     num_scans = len(os.listdir(scan_path))
     num_frames = 0
     gt_poses = {}
-    scan_indeces = [0, 20, 30]
     for idx, scan in enumerate(sorted(os.listdir(scan_path))):
-        if idx not in scan_indeces:
-            continue
         if num_frames >= max_sample:
             break
 
@@ -174,6 +175,8 @@ def main(seq_id):
         # Populate voxels based on scan
         if input_type == 'local_map':
             scan_data = plt.imread(osp.join(scan_path, scan))
+            # Apply Gaussian blur
+            scan_data = gaussian_filter(scan_data, sigma=gauss_blur_sigma)
             scan = LocalMapScan(rel_pose, scan_data, img_res, idx)
         else:
             scan_data = np.load(osp.join(scan_path, scan))
@@ -191,7 +194,6 @@ def main(seq_id):
 
     # Set up constant covariances
     Q_meas_sqrt = 1/measurement_std
-    xy1  = np.empty(4)
 
     prev_cost = np.inf
     cost_history = []
@@ -290,7 +292,7 @@ def main(seq_id):
             if not vox_covered:
                 # Add prior for this voxel
                 H_MM[v_idx, v_idx] += (1/prior_map_std**2)
-                cost += vox_int**2 / (prior_map_std**2)
+                cost += vox_int**2
 
         print("Solving for state updates...")
         # One-time factorization
@@ -375,6 +377,9 @@ def main(seq_id):
         print("Final pose error (x,y,yaw):", pose_err[0], pose_err[1], np.rad2deg(pose_err[5]))
     
     vox_map.plot()
+    plot_cost_history(cost_history)
+    plot_pose_errors(trans_errors, rot_errors)
+    plt.show()
 
 if __name__ == '__main__':
     main(kSeqId)
