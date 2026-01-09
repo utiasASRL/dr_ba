@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <ba/scans/local_map_scan.hpp>
+#include <lgmath/se3/Transformation.hpp>
 #include <iostream>
 
 TEST(LocalMapScanTests, ValidateCoordToPixel) {
@@ -9,7 +10,7 @@ TEST(LocalMapScanTests, ValidateCoordToPixel) {
 
     // Define scan parameters
     int scan_id = 1;
-    Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+    lgmath::se3::Transformation pose;
     double res = 1.0;
 
     // Create LocalMapScan instance
@@ -41,7 +42,7 @@ TEST(LocalMapScanTests, ValidateRootPixelCoords) {
 
     // Define scan parameters
     int scan_id = 1;
-    Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+    lgmath::se3::Transformation pose;
     double res = 1.0;
 
     // Create LocalMapScan instance
@@ -80,7 +81,7 @@ TEST(LocalMapScanTests, ValidateCoverageCheck) {
 
     // Define scan parameters
     int scan_id = 1;
-    Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+    lgmath::se3::Transformation pose;
     double res = 1.0;
 
     // Create LocalMapScan instance
@@ -117,7 +118,7 @@ TEST(LocalMapScanTests, ValidateCoverageCheck) {
 TEST(LocalMapScanTests, ValidateInterpolation) {
     // Define scan parameters
     int scan_id = 1;
-    Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+    lgmath::se3::Transformation pose;
     double res = 1.0;
 
     // Create a simple local map (3x3) with identical intensity values

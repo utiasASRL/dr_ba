@@ -3,6 +3,7 @@
 
 #include <ba/scans/scan.hpp>
 #include <Eigen/Dense>
+#include <lgmath/se3/Transformation.hpp>
 
 namespace ba {
 
@@ -11,7 +12,7 @@ public:
     using PixelCoords = std::pair<double, double>;
     using Index = std::pair<int32_t, int32_t>;
 
-    LocalMapScan(int scan_id, const Eigen::Matrix4d &pose, double res, const Eigen::MatrixXd &local_map)
+    LocalMapScan(int scan_id, const lgmath::se3::Transformation &pose, double res, const Eigen::MatrixXd &local_map)
         : Scan(scan_id, pose) {
         res_ = res;
         local_map_ = local_map;

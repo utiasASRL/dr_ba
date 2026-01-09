@@ -16,7 +16,7 @@ add_subdirectory(deps/lgmath)
 
 # Library
 add_subdirectory(src)
-target_link_libraries(ba unordered_dense::unordered_dense lgmath yaml-cpp Eigen3::Eigen)
+target_link_libraries(ba unordered_dense::unordered_dense lgmath yaml-cpp Eigen3::Eigen ${OpenCV_LIBS})
 
 # Enable testing
 enable_testing()

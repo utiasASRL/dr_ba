@@ -2,6 +2,7 @@
 #pragma once
 
 #include <string>
+#include <memory>
 #include <ba/scans/scan.hpp>
 
 namespace ba {
@@ -9,16 +10,16 @@ namespace ba {
 class ScanLoader {
 public:
     ScanLoader() = default;
-    void add_scan(const &Scan scan) {
-        scans_.emplace(scan.id(), scan);
+    void add_scan(std::shared_ptr<Scan> scan) {
+        scans_.emplace(scan->id(), scan);
     }
 
-    Scan get_scan(int scan_id) {
+    std::shared_ptr<Scan> get_scan(int scan_id) {
         return scans_.at(scan_id);
     }
 
 private:
-    ankerl::unordered_dense::map<int, Scan> scans_;
+    ankerl::unordered_dense::map<int, std::shared_ptr<Scan>> scans_;
 };
 
 

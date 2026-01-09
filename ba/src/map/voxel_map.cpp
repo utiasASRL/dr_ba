@@ -3,6 +3,8 @@
 #include <cmath>
 #include <random>
 #include <stdexcept>
+#include <opencv2/opencv.hpp>
+#include <iostream>
 
 namespace ba {
 
@@ -37,10 +39,10 @@ void VoxelMap::randomize(uint32_t seed) {
 	for (auto& kv : voxels_) kv.second = dist(rng);
 }
 
-void VoxelMap::init_map(const lgmath::se2::Transformation& pose, double max_dist) {
-    const Eigen::Matrix<double, 3, 1> pose_xi = pose.vec();
-	const double x_center = pose_xi(0);
-	const double y_center = pose_xi(1);
+void VoxelMap::init_map(const lgmath::se3::Transformation& pose, double max_dist) {
+    const Eigen::Matrix<double, 4, 4> pose_mat = pose.matrix();
+	const double x_center = pose_mat(0, 3);
+	const double y_center = pose_mat(1, 3);
 	const auto center = index(x_center, y_center);
 	const int32_t n = static_cast<int32_t>(std::ceil(max_dist / res_));
 	for (int32_t da = -n; da <= n; ++da) {
@@ -52,6 +54,10 @@ void VoxelMap::init_map(const lgmath::se2::Transformation& pose, double max_dist
 			if (!contains(idx)) voxels_.emplace(idx, 0.0);
 		}
 	}
+}
+
+void VoxelMap::init_map(const lgmath::se2::Transformation& pose, double max_dist) {
+    init_map(pose.toSE3(), max_dist);
 }
 
 std::vector<VoxelMap::Index> VoxelMap::get_sorted_keys_downsampled(double downsample_factor) const {
@@ -80,6 +86,50 @@ std::vector<VoxelMap::Index> VoxelMap::get_sorted_keys_downsampled(double downsa
     }
     return downsampled_keys;
 }
+
+void VoxelMap::visualize(double downsample_factor) const {
+    if (voxels_.empty()) return;
+
+    // 1. Find bounds of the indices
+    int32_t min_x = std::numeric_limits<int32_t>::max();
+    int32_t max_x = std::numeric_limits<int32_t>::min();
+    int32_t min_y = std::numeric_limits<int32_t>::max();
+    int32_t max_y = std::numeric_limits<int32_t>::min();
+
+    for (const auto &[idx, val] : voxels_) {
+        min_x = std::min(min_x, idx.first);
+        max_x = std::max(max_x, idx.first);
+        min_y = std::min(min_y, idx.second);
+        max_y = std::max(max_y, idx.second);
+    }
+
+    int width  = max_x - min_x + 1;
+    int height = max_y - min_y + 1;
+
+    cv::Mat img(height, width, CV_64F, cv::Scalar(0)); // use double for intensity
+
+    // 2. Fill image
+    for (const auto &[idx, val] : voxels_) {
+        int x = idx.first - min_x;
+        int y = idx.second - min_y;
+        img.at<double>(y, x) = val; // row = y, col = x
+    }
+
+    // 3. Normalize to 0-255 and convert to 8-bit for display
+    cv::Mat img8;
+    double minVal, maxVal;
+    cv::minMaxLoc(img, &minVal, &maxVal);
+    img.convertTo(img8, CV_8U, 255.0 / (maxVal - minVal), -minVal * 255.0 / (maxVal - minVal));
+    // Show image
+
+    cv::namedWindow("Scan", cv::WINDOW_NORMAL);
+    cv::resizeWindow("Scan", 480, 480);
+    cv::imshow("Scan", img);
+    cv::waitKey(0);      // waits for key press
+    cv::destroyAllWindows();
+}
+
+
 
 bool VoxelMap::contains(Index idx) const { return voxels_.find(idx) != voxels_.end(); }
 

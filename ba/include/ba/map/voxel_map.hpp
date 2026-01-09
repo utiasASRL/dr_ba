@@ -6,9 +6,8 @@
 #include <cstdint>
 #include <utility>
 #include <vector>
-
-// Optional dependency for init_map pose interface
-#include <lgmath/se2/TransformationWithCovariance.hpp>
+#include <lgmath/se2/Transformation.hpp>
+#include <lgmath/se3/Transformation.hpp>
 
 namespace ba {
 
@@ -37,7 +36,9 @@ public:
 	void randomize(uint32_t seed = 0) /* deterministic if seed!=0 */;
 
 	// Initialize empty voxels in a square window around pose within max_dist
+	// If SE3 pose provided, only the SE2 components are used
 	void init_map(const lgmath::se2::Transformation& pose, double max_dist);
+	void init_map(const lgmath::se3::Transformation& pose, double max_dist);
 
 	// Return sorted voxel keys downsampled by factor in [0,1]; 1.0 means no downsample
 	std::vector<Index> get_sorted_keys_downsampled(double downsample_factor = 1.0) const;
@@ -49,6 +50,9 @@ public:
 
 	// Resolution access
 	double resolution() const { return res_; }
+
+	// Visualize as pixel image (for debugging)
+	void visualize(double downsample_factor = 1.0) const;
 
 private:
 	double res_;

@@ -61,10 +61,11 @@ LocalMapScan::PixelCoords LocalMapScan::coord_to_pixel(double x, double y, Eigen
     Eigen::Matrix<double, 2, 3> D;
     D << 0, 1/res_, 0,
          -1/res_, 0, 0;
-    Eigen::Vector2d p = D * pose2d_.inverse() * Eigen::Vector3d(x, y, 1.0) + 0.5 * Eigen::Vector2d(img_width_ - 1, img_height_ - 1);
+    Eigen::Matrix<double, 3, 3> pose2d_inv_mat = pose_.toSE2().inverse().matrix();
+    Eigen::Vector2d p = D * pose2d_inv_mat * Eigen::Vector3d(x, y, 1.0) + 0.5 * Eigen::Vector2d(img_width_ - 1, img_height_ - 1);
 
     if (jacobian) {
-        *jacobian = D * pose2d_.inverse() * lgmath::se2::point2fs(Eigen::Vector2d(x, y), 1.0);
+        *jacobian = D * pose2d_inv_mat * lgmath::se2::point2fs(Eigen::Vector2d(x, y), 1.0);
     }
 
     return {p(0), p(1)};

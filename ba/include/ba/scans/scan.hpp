@@ -2,6 +2,8 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <lgmath/se3/Transformation.hpp>
+#include <lgmath/se2/Transformation.hpp>
 
 namespace ba {
 
@@ -10,18 +12,16 @@ public:
 	virtual ~Scan() = default;
 
 	// Identification
-	inline int id() const { return id_; }
+	int id() const { return id_; }
 
 	// Pose accessors
-	inline const Eigen::Matrix4d &pose() const { return pose_; }
-	inline const Eigen::Matrix3d &pose2d() const { return pose2d_; }
+	const lgmath::se3::Transformation &pose() const { return pose_; }
+	const lgmath::se2::Transformation pose2d() const { return pose_.toSE2(); }
+	
 
 	// Update pose (override if derived classes need custom behavior)
-	virtual void update_pose(const Eigen::Matrix4d &new_pose) {
+	virtual void update_pose(const lgmath::se3::Transformation &new_pose) {
 		pose_ = new_pose;
-		pose2d_.setIdentity();
-		pose2d_.block<2, 2>(0, 0) = new_pose.block<2, 2>(0, 0);
-		pose2d_.block<2, 1>(0, 2) = new_pose.block<2, 1>(0, 3);
 	}
 
 	// Interpolate intensity value at a query point in world frame
@@ -34,16 +34,11 @@ public:
 	virtual bool check_coverage_at_point(double x, double y) const = 0;
 
 protected:
-	Scan(int scan_id, const Eigen::Matrix4d &pose)
-		: id_(scan_id), pose_(pose) {
-		pose2d_.setIdentity();
-		pose2d_.block<2, 2>(0, 0) = pose.block<2, 2>(0, 0);
-		pose2d_.block<2, 1>(0, 2) = pose.block<2, 1>(0, 3);
-	}
+	Scan(int scan_id, const lgmath::se3::Transformation &pose)
+		: id_(scan_id), pose_(pose) {}
 
 	int id_;
-	Eigen::Matrix4d pose_;
-	Eigen::Matrix3d pose2d_;
+	lgmath::se3::Transformation pose_;
 };
 
 } // namespace ba
