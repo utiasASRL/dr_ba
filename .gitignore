@@ -3,3 +3,5 @@ venv
 *pycache*
 *build*
 *ini*
+.vscode
+.DS_Store

@@ -1,0 +1,6 @@
+[submodule "ba/deps/unordered_dense"]
+	path = ba/deps/unordered_dense
+	url = git@github.com:martinus/unordered_dense.git
+[submodule "ba/deps/lgmath"]
+	path = ba/deps/lgmath
+	url = git@github.com:utiasASRL/lgmath.git
