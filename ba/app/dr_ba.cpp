@@ -39,7 +39,7 @@ int main() {
 
     // Initialize map and loader
     ba::VoxelMap vox_map(opts.voxel_res);
-    ba::ScanLoader scan_loader();
+    ba::ScanLoader scan_loader;
 
     // Load in image
     // TODO: Generalize to other input types
@@ -133,18 +133,11 @@ int main() {
 
         // Create scan object
         auto scan = std::make_shared<ba::LocalMapScan>(num_checked, T_est_rel, opts.local_map_res, img_mat);
+        scan_loader.add_scan(scan);
         vox_map.init_map(T_est_rel, opts.max_dist);
-
-        // cv::Mat back;
-        // cv::eigen2cv(img_mat, back);
-
-        // cv::namedWindow("Scan", cv::WINDOW_NORMAL);
-        // cv::resizeWindow("Scan", 480, 480);
-        // cv::imshow("Scan", back);
-        // cv::waitKey(0);      // waits for key press
-        // cv::destroyAllWindows();
-
     }
+
+    std::cout << "Scan loader has " << scan_loader.num_scans() << " scans." << std::endl;
 
     // Visualize final map
     vox_map.randomize(42); // For visualization purposes

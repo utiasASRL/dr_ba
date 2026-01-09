@@ -18,6 +18,10 @@ public:
         return scans_.at(scan_id);
     }
 
+    int num_scans() const {
+        return static_cast<int>(scans_.size());
+    }
+
 private:
     ankerl::unordered_dense::map<int, std::shared_ptr<Scan>> scans_;
 };
