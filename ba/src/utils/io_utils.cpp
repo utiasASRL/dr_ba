@@ -118,11 +118,28 @@ lgmath::se3::Transformation get_interpolated_pose(
     double t1 = all_times[i + 1];
     double alpha = (query_time - t0) / (t1 - t0);
 
-    // Extract matrices
-    Eigen::Matrix<double, 6, 1> xi1 = all_poses[i].vec();
-    Eigen::Matrix<double, 6, 1> xi2 = all_poses[i+1].vec();
-    Eigen::Matrix<double, 6, 1> xi_interp = (1.0 - alpha) * xi1 + alpha * xi2;
-    return lgmath::se3::Transformation(xi_interp);
+    Eigen::Matrix4d T_0 = all_poses[i].matrix();
+    Eigen::Matrix4d T_1 = all_poses[i + 1].matrix();
+
+    // Interpolate the translation linearly
+    Eigen::Vector3d t0_vec = T_0.block<3, 1>(0, 3);
+    Eigen::Vector3d t1_vec = T_1.block<3, 1>(0, 3);
+    Eigen::Vector3d t_interp = (1.0 - alpha) * t0_vec + alpha * t1_vec;
+
+    // Interpolate the rotation using slerp
+    Eigen::Matrix3d R0 = T_0.block<3, 3>(0, 0);
+    Eigen::Matrix3d R1 = T_1.block<3, 3>(0, 0);
+    Eigen::Quaterniond q0(R0);
+    Eigen::Quaterniond q1(R1);
+    Eigen::Quaterniond q_interp = q0.slerp(alpha, q1);
+    Eigen::Matrix3d R_interp = q_interp.toRotationMatrix();
+
+    // Construct the interpolated transformation
+    Eigen::Matrix4d T_interp = Eigen::Matrix4d::Identity();
+    T_interp.block<3, 3>(0, 0) = R_interp;
+    T_interp.block<3, 1>(0, 3) = t_interp;
+
+    return lgmath::se3::Transformation(T_interp);
 }
 
 
