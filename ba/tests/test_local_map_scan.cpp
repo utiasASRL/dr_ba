@@ -1,0 +1,188 @@
+#include <gtest/gtest.h>
+#include <ba/scans/local_map_scan.hpp>
+#include <iostream>
+
+TEST(LocalMapScanTests, ValidateCoordToPixel) {
+    // Create a simple local map (3x3)
+    // Here the pixel coordinates line up with the radar coordinates
+    Eigen::MatrixXd local_map(3, 3);
+
+    // Define scan parameters
+    int scan_id = 1;
+    Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+    double res = 1.0;
+
+    // Create LocalMapScan instance
+    ba::LocalMapScan scan(scan_id, pose, res, local_map);
+
+    // Test point at in world coordinates
+    // This point should be top left corner of the image
+    double x_world = 1.0;
+    double y_world = -1.0;
+    auto px = scan.coord_to_pixel(x_world, y_world);
+
+    // Validate results
+    EXPECT_EQ(px.first, 0.0);
+    EXPECT_EQ(px.second, 0.0);
+
+    // Now let's try an imperfect alignment (even number of pixels)
+    local_map = Eigen::MatrixXd(4, 4);
+
+    // The same world coordinates should now map to pixel (0.5, 0.5)
+    ba::LocalMapScan scan2(scan_id, pose, res, local_map);
+    px = scan2.coord_to_pixel(x_world, y_world);
+    EXPECT_EQ(px.first, 0.5);
+    EXPECT_EQ(px.second, 0.5);
+}
+
+TEST(LocalMapScanTests, ValidateRootPixelCoords) {
+    // Create a simple local map (3x3)
+    Eigen::MatrixXd local_map(3, 3);
+
+    // Define scan parameters
+    int scan_id = 1;
+    Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+    double res = 1.0;
+
+    // Create LocalMapScan instance
+    ba::LocalMapScan scan(scan_id, pose, res, local_map);
+
+    // First try the top left corner, this should correspond to pixel (0,0)
+    // so the root pixel coords should also be (0,0)
+    double x_world = 1.0;
+    double y_world = -1.0;
+    auto root_px = scan.get_root_pixel_coords(x_world, y_world);
+    EXPECT_EQ(root_px.first, 0.0);
+    EXPECT_EQ(root_px.second, 0.0);
+
+    // Now let's have a point that lies between pixel (0,0) and (1,1)
+    // This should have the same (0,0) root pixel coords
+    x_world = 0.5;
+    y_world = -0.5;
+    root_px = scan.get_root_pixel_coords(x_world, y_world);
+    EXPECT_EQ(root_px.first, 0.0);
+    EXPECT_EQ(root_px.second, 0.0);
+
+    // Now let's try a point between pixel (1,1) and (2,2)
+    // This should have root pixel coords (1,1)
+    x_world = -0.5;
+    y_world = 0.5;
+    root_px = scan.get_root_pixel_coords(x_world, y_world);
+    EXPECT_EQ(root_px.first, 1.0);
+    EXPECT_EQ(root_px.second, 1.0);
+}
+
+TEST(LocalMapScanTests, ValidateCoverageCheck) {
+    // Create a simple local map (11x11) with arbitrary values
+    // This spans from -5 to +5 in both x and y in world coordinates
+    Eigen::MatrixXd local_map(11, 11);
+    local_map.setRandom();
+
+    // Define scan parameters
+    int scan_id = 1;
+    Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+    double res = 1.0;
+
+    // Create LocalMapScan instance
+    ba::LocalMapScan scan(scan_id, pose, res, local_map);
+
+    // Test point well within bounds
+    double x_in = 0.0;
+    double y_in = 0.0;
+    EXPECT_TRUE(scan.check_coverage_at_point(x_in, y_in));
+
+    // Test point near edge, but within
+    double x_edge = 4.9;
+    double y_edge = 4.9;
+    EXPECT_TRUE(scan.check_coverage_at_point(x_edge, y_edge));
+
+    // Test point right on the top left edge, we can still interpolate this
+    // so it should be valid
+    double x_on_edge = 5.0;
+    double y_on_edge = -5.0;
+    EXPECT_TRUE(scan.check_coverage_at_point(x_on_edge, y_on_edge));
+
+    // Test point right on the top right edge, we can't interpolate this one
+    // since we always look to the right/down from the root coords
+    double x_on_edge2 = 5.0;
+    double y_on_edge2 = 5.0;
+    EXPECT_FALSE(scan.check_coverage_at_point(x_on_edge2, y_on_edge2));
+
+    // Test point outside bounds
+    double x_out = 5.0;
+    double y_out = 5.1;
+    EXPECT_FALSE(scan.check_coverage_at_point(x_out, y_out));
+}
+
+TEST(LocalMapScanTests, ValidateInterpolation) {
+    // Define scan parameters
+    int scan_id = 1;
+    Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+    double res = 1.0;
+
+    // Create a simple local map (3x3) with identical intensity values
+    Eigen::MatrixXd local_map(3, 3);
+    local_map << 1.0, 1.0, 1.0,
+                 1.0, 1.0, 1.0,
+                 1.0, 1.0, 1.0;
+    ba::LocalMapScan scan(scan_id, pose, res, local_map);
+    // Test interpolation within the local map, it should produce 1.0 everywhere
+    double x_query = 0.5;
+    double y_query = 0.5;
+    auto intensity_opt = scan.interpolate(x_query, y_query);
+    ASSERT_TRUE(intensity_opt.has_value());
+    double intensity = intensity_opt.value();
+    EXPECT_DOUBLE_EQ(intensity, 1.0);
+
+    // Test another point within map
+    x_query = -0.5;
+    y_query = -0.5;
+    intensity_opt = scan.interpolate(x_query, y_query);
+    ASSERT_TRUE(intensity_opt.has_value());
+    intensity = intensity_opt.value();
+    EXPECT_DOUBLE_EQ(intensity, 1.0);
+
+    // Make the map non-uniform
+    local_map << 0.0, 1.0, 0.0,
+                1.0, 0.0, 1.0,
+                0.0, 1.0, 0.0;
+    ba::LocalMapScan scan2(scan_id, pose, res, local_map);
+
+    // Test point at center (0,0), should be exactly 0.0
+    x_query = 0.0;
+    y_query = 0.0;
+    intensity_opt = scan2.interpolate(x_query, y_query);
+    ASSERT_TRUE(intensity_opt.has_value());
+    intensity = intensity_opt.value();
+    EXPECT_DOUBLE_EQ(intensity, 0.0);
+
+    // Test point at (0.5, 0.5), should be 0.5
+    x_query = 0.5;
+    y_query = 0.5;
+    intensity_opt = scan2.interpolate(x_query, y_query);
+    ASSERT_TRUE(intensity_opt.has_value());
+    intensity = intensity_opt.value();
+    EXPECT_DOUBLE_EQ(intensity, 0.5);
+
+    // Test point at (0.5, 0.0), should also be 0.5
+    x_query = 0.5;
+    y_query = 0.0;
+    intensity_opt = scan2.interpolate(x_query, y_query);
+    ASSERT_TRUE(intensity_opt.has_value());
+    intensity = intensity_opt.value();
+    EXPECT_DOUBLE_EQ(intensity, 0.5);
+
+    // Test point at (0.0, 0.25), should be 0.25
+    x_query = 0.0;
+    y_query = 0.25;
+    intensity_opt = scan2.interpolate(x_query, y_query);
+    ASSERT_TRUE(intensity_opt.has_value());
+    intensity = intensity_opt.value();
+    EXPECT_DOUBLE_EQ(intensity, 0.25);
+
+    // Test point outside bounds, should return nullopt
+    x_query = 2.0;
+    y_query = 2.0;
+    intensity_opt = scan2.interpolate(x_query, y_query);
+    EXPECT_FALSE(intensity_opt.has_value());
+}

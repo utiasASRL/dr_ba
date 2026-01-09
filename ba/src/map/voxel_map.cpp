@@ -1,0 +1,90 @@
+#include <ba/map/voxel_map.hpp>
+#include <algorithm>
+#include <cmath>
+#include <random>
+#include <stdexcept>
+
+namespace ba {
+
+VoxelMap::VoxelMap(double res) : res_(res) {}
+
+auto VoxelMap::index(double x, double y) const -> Index {
+	const int32_t a = static_cast<int32_t>(std::floor(x / res_));
+	const int32_t b = static_cast<int32_t>(std::floor(y / res_));
+	return {a, b};
+}
+
+std::size_t VoxelMap::size() const { return voxels_.size(); }
+
+void VoxelMap::add_single_voxel(int32_t a, int32_t b, double intensity) {
+    if (voxels_.contains({a, b})) return;
+	voxels_[{a, b}] = intensity;
+}
+
+void VoxelMap::add_single_voxel(double x, double y, double intensity) {
+    const Index ab = index(x, y);
+    if (voxels_.contains(ab)) return;
+    voxels_[ab] = intensity;
+}
+
+void VoxelMap::zero_out() {
+	for (auto& kv : voxels_) kv.second = 0.0;
+}
+
+void VoxelMap::randomize(uint32_t seed) {
+	std::mt19937 rng(seed == 0 ? std::random_device{}() : seed);
+	std::uniform_real_distribution<double> dist(0.0, 1.0);
+	for (auto& kv : voxels_) kv.second = dist(rng);
+}
+
+void VoxelMap::init_map(const lgmath::se2::Transformation& pose, double max_dist) {
+    const Eigen::Matrix<double, 3, 1> pose_xi = pose.vec();
+	const double x_center = pose_xi(0);
+	const double y_center = pose_xi(1);
+	const auto center = index(x_center, y_center);
+	const int32_t n = static_cast<int32_t>(std::ceil(max_dist / res_));
+	for (int32_t da = -n; da <= n; ++da) {
+		for (int32_t db = -n; db <= n; ++db) {
+            if (std::sqrt(std::pow(da * res_, 2) + std::pow(db * res_, 2)) > max_dist) {
+                continue;
+            }
+			const Index idx{center.first + da, center.second + db};
+			if (!contains(idx)) voxels_.emplace(idx, 0.0);
+		}
+	}
+}
+
+std::vector<VoxelMap::Index> VoxelMap::get_sorted_keys_downsampled(double downsample_factor) const {
+    if (voxels_.empty()) return {};
+    if (downsample_factor > 1.0 || downsample_factor <= 0.0) {
+        throw std::invalid_argument("Downsample factor must be in (0, 1]");
+    }
+
+    std::vector<Index> keys;
+    keys.reserve(voxels_.size());
+
+    // Collect and sort all keys
+    for (const auto& kv : voxels_) keys.push_back(kv.first);
+    std::sort(keys.begin(), keys.end());
+
+    // No downsample
+    if (downsample_factor >= 1.0) return keys;
+
+    std::vector<Index> downsampled_keys;
+    downsampled_keys.reserve(static_cast<std::size_t>(std::ceil(keys.size() * downsample_factor)));
+
+    const std::size_t step = static_cast<std::size_t>(
+        std::max<double>(1.0, std::round(1.0 / downsample_factor)));
+    for (std::size_t i = 0; i < keys.size(); i += step) {
+        downsampled_keys.push_back(keys[i]);
+    }
+    return downsampled_keys;
+}
+
+bool VoxelMap::contains(Index idx) const { return voxels_.find(idx) != voxels_.end(); }
+
+double& VoxelMap::at(Index idx) { return voxels_.at(idx); }
+
+const double& VoxelMap::at(Index idx) const { return voxels_.at(idx); }
+
+}

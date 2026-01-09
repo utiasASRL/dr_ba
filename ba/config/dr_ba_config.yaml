@@ -1,0 +1,27 @@
+map:
+  voxel_res: 0.2  # m
+input:
+  data_path: '/home/dl/Documents/phd/data/boreas'
+  meas_path: '/home/dl/Documents/phd/dev/dr_ba/output'
+  seq_ids:
+    - 'boreas-2024-12-03-12-54'
+  max_dist: 80.0  # m
+  gauss_blur_sigma: 2.0  # pixels
+  init_poses: 'pogo'  # 'pogo' or 'gt'
+  init_translation_std: 1.0  # m (only relevant if init_poses is 'gt')
+  init_rotation_std: 5.0  # degrees (only relevant if init_poses is 'gt')
+  input_type: 'local_maps' # 'local_maps' or 'scans'
+  local_map_res: 0.1  # m/pixel (only relevant if input_type is 'local_map')
+keyframing:
+  num_frames: 2
+  max_kf_dist: 15.0  # m
+  max_kf_rot: 15.0  # degrees
+optimization:
+  max_iterations: 20
+  convergence_tol: 1e-3
+  prior_map_std: 1e-3 # intensity units
+  meas_std: 1.0 # intensity units
+  # Downsample control
+  num_coarse_iterations: 5
+  coarse_downsample: 0.2
+  refine_downsample: 1.0
