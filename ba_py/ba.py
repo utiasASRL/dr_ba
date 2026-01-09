@@ -101,7 +101,6 @@ def main(seq_id):
 
     # Load in gt
     all_gt_poses, gt_times = utils.getGTRadarPosesAndTimes(kSeqId)
-    print("Loaded GT poses:", len(all_gt_poses))
 
     # Load in pogo
     all_pogo_poses, pogo_times = utils.getPogoPosesAndTimes(kSeqId)
