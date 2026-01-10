@@ -53,7 +53,7 @@ def plot_pose_errors(trans_errors, rot_errors, path=None, show=False):
 
 def main(seq_id):
     # Map parameters
-    map_res = 0.2  # meters
+    map_res = 1.0  # meters
 
     # Raw measurement parameters
     max_dist = 80.0  # meters
@@ -70,8 +70,8 @@ def main(seq_id):
     max_sample = 2
 
     # Init error parameters
-    translation_std = 0.0  # meters
-    rotation_std = np.deg2rad(0.0)  # radians
+    translation_std = 1.0  # meters
+    rotation_std = np.deg2rad(2.0)  # radians
 
     # Optimization parameters
     max_iter = 200
@@ -235,12 +235,12 @@ def main(seq_id):
 
         # Construct necessary matrices. We're trying to avoid ever forming a matrix
         # with rows/columns corresponding to num measurements
-        H_TT = np.zeros((num_states * 3, num_states * 3))
-        H_TM = np.zeros((num_states * 3, num_voxels))
+        H_TT = np.zeros(((num_states - 1) * 3, (num_states - 1) * 3))
+        H_TM = np.zeros(((num_states - 1) * 3, num_voxels))
         H_MM = lil_matrix((num_voxels, num_voxels))
 
         # Measurement pre-multipliers
-        J_T_B = np.zeros((num_states * 3, 1)) # J_T^T @ B
+        J_T_B = np.zeros(((num_states - 1) * 3, 1)) # J_T^T @ B
         J_M_B = np.zeros((num_voxels, 1)) # J_M^T @ B
 
         cost = 0.0
