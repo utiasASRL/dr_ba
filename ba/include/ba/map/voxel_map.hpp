@@ -49,7 +49,7 @@ public:
 	const double& at(Index idx) const;
 
 	// Resolution access
-	double resolution() const { return res_; }
+	double res() const { return res_; }
 
 	// Visualize as pixel image (for debugging)
 	void visualize(double downsample_factor = 1.0) const;
