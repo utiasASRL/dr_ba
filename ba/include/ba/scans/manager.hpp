@@ -12,6 +12,7 @@ public:
     ScanManager() = default;
     void add_scan(std::shared_ptr<Scan> scan) {
         scans_.emplace(scan->id(), scan);
+        scan_id_list_.push_back(scan->id());
     }
 
     std::shared_ptr<Scan> get_scan(int scan_id) {
@@ -22,6 +23,11 @@ public:
         return static_cast<int>(scans_.size());
     }
 
+    std::vector<int> get_all_scan_ids() const {
+        return scan_id_list_;
+    }
+
+    // Compute RMSE of all scan poses compared to groundtruth (SE2: x, y, yaw)
     virtual Eigen::Matrix<double, 3, 1> compute_pose_rmse() const {
         if (scans_.empty()) {
             return Eigen::Matrix<double, 3, 1>::Zero();
@@ -35,11 +41,13 @@ public:
         }
         rmse /= static_cast<double>(scans_.size());
         rmse = rmse.cwiseSqrt();
+        rmse(2) *= (180.0 / M_PI); // convert yaw to degrees
         return rmse;
     }
 
 private:
     ankerl::unordered_dense::map<int, std::shared_ptr<Scan>> scans_;
+    std::vector<int> scan_id_list_;
 };
 
 
