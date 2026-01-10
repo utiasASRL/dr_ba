@@ -1,5 +1,5 @@
 #include <ba/map/voxel_map.hpp>
-#include <ba/scans/loader.hpp>
+#include <ba/scans/manager.hpp>
 #include <ba/scans/local_map_scan.hpp>
 #include "ba/utils/ba_config.hpp"
 #include "ba/utils/io_utils.hpp"
@@ -14,6 +14,11 @@
 #include <opencv2/core/eigen.hpp>
 
 namespace fs = std::filesystem;
+using SpMat = Eigen::SparseMatrix<double>;
+using Triplet = Eigen::Triplet<double>;
+using Vec = Eigen::VectorXd;
+using Vec3d = Eigen::Vector3dd;
+using Mat = Eigen::MatrixXd;
 
 int main() {
     // Load in config from ba/config/dr_ba_config.yaml
@@ -39,7 +44,7 @@ int main() {
 
     // Initialize map and loader
     ba::VoxelMap vox_map(opts.voxel_res);
-    ba::ScanLoader scan_loader;
+    ba::ScanManager scan_manager;
 
     // Load in image
     // TODO: Generalize to other input types
@@ -64,8 +69,6 @@ int main() {
     double num_scans = files.size();
     double num_checked = -1;
     double num_loaded = 0;
-    std::vector<lgmath::se3::Transformation> gt_poses;
-    gt_poses.reserve(opts.num_frames);
     for (const auto& path : files) {
         if (num_loaded >= opts.num_frames) break;
         num_checked++;
@@ -83,7 +86,7 @@ int main() {
         } else if (opts.init_poses == "gt") {
             T_est = ba::get_interpolated_pose(all_gt_poses, all_gt_times, timestamp_scan);
             // Add noise to gt pose sampled from uniform distribution
-            Eigen::Vector3d noise;
+            Vec3d noise;
             noise << translation_dist(rng), translation_dist(rng), rotation_dist(rng);
             lgmath::se3::Transformation T_noise = lgmath::se2::Transformation(noise).toSE3();
             T_est = T_est * T_noise;
@@ -116,7 +119,6 @@ int main() {
 
         // Get relative gt transform
         lgmath::se3::Transformation T_gt_rel = T_gt_0.inverse() * T_gt;
-        gt_poses.push_back(T_gt_rel);
 
         // Get relative est transform
         lgmath::se3::Transformation T_est_rel = T_est_0.inverse() * T_est;
@@ -128,16 +130,18 @@ int main() {
 
         cv::Mat img = cv::imread(path.string(), cv::IMREAD_GRAYSCALE);
         img.convertTo(img, CV_64F, 1.0 / 255.0);
-        Eigen::MatrixXd img_mat;
+        Mat img_mat;
         cv::cv2eigen(img, img_mat);
 
         // Create scan object
-        auto scan = std::make_shared<ba::LocalMapScan>(num_checked, T_est_rel, opts.local_map_res, img_mat);
-        scan_loader.add_scan(scan);
+        auto scan = std::make_shared<ba::LocalMapScan>(num_checked, T_est_rel, T_gt_rel, opts.local_map_res, img_mat);
+        scan_manager.add_scan(scan);
         vox_map.init_map(T_est_rel, opts.max_dist);
     }
 
-    std::cout << "Scan loader has " << scan_loader.num_scans() << " scans." << std::endl;
+    std::cout << "Scan manager has " << scan_manager.num_scans() << " scans." << std::endl;
+    std::cout << "Full voxel map has " << vox_map.size() << " voxels." << std::endl;
+    std::cout << "Initial pose RMSE (x, y, yaw): " << scan_manager.compute_pose_rmse().transpose() << std::endl;
 
     // Visualize final map
     vox_map.randomize(42); // For visualization purposes

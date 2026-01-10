@@ -19,6 +19,14 @@ public:
         img_width_ = local_map.cols();
         img_height_ = local_map.rows();
     }
+    LocalMapScan(int scan_id, const lgmath::se3::Transformation &pose, const lgmath::se3::Transformation &gt_pose, 
+                double res, const Eigen::MatrixXd &local_map)
+        : Scan(scan_id, pose, gt_pose) {
+        res_ = res;
+        local_map_ = local_map;
+        img_width_ = local_map.cols();
+        img_height_ = local_map.rows();
+    }
 
     std::optional<double> interpolate(double x, double y, Eigen::Matrix<double, 1, 3> *jacobian = nullptr) const override;
     bool check_coverage_at_point(double x, double y) const override;
