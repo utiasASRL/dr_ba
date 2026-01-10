@@ -6,7 +6,7 @@
 TEST(VoxelMapTests, ValidateObjectCreation) {
     double resolution = 0.5;
     ba::VoxelMap voxel_map(resolution);
-    EXPECT_DOUBLE_EQ(voxel_map.resolution(), resolution);
+    EXPECT_DOUBLE_EQ(voxel_map.res(), resolution);
     EXPECT_EQ(voxel_map.size(), 0);
 }
 
