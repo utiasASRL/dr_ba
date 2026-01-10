@@ -219,12 +219,16 @@ int main() {
 
         std::cout << "Solving for state update..." << std::endl;
         // Solve for state update using Schur complement
-        Mat H_MM_inv = H_MM_diag.asDiagonal().inverse();
-        Mat lhs = H_TT - H_TM * H_MM_inv * H_TM.transpose();
-        Vec rhs = - H_TM * H_MM_inv * J_M_B + J_T_B;
+        Vec H_MM_inv_diag = H_MM_diag.array().inverse();  // element-wise inverse
+        Mat H_TM_HMMinv = H_TM.array().rowwise() * H_MM_inv_diag.transpose().array();
+        Mat lhs = H_TT - H_TM_HMMinv * H_TM.transpose();
+        Vec rhs = - H_TM_HMMinv * J_M_B + J_T_B;
 
+        // Regularization
         lhs.diagonal().array() += 1e-8;
-        Eigen::VectorXd del_x = lhs.ldlt().solve(rhs);
+
+        // Solve
+        Eigen::VectorXd del_x = lhs.selfadjointView<Eigen::Upper>().ldlt().solve(rhs);
 
         // Update poses
         for (int scan_idx = 1; scan_idx < scan_manager.num_scans(); scan_idx++) {
@@ -236,6 +240,7 @@ int main() {
             scan->update_pose(delta_xi);
         }
 
+        std::cout << "Updating map voxels..." << std::endl;
         // Update map voxels
         for (int v = 0; v < voxels_size; ++v) {
             double new_intensity = J_M_B(v) / H_MM_diag(v);
