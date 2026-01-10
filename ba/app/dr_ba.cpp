@@ -130,6 +130,12 @@ int main() {
         }
 
         cv::Mat img = cv::imread(path.string(), cv::IMREAD_GRAYSCALE);
+        // Apply Gaussian blur
+        if (opts.gauss_blur_sigma > 0.0) {
+            int ksize = static_cast<int>(std::ceil(opts.gauss_blur_sigma * 6)) | 1; // kernel size should be odd
+            cv::GaussianBlur(img, img, cv::Size(ksize, ksize), opts.gauss_blur_sigma);
+        }
+        // Convert to CV_64F and normalize to [0, 1]
         img.convertTo(img, CV_64F, 1.0 / 255.0);
         Mat img_mat;
         cv::cv2eigen(img, img_mat);
@@ -218,11 +224,20 @@ int main() {
         }
 
         std::cout << "Solving for state update..." << std::endl;
-        // Solve for state update using Schur complement
-        Vec H_MM_inv_diag = H_MM_diag.array().inverse();  // element-wise inverse
-        Mat H_TM_HMMinv = H_TM.array().rowwise() * H_MM_inv_diag.transpose().array();
-        Mat lhs = H_TT - H_TM_HMMinv * H_TM.transpose();
-        Vec rhs = - H_TM_HMMinv * J_M_B + J_T_B;
+        // Precompute element-wise inverse of the diagonal
+        Eigen::VectorXd H_MM_inv_diag = H_MM_diag.array().inverse();
+
+        // Compute rhs directly without forming full diagonal matrix
+        Eigen::VectorXd rhs = J_T_B;
+        for (int i = 0; i < H_TM.cols(); ++i) {
+            rhs.noalias() -= H_TM.col(i) * (H_MM_inv_diag(i) * J_M_B(i));
+        }
+
+        // Compute lhs using the same trick
+        Eigen::MatrixXd lhs = H_TT;
+        for (int i = 0; i < H_TM.cols(); ++i) {
+            lhs.noalias() -= H_TM.col(i) * (H_MM_inv_diag(i) * H_TM.col(i).transpose());
+        }
 
         // Regularization
         lhs.diagonal().array() += 1e-8;
