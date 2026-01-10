@@ -22,9 +22,19 @@ public:
 	const lgmath::se2::Transformation gt_pose2d() const { return gt_pose_.toSE2(); }
 	
 
-	// Update pose (override if derived classes need custom behavior)
-	virtual void update_pose(const lgmath::se3::Transformation &new_pose) {
-		pose_ = new_pose;
+	// Update pose
+	void update_pose(const Eigen::Matrix<double, 6, 1> &delta_xi) {
+		// Update should be T_new = exp(-delta_xi) * T_old
+		// but we don't have negative since lgmath flips the convention
+		// internally
+		lgmath::se3::Transformation T_update((delta_xi).eval());
+		pose_ = T_update * pose_;
+	}
+
+	void update_pose(const Eigen::Matrix<double, 3, 1> &delta_xi) {
+		Eigen::Matrix<double, 6, 1> delta_xi_se3;
+		delta_xi_se3 << delta_xi(0), delta_xi(1), 0.0, 0.0, 0.0, delta_xi(2);
+		update_pose(delta_xi_se3);
 	}
 
 	// Compute pose error (SE3)
