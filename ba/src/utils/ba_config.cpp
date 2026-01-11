@@ -97,6 +97,10 @@ Options load_options(const YAML::Node& config) {
             opts.meas_std = config["optimization"]["meas_std"].as<double>();
         else
             throw std::runtime_error("Measurement standard deviation not found in config file.");
+        if (config["optimization"]["range_factor"])
+            opts.range_factor = config["optimization"]["range_factor"].as<double>();
+        else
+            throw std::runtime_error("Range factor not found in config file.");
         if (config["optimization"]["num_coarse_iterations"])
             opts.num_coarse_iterations = config["optimization"]["num_coarse_iterations"].as<int>();
         else

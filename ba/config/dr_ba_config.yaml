@@ -13,15 +13,16 @@ input:
   input_type: 'local_maps' # 'local_maps' or 'scans'
   local_map_res: 0.1  # m/pixel (only relevant if input_type is 'local_map')
 keyframing:
-  num_frames: 2
+  num_frames: 5
   max_kf_dist: 15.0  # m
   max_kf_rot: 15.0  # degrees
 optimization:
-  max_iterations: 20
+  max_iterations: 10
   convergence_tol: 1e-3
   prior_map_std: 1e-3 # intensity units
-  meas_std: 1.0 # intensity units
+  meas_std: 0.1 # intensity units
+  range_factor: 0.002  # factor to scale range uncertainty to intensity uncertainty
   # Downsample control
-  num_coarse_iterations: 5
+  num_coarse_iterations: 0
   coarse_downsample: 0.2
   refine_downsample: 1.0
