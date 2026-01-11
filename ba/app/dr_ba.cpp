@@ -141,7 +141,7 @@ int main() {
         cv::cv2eigen(img, img_mat);
 
         // Create scan object
-        auto scan = std::make_shared<ba::LocalMapScan>(num_checked, T_est_rel, T_gt_rel, opts.local_map_res, img_mat);
+        auto scan = std::make_shared<ba::LocalMapScan>(num_checked, opts.meas_std, opts.range_factor, T_est_rel, T_gt_rel, opts.local_map_res, img_mat);
         scan_manager.add_scan(scan);
         vox_map.init_map(T_est_rel, opts.max_dist);
     }
@@ -171,6 +171,8 @@ int main() {
         Vec J_M_B = Vec::Zero(voxels_size);
         Vec H_MM_diag = Vec::Zero(voxels_size);
 
+        std::cout << "Assembling system with " << voxels_size << " voxels at downsample factor " << downsample_factor << "..." << std::endl;
+
         // Loop through all voxels
         double cost = 0.0;
         for (int v_idx = 0; v_idx < voxels_size; v_idx++) {
@@ -184,17 +186,20 @@ int main() {
                 auto scan = scan_manager.get_scan(scan_id);
 
                 // Interpolate intensity and Jacobian
-                Eigen::Matrix<double, 1, 3> d_I_d_T;
-                std::optional<double> interp_intensity = scan->interpolate(voxel_x, voxel_y, &d_I_d_T);
+                
+                std::optional<ba::Scan::Measurement> interp_meas = scan->interpolate(voxel_x, voxel_y);
                 // If scan is outside coverage, no intensity will be provided
-                if (!interp_intensity.has_value()) {
+                if (!interp_meas.has_value()) {
                     continue;
                 }
                 voxel_covered = true;
-                double I_meas = interp_intensity.value();
-                double I_meas_weighted = I_meas / opts.meas_std;
-                Eigen::Matrix<double, 1, 3> d_e_d_T = - d_I_d_T / opts.meas_std; // e = I_vox - I_meas
-                double d_e_d_M = 1 / opts.meas_std;
+                double I_meas = interp_meas->intensity;
+                Eigen::Matrix<double, 1, 3> d_I_d_T = interp_meas->jacobian;
+                double meas_cov = interp_meas->covariance;
+                // Weight everything by square root of measurement covariance
+                double I_meas_weighted = I_meas / std::sqrt(meas_cov);
+                Eigen::Matrix<double, 1, 3> d_e_d_T = - d_I_d_T / std::sqrt(meas_cov); // e = I_vox - I_meas
+                double d_e_d_M = 1 / std::sqrt(meas_cov);
 
                 // Assemble Jacobians and Hessians
                 if (scan_idx != 0) {
@@ -206,8 +211,8 @@ int main() {
                     H_TM.block<3,1>(state_idx, v_idx) += d_I_d_T.transpose() * d_e_d_M;
                     // J_T_B
                     J_T_B.segment<3>(state_idx) += d_e_d_T.transpose() * I_meas_weighted;
-
                 }
+
                 // H_MM
                 H_MM_diag(v_idx) += d_e_d_M * d_e_d_M;
                 // J_M_B
@@ -227,17 +232,17 @@ int main() {
         // Precompute element-wise inverse of the diagonal
         Eigen::VectorXd H_MM_inv_diag = H_MM_diag.array().inverse();
 
-        // Compute rhs directly without forming full diagonal matrix
-        Eigen::VectorXd rhs = J_T_B;
-        for (int i = 0; i < H_TM.cols(); ++i) {
-            rhs.noalias() -= H_TM.col(i) * (H_MM_inv_diag(i) * J_M_B(i));
-        }
+        // Pre-scale columns of H_TM by H_MM_inv_diag
+        Eigen::MatrixXd H_TM_scaled = H_TM;
+        H_TM_scaled.array().rowwise() *= H_MM_inv_diag.transpose().array();
 
-        // Compute lhs using the same trick
+        // rhs: J_T_B - H_TM_scaled * J_M_B
+        Eigen::VectorXd rhs = J_T_B;
+        rhs.noalias() -= H_TM_scaled * J_M_B;
+
+        // lhs: H_TT - H_TM_scaled * H_TM.transpose()
         Eigen::MatrixXd lhs = H_TT;
-        for (int i = 0; i < H_TM.cols(); ++i) {
-            lhs.noalias() -= H_TM.col(i) * (H_MM_inv_diag(i) * H_TM.col(i).transpose());
-        }
+        lhs.selfadjointView<Eigen::Upper>().rankUpdate(H_TM_scaled, -1.0);
 
         // Regularization
         lhs.diagonal().array() += 1e-8;

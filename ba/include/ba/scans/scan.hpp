@@ -10,6 +10,14 @@ namespace ba {
 
 class Scan {
 public:
+	struct Measurement {
+		double x;
+		double y;
+		double intensity;
+		double covariance;
+		Eigen::Matrix<double, 1, 3> jacobian; // Jacobian w.r.t. SE(2) pose
+	};
+
 	virtual ~Scan() = default;
 
 	// Identification
@@ -20,7 +28,6 @@ public:
 	const lgmath::se2::Transformation pose2d() const { return pose_.toSE2(); }
 	const lgmath::se3::Transformation &gt_pose() const { return gt_pose_; }
 	const lgmath::se2::Transformation gt_pose2d() const { return gt_pose_.toSE2(); }
-	
 
 	// Update pose
 	void update_pose(const Eigen::Matrix<double, 6, 1> &delta_xi) {
@@ -46,22 +53,22 @@ public:
 	// Interpolate intensity value at a query point in world frame
     // No value will be provided if the requested point is out of bounds
     // Additionally provides optional Jacobian of intensity w.r.t. SE(2) pose (1x3)
-	virtual std::optional<double> interpolate(double x, double y,
-							   Eigen::Matrix<double, 1, 3> *jacobian = nullptr) const = 0;
+	virtual std::optional<Measurement> interpolate(double x, double y) const = 0;
 
 	// Coverage check at a query point in world frame
 	virtual bool check_coverage_at_point(double x, double y) const = 0;
 
 protected:
-	Scan(int scan_id, const lgmath::se3::Transformation &pose)
-		: id_(scan_id), pose_(pose) {}
-	Scan(int scan_id, const lgmath::se3::Transformation &pose,
+	Scan(int scan_id, double meas_std, const lgmath::se3::Transformation &pose)
+		: id_(scan_id), pose_(pose), meas_std_(meas_std) {}
+	Scan(int scan_id, double meas_std, const lgmath::se3::Transformation &pose,
 		 const lgmath::se3::Transformation &gt_pose)
-		: id_(scan_id), pose_(pose), gt_pose_(gt_pose) {}
+		: id_(scan_id), pose_(pose), meas_std_(meas_std), gt_pose_(gt_pose) {}
 
 	int id_;
 	lgmath::se3::Transformation pose_;
 	lgmath::se3::Transformation gt_pose_;
+	double meas_std_;
 };
 
 } // namespace ba

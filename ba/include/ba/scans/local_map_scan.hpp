@@ -12,23 +12,25 @@ public:
     using PixelCoords = std::pair<double, double>;
     using Index = std::pair<int32_t, int32_t>;
 
-    LocalMapScan(int scan_id, const lgmath::se3::Transformation &pose, double res, const Eigen::MatrixXd &local_map)
-        : Scan(scan_id, pose) {
+    LocalMapScan(int scan_id, double meas_std, double range_factor, const lgmath::se3::Transformation &pose, double res, const Eigen::MatrixXd &local_map)
+        : Scan(scan_id, meas_std, pose) {
         res_ = res;
         local_map_ = local_map;
         img_width_ = local_map.cols();
         img_height_ = local_map.rows();
+        range_factor_ = range_factor;
     }
-    LocalMapScan(int scan_id, const lgmath::se3::Transformation &pose, const lgmath::se3::Transformation &gt_pose, 
+    LocalMapScan(int scan_id, double meas_std, double range_factor, const lgmath::se3::Transformation &pose, const lgmath::se3::Transformation &gt_pose, 
                 double res, const Eigen::MatrixXd &local_map)
-        : Scan(scan_id, pose, gt_pose) {
+        : Scan(scan_id, meas_std, pose, gt_pose) {
         res_ = res;
         local_map_ = local_map;
         img_width_ = local_map.cols();
         img_height_ = local_map.rows();
+        range_factor_ = range_factor;
     }
 
-    std::optional<double> interpolate(double x, double y, Eigen::Matrix<double, 1, 3> *jacobian = nullptr) const override;
+    std::optional<Measurement> interpolate(double x, double y) const override;
     bool check_coverage_at_point(double x, double y) const override;
     double res() const { return res_; }
     int img_width() const { return img_width_; }
@@ -46,6 +48,7 @@ private:
     double res_;
     int img_width_;
     int img_height_;
+    double range_factor_;
     Eigen::MatrixXd local_map_;
 };
 

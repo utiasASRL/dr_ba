@@ -1,9 +1,10 @@
+#include <optional>
 #include <ba/scans/local_map_scan.hpp>
 #include <lgmath/se2/Operations.hpp>
 
 namespace ba {
 
-std::optional<double> LocalMapScan::interpolate(double x, double y, Eigen::Matrix<double, 1, 3> *jacobian) const {
+std::optional<Scan::Measurement> LocalMapScan::interpolate(double x, double y) const {
     // Check coverage first
     if (!check_coverage_at_point(x, y)) {
         return std::nullopt;
@@ -11,9 +12,10 @@ std::optional<double> LocalMapScan::interpolate(double x, double y, Eigen::Matri
     
     // Get pixel coordinates and Jacobian
     Eigen::Matrix<double, 2, 3> d_g_d_T;
-    PixelCoords p = coord_to_pixel(x, y, jacobian ? &d_g_d_T : nullptr);
+    PixelCoords p = coord_to_pixel(x, y, &d_g_d_T);
     double u = p.first;
     double v = p.second;
+    double range = std::sqrt(std::pow(x, 2) + std::pow(y, 2));
 
     // Get root pixel coords
     Index root_px = get_root_pixel_coords(x, y);
@@ -37,16 +39,28 @@ std::optional<double> LocalMapScan::interpolate(double x, double y, Eigen::Matri
     // Bilinear interpolation
     double int_xy = w0 * int_ab + w1 * int_ab1 + w2 * int_a1b + w3 * int_a1b1;
 
-    // Compute Jacobian if requested
-    if (jacobian) {
-        double d_B_d_u = (1.0 - v_tilde) * (int_a1b - int_ab) + v_tilde * (int_a1b1 - int_ab1);
-        double d_B_d_v = (1.0 - u_tilde) * (int_ab1 - int_ab) + u_tilde * (int_a1b1 - int_a1b);
-        Eigen::Matrix<double, 1, 2> d_B_d_g;
-        d_B_d_g << d_B_d_u, d_B_d_v;
-        *jacobian = d_B_d_g * d_g_d_T;
-    }
+    // Compute Jacobian
+    double d_B_d_u = (1.0 - v_tilde) * (int_a1b - int_ab) + v_tilde * (int_a1b1 - int_ab1);
+    double d_B_d_v = (1.0 - u_tilde) * (int_ab1 - int_ab) + u_tilde * (int_a1b1 - int_a1b);
+    Eigen::Matrix<double, 1, 2> d_B_d_g;
+    d_B_d_g << d_B_d_u, d_B_d_v;
+    Eigen::Matrix<double, 1, 3> jacobian = d_B_d_g * d_g_d_T;
 
-    return int_xy;
+    // Compute covariance
+    double raw_meas_cov = meas_std_ * meas_std_;
+    double covariance = (w0 * w0 + w1 * w1 + w2 * w2 + w3 * w3) * raw_meas_cov;
+    // Add range-dependent uncertainty
+    covariance += std::pow(range_factor_ * range, 2);
+
+    // Form measurement
+    Measurement meas;
+    meas.x = x;
+    meas.y = y;
+    meas.intensity = int_xy;
+    meas.covariance = covariance;
+    meas.jacobian = jacobian;
+
+    return meas;
 }
 
 bool LocalMapScan::check_coverage_at_point(double x, double y) const {
