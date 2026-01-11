@@ -50,7 +50,6 @@ int main() {
     // Load in image
     // TODO: Generalize to other input types
     fs::path all_img_dir = opts.meas_path / seq_id / opts.input_type;
-
     // Sort files in directory
     std::vector<fs::path> files;
     for (const auto& entry : fs::directory_iterator(all_img_dir)) {
@@ -59,6 +58,16 @@ int main() {
         }
     }
     std::sort(files.begin(), files.end());
+
+    // Load in cumulative return images
+    fs::path cumul_img_dir = opts.meas_path / seq_id / "cumulated_returns";
+    std::vector<fs::path> cumul_files;
+    for (const auto& entry : fs::directory_iterator(cumul_img_dir)) {
+        if (entry.is_regular_file()) {
+            cumul_files.push_back(entry.path());
+        }
+    }
+    std::sort(cumul_files.begin(), cumul_files.end());
 
     // Initialize looping through trajectory
     lgmath::se3::Transformation T_gt_0;
@@ -129,6 +138,7 @@ int main() {
             throw std::invalid_argument("Input type " + opts.input_type + " not supported yet.");
         }
 
+        // Load in image as Eigen matrix
         cv::Mat img = cv::imread(path.string(), cv::IMREAD_GRAYSCALE);
         // Apply Gaussian blur
         if (opts.gauss_blur_sigma > 0.0) {
@@ -140,8 +150,16 @@ int main() {
         Mat img_mat;
         cv::cv2eigen(img, img_mat);
 
+        // Load in cumulative return image
+        fs::path cumul_path = cumul_files[num_checked];
+        cv::Mat cumul_img = cv::imread(cumul_path.string(), cv::IMREAD_GRAYSCALE);
+        // Convert to CV_64F and normalize to [0, 1]
+        cumul_img.convertTo(cumul_img, CV_64F, 1.0 / 255.0);
+        Mat cumul_img_mat;
+        cv::cv2eigen(cumul_img, cumul_img_mat);
+
         // Create scan object
-        auto scan = std::make_shared<ba::LocalMapScan>(num_checked, opts.meas_std, opts.range_factor, T_est_rel, T_gt_rel, opts.local_map_res, img_mat);
+        auto scan = std::make_shared<ba::LocalMapScan>(num_checked, opts, T_est_rel, T_gt_rel, img_mat, cumul_img_mat);
         scan_manager.add_scan(scan);
         vox_map.init_map(T_est_rel, opts.max_dist);
     }
@@ -156,6 +174,8 @@ int main() {
     Mat H_TT = Mat::Zero(states_size, states_size);
     Vec J_T_B = Vec::Zero(states_size);
     std::vector<int> scan_id_list = scan_manager.get_all_scan_ids();
+    double prev_cost = std::numeric_limits<double>::max();
+    double alpha = 1.0; // initial step size scaling factor
     for (int iter = 0; iter < opts.max_iterations; iter++) {
         std::cout << "Iteration " << iter + 1 << " / " << opts.max_iterations << std::endl;
         double downsample_factor = (iter < opts.num_coarse_iterations) ? opts.coarse_downsample : opts.refine_downsample;
@@ -247,8 +267,16 @@ int main() {
         // Regularization
         lhs.diagonal().array() += 1e-8;
 
+        // Compute alpha scaling based on cost increase
+        double percent_cost_change = (prev_cost - cost) / prev_cost;
+        if (percent_cost_change < 0) {
+            // Cost increased, reduce step size
+            alpha *= 0.8;
+            alpha = std::max(alpha, 0.1);
+        }
+
         // Solve
-        Eigen::VectorXd del_x = lhs.selfadjointView<Eigen::Upper>().ldlt().solve(rhs);
+        Eigen::VectorXd del_x = alpha * lhs.selfadjointView<Eigen::Upper>().ldlt().solve(rhs);
 
         // Update poses
         for (int scan_idx = 1; scan_idx < scan_manager.num_scans(); scan_idx++) {
@@ -268,6 +296,7 @@ int main() {
             vox_map.at(voxel_idx) = new_intensity;
         }
 
+        prev_cost = cost;
         std::cout << "Cost: " << cost << std::endl;
         std::cout << "Pose RMSE (x, y, yaw): " << scan_manager.compute_pose_rmse().transpose() << std::endl;
         if (del_x.norm() < opts.convergence_tol) {
