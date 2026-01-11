@@ -101,6 +101,10 @@ Options load_options(const YAML::Node& config) {
             opts.range_factor = config["optimization"]["range_factor"].as<double>();
         else
             throw std::runtime_error("Range factor not found in config file.");
+        if (config["optimization"]["cumul_thresh"])
+            opts.cumul_thresh = config["optimization"]["cumul_thresh"].as<double>();
+        else
+            throw std::runtime_error("Cumulative threshold not found in config file.");
         if (config["optimization"]["num_coarse_iterations"])
             opts.num_coarse_iterations = config["optimization"]["num_coarse_iterations"].as<int>();
         else

@@ -39,6 +39,7 @@ struct Options {
     double prior_map_std = 1e-3; // intensity units
     double meas_std = 1.0;       // intensity units
     double range_factor = 0.0;   // factor to scale range uncertainty to intensity uncertainty
+    double cumul_thresh = 1.0;   // threshold to ignore measurements with too high a cumulative return
     int num_coarse_iterations = 5; // number of initial iterations with higher downsampling
     double coarse_downsample = 0.2; // downsampling factor for coarse iterations
     double refine_downsample = 1.0; // downsampling factor for refinement iterations
