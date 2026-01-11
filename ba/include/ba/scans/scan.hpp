@@ -5,6 +5,7 @@
 #include <lgmath/se3/Transformation.hpp>
 #include <lgmath/se2/Transformation.hpp>
 #include <lgmath/se3/Operations.hpp>
+#include <ba/utils/ba_config.hpp>
 
 namespace ba {
 
@@ -59,16 +60,14 @@ public:
 	virtual bool check_coverage_at_point(double x, double y) const = 0;
 
 protected:
-	Scan(int scan_id, double meas_std, const lgmath::se3::Transformation &pose)
-		: id_(scan_id), pose_(pose), meas_std_(meas_std) {}
-	Scan(int scan_id, double meas_std, const lgmath::se3::Transformation &pose,
+	Scan(int scan_id, const Options &opts, const lgmath::se3::Transformation &pose,
 		 const lgmath::se3::Transformation &gt_pose)
-		: id_(scan_id), pose_(pose), meas_std_(meas_std), gt_pose_(gt_pose) {}
+		: id_(scan_id), meas_std_(opts.meas_std), pose_(pose), gt_pose_(gt_pose) {}
 
 	int id_;
+	double meas_std_;
 	lgmath::se3::Transformation pose_;
 	lgmath::se3::Transformation gt_pose_;
-	double meas_std_;
 };
 
 } // namespace ba

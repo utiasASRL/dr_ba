@@ -12,22 +12,29 @@ public:
     using PixelCoords = std::pair<double, double>;
     using Index = std::pair<int32_t, int32_t>;
 
-    LocalMapScan(int scan_id, double meas_std, double range_factor, const lgmath::se3::Transformation &pose, double res, const Eigen::MatrixXd &local_map)
-        : Scan(scan_id, meas_std, pose) {
-        res_ = res;
-        local_map_ = local_map;
+    // Optionally don't provide cumulative image
+    // The cumulative image check will be silently skipped if not provided
+    LocalMapScan(int scan_id, const Options &opts, const lgmath::se3::Transformation &pose, const lgmath::se3::Transformation &gt_pose, 
+                const Eigen::MatrixXd &local_map)
+        : Scan(scan_id, opts, pose, gt_pose) {
+        res_ = opts.local_map_res;
+        range_factor_ = opts.range_factor;
+        cumul_thresh_ = opts.cumul_thresh;
         img_width_ = local_map.cols();
         img_height_ = local_map.rows();
-        range_factor_ = range_factor;
+        local_map_ = local_map;
     }
-    LocalMapScan(int scan_id, double meas_std, double range_factor, const lgmath::se3::Transformation &pose, const lgmath::se3::Transformation &gt_pose, 
-                double res, const Eigen::MatrixXd &local_map)
-        : Scan(scan_id, meas_std, pose, gt_pose) {
-        res_ = res;
-        local_map_ = local_map;
+
+    LocalMapScan(int scan_id, const Options &opts, const lgmath::se3::Transformation &pose, const lgmath::se3::Transformation &gt_pose, 
+                const Eigen::MatrixXd &local_map, const Eigen::MatrixXd &cumul_img)
+        : Scan(scan_id, opts, pose, gt_pose) {
+        res_ = opts.local_map_res;
+        range_factor_ = opts.range_factor;
+        cumul_thresh_ = opts.cumul_thresh;
         img_width_ = local_map.cols();
         img_height_ = local_map.rows();
-        range_factor_ = range_factor;
+        local_map_ = local_map;
+        cumul_img_ = cumul_img;
     }
 
     std::optional<Measurement> interpolate(double x, double y) const override;
@@ -46,10 +53,12 @@ public:
 
 private:
     double res_;
+    double range_factor_;
+    double cumul_thresh_;
     int img_width_;
     int img_height_;
-    double range_factor_;
     Eigen::MatrixXd local_map_;
+    Eigen::MatrixXd cumul_img_;
 };
 
 

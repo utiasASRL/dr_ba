@@ -22,6 +22,15 @@ std::optional<Scan::Measurement> LocalMapScan::interpolate(double x, double y) c
     int a = root_px.first;
     int b = root_px.second;
 
+    // Check value of cumulative image at this point
+    if (cumul_img_.rows() != 0 && cumul_img_.cols() != 0) {
+        double cumul_value = cumul_img_(b, a);
+        double root_intensity = local_map_(b, a);
+        if (root_intensity < 0.1 && cumul_value > cumul_thresh_) {
+            return std::nullopt;
+        }
+    }
+
     // Get intensities at four corners
     double int_ab = local_map_(b, a);
     double int_a1b = local_map_(b, a + 1);
