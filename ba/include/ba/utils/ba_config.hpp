@@ -38,6 +38,9 @@ struct Options {
     double convergence_tol = 1e-3;
     double prior_map_std = 1e-3; // intensity units
     double meas_std = 1.0;       // intensity units
+    bool use_rel_pose_prior = true;
+    double rel_pose_prior_translation_std = 0.1; // meters
+    double rel_pose_prior_rotation_std = 5.0;    // degrees
     double range_factor = 0.0;   // factor to scale range uncertainty to intensity uncertainty
     double cumul_thresh = 1.0;   // threshold to ignore measurements with too high a cumulative return
     int num_coarse_iterations = 5; // number of initial iterations with higher downsampling

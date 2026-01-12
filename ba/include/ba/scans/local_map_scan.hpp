@@ -51,6 +51,11 @@ public:
     // Pixel coordinates have u right and v down, with (0,0) at the top-left corner of the image
     PixelCoords coord_to_pixel(double x, double y, Eigen::Matrix<double, 2, 3> *jacobian = nullptr) const;
 
+    // Clone method for deep copying
+    std::shared_ptr<Scan> clone() const override {
+        return std::make_shared<LocalMapScan>(*this);
+    }
+
 private:
     double res_;
     double range_factor_;

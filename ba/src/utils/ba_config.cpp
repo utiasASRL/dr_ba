@@ -97,6 +97,20 @@ Options load_options(const YAML::Node& config) {
             opts.meas_std = config["optimization"]["meas_std"].as<double>();
         else
             throw std::runtime_error("Measurement standard deviation not found in config file.");
+        if (config["optimization"]["rel_pose_prior"]) {
+            if (config["optimization"]["rel_pose_prior"]["use_pose_prior"])
+                opts.use_rel_pose_prior = config["optimization"]["rel_pose_prior"]["use_pose_prior"].as<bool>();
+            else
+                throw std::runtime_error("Use relative pose prior flag not found in config file.");
+            if (config["optimization"]["rel_pose_prior"]["translation_std"])
+                opts.rel_pose_prior_translation_std = config["optimization"]["rel_pose_prior"]["translation_std"].as<double>();
+            else
+                throw std::runtime_error("Relative pose prior translation std not found in config file.");
+            if (config["optimization"]["rel_pose_prior"]["rotation_std"])
+                opts.rel_pose_prior_rotation_std = config["optimization"]["rel_pose_prior"]["rotation_std"].as<double>();
+        } else {
+            throw std::runtime_error("Relative pose prior configuration not found in config file.");
+        }
         if (config["optimization"]["range_factor"])
             opts.range_factor = config["optimization"]["range_factor"].as<double>();
         else

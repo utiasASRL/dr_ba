@@ -3,6 +3,7 @@
 #include <ba/scans/local_map_scan.hpp>
 #include "ba/utils/ba_config.hpp"
 #include "ba/utils/io_utils.hpp"
+#include "ba/solver/solver.hpp"
 
 #include <iostream>
 #include <random>
@@ -73,6 +74,8 @@ int main() {
     lgmath::se3::Transformation T_gt_0;
     lgmath::se3::Transformation T_est_0;
     lgmath::se3::Transformation T_kf_prev;  // Previous keyframe pose
+    int kf_prev_id = 0;
+    ankerl::unordered_dense::map<std::pair<int32_t, int32_t>, lgmath::se3::Transformation> pose_priors;
 
     // Loop through all images
     std::cout << "Loading images from: " << all_img_dir << std::endl;
@@ -99,7 +102,7 @@ int main() {
             Vec3d noise;
             noise << translation_dist(rng), translation_dist(rng), rotation_dist(rng);
             lgmath::se3::Transformation T_noise = lgmath::se2::Transformation(noise).toSE3();
-            T_est = T_est * T_noise;
+            T_est = T_est * T_noise;            
         } else {
             throw std::invalid_argument("Invalid init_poses option: " + opts.init_poses);
         }
@@ -116,6 +119,8 @@ int main() {
                 // Not a keyframe, skip
                 continue;
             }
+            // Set up prior from prev keyframe radar frame to this keyframe radar frame
+            pose_priors[{kf_prev_id, num_checked}] = T_kf_rel;
         } else {
             T_gt_0 = T_gt;
             T_est_0 = T_est;
@@ -124,6 +129,7 @@ int main() {
 
         // We've decided this is a keyframe!
         std::cout << "Processing frame " << num_checked << " / " << num_scans << std::endl;
+        kf_prev_id = num_checked;
         num_loaded++;
         T_kf_prev = T_est; 
 
@@ -169,141 +175,8 @@ int main() {
     std::cout << "Initial pose RMSE (x, y, yaw): " << scan_manager.compute_pose_rmse().transpose() << std::endl;
 
     std::cout << "Starting optimization..." << std::endl;
-    int states_size = (scan_manager.num_scans() - 1) * 3; // SE2 poses with first pose fixed
-    // Initialize necessary constant-size matrices
-    Mat H_TT = Mat::Zero(states_size, states_size);
-    Vec J_T_B = Vec::Zero(states_size);
-    std::vector<int> scan_id_list = scan_manager.get_all_scan_ids();
-    double prev_cost = std::numeric_limits<double>::max();
-    double alpha = 1.0; // initial step size scaling factor
-    for (int iter = 0; iter < opts.max_iterations; iter++) {
-        std::cout << "Iteration " << iter + 1 << " / " << opts.max_iterations << std::endl;
-        double downsample_factor = (iter < opts.num_coarse_iterations) ? opts.coarse_downsample : opts.refine_downsample;
-
-        // Downsample desired voxels
-        std::vector<ba::VoxelMap::Index> voxel_keys = vox_map.get_sorted_keys_downsampled(downsample_factor);
-        int voxels_size = voxel_keys.size();
-
-        // Initialize matrices
-        H_TT.setZero();
-        J_T_B.setZero();
-        Mat H_TM = Mat::Zero(states_size, voxels_size);
-        Vec J_M_B = Vec::Zero(voxels_size);
-        Vec H_MM_diag = Vec::Zero(voxels_size);
-
-        std::cout << "Assembling system with " << voxels_size << " voxels at downsample factor " << downsample_factor << "..." << std::endl;
-
-        // Loop through all voxels
-        double cost = 0.0;
-        for (int v_idx = 0; v_idx < voxels_size; v_idx++) {
-            const auto& voxel_idx = voxel_keys[v_idx];
-            double voxel_x = static_cast<double>(voxel_idx.first) * vox_map.res();
-            double voxel_y = static_cast<double>(voxel_idx.second) * vox_map.res();
-            double vox_intensity = vox_map.at(voxel_idx);
-            bool voxel_covered = false;
-            for (int scan_idx = 0; scan_idx < scan_manager.num_scans(); scan_idx++) {
-                int scan_id = scan_id_list[scan_idx];
-                auto scan = scan_manager.get_scan(scan_id);
-
-                // Interpolate intensity and Jacobian
-                
-                std::optional<ba::Scan::Measurement> interp_meas = scan->interpolate(voxel_x, voxel_y);
-                // If scan is outside coverage, no intensity will be provided
-                if (!interp_meas.has_value()) {
-                    continue;
-                }
-                voxel_covered = true;
-                double I_meas = interp_meas->intensity;
-                Eigen::Matrix<double, 1, 3> d_I_d_T = interp_meas->jacobian;
-                double meas_cov = interp_meas->covariance;
-                // Weight everything by square root of measurement covariance
-                double I_meas_weighted = I_meas / std::sqrt(meas_cov);
-                Eigen::Matrix<double, 1, 3> d_e_d_T = - d_I_d_T / std::sqrt(meas_cov); // e = I_vox - I_meas
-                double d_e_d_M = 1 / std::sqrt(meas_cov);
-
-                // Assemble Jacobians and Hessians
-                if (scan_idx != 0) {
-                    // First pose is fixed
-                    int state_idx = (scan_idx - 1) * 3;
-                    // H_TT
-                    H_TT.block<3,3>(state_idx, state_idx) += d_e_d_T.transpose() * d_e_d_T;
-                    // H_TM
-                    H_TM.block<3,1>(state_idx, v_idx) += d_I_d_T.transpose() * d_e_d_M;
-                    // J_T_B
-                    J_T_B.segment<3>(state_idx) += d_e_d_T.transpose() * I_meas_weighted;
-                }
-
-                // H_MM
-                H_MM_diag(v_idx) += d_e_d_M * d_e_d_M;
-                // J_M_B
-                J_M_B(v_idx) += d_e_d_M * I_meas_weighted;
-
-                // Update cost (purely for monitoring convergence)
-                cost += 0.5 * std::pow((vox_intensity - I_meas), 2);
-            }
-            if (!voxel_covered) {
-                // Add zero prior to this voxel
-                H_MM_diag(v_idx) += 1.0 / (opts.prior_map_std * opts.prior_map_std);
-                cost += 0.5 * std::pow((vox_intensity - 0.0), 2);
-            }
-        }
-
-        std::cout << "Solving for state update..." << std::endl;
-        // Precompute element-wise inverse of the diagonal
-        Eigen::VectorXd H_MM_inv_diag = H_MM_diag.array().inverse();
-
-        // Pre-scale columns of H_TM by H_MM_inv_diag
-        Eigen::MatrixXd H_TM_scaled = H_TM;
-        H_TM_scaled.array().rowwise() *= H_MM_inv_diag.transpose().array();
-
-        // rhs: J_T_B - H_TM_scaled * J_M_B
-        Eigen::VectorXd rhs = J_T_B;
-        rhs.noalias() -= H_TM_scaled * J_M_B;
-
-        // lhs: H_TT - H_TM_scaled * H_TM.transpose()
-        Eigen::MatrixXd lhs = H_TT;
-        lhs.selfadjointView<Eigen::Upper>().rankUpdate(H_TM_scaled, -1.0);
-
-        // Regularization
-        lhs.diagonal().array() += 1e-8;
-
-        // Compute alpha scaling based on cost increase
-        double percent_cost_change = (prev_cost - cost) / prev_cost;
-        if (percent_cost_change < 0) {
-            // Cost increased, reduce step size
-            alpha *= 0.8;
-            alpha = std::max(alpha, 0.1);
-        }
-
-        // Solve
-        Eigen::VectorXd del_x = alpha * lhs.selfadjointView<Eigen::Upper>().ldlt().solve(rhs);
-
-        // Update poses
-        for (int scan_idx = 1; scan_idx < scan_manager.num_scans(); scan_idx++) {
-            // Extract delta for this scan
-            int state_idx = (scan_idx - 1) * 3;
-            Eigen::Matrix<double, 3, 1> delta_xi = del_x.segment<3>(state_idx);
-            // Load in scan and update pose
-            auto scan = scan_manager.get_scan(scan_id_list[scan_idx]);
-            scan->update_pose(delta_xi);
-        }
-
-        std::cout << "Updating map voxels..." << std::endl;
-        // Update map voxels
-        for (int v = 0; v < voxels_size; ++v) {
-            double new_intensity = J_M_B(v) / H_MM_diag(v);
-            const auto& voxel_idx = voxel_keys[v];
-            vox_map.at(voxel_idx) = new_intensity;
-        }
-
-        prev_cost = cost;
-        std::cout << "Cost: " << cost << std::endl;
-        std::cout << "Pose RMSE (x, y, yaw): " << scan_manager.compute_pose_rmse().transpose() << std::endl;
-        if (del_x.norm() < opts.convergence_tol) {
-            std::cout << "Converged!" << std::endl;
-            break;
-        }
-    }
+    ba::Solver solver(opts, scan_manager, vox_map, pose_priors);
+    solver.optimize();
 
     // Visualize final map
     vox_map.visualize();

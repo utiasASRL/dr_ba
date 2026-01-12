@@ -51,6 +51,9 @@ public:
 		return T_err.vec();
 	}
 
+	// Clone method for deep copying
+	virtual std::shared_ptr<Scan> clone() const = 0;
+
 	// Interpolate intensity value at a query point in world frame
     // No value will be provided if the requested point is out of bounds
     // Additionally provides optional Jacobian of intensity w.r.t. SE(2) pose (1x3)

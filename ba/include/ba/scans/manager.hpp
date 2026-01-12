@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <ba/scans/scan.hpp>
+#include <ankerl/unordered_dense.h>
 
 namespace ba {
 
@@ -43,6 +44,16 @@ public:
         rmse = rmse.cwiseSqrt();
         rmse(2) *= (180.0 / M_PI); // convert yaw to degrees
         return rmse;
+    }
+
+    ScanManager deep_copy() const {
+        ScanManager copy;
+        for (const auto& scan_id : scan_id_list_) {
+            const auto& scan = scans_.at(scan_id);
+            auto scan_clone = scan->clone();
+            copy.add_scan(scan_clone);
+        }
+        return copy;
     }
 
 private:
