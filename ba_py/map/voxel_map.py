@@ -81,6 +81,8 @@ class Map:
         num_voxels = int(np.ceil(max_dist / self.res))
         for da in range(-num_voxels, num_voxels +1):
             for db in range(-num_voxels, num_voxels +1):
+                if (da*self.res)**2 + (db*self.res)**2 > max_dist**2:
+                    continue
                 a = a_center + da
                 b = b_center + db
                 # x_vox = a * self.res
