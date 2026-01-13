@@ -32,10 +32,7 @@ public:
 
 	// Update pose
 	void update_pose(const Eigen::Matrix<double, 6, 1> &delta_xi) {
-		// Update should be T_new = exp(-delta_xi) * T_old
-		// but we don't have negative since lgmath flips the convention
-		// internally
-		lgmath::se3::Transformation T_update((delta_xi).eval());
+		lgmath::se3::Transformation T_update((-delta_xi).eval());
 		pose_ = T_update * pose_;
 	}
 

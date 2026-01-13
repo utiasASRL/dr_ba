@@ -3,10 +3,10 @@
 
 namespace ba {
 
-void Solver::construct_problem(double downsample_factor) {
+void Solver::construct_problem(ba::ScanManager &scan_manager, double downsample_factor) {
     // Load in constants
-    std::vector<int> scan_id_list = scan_manager_.get_all_scan_ids();
-    int states_size = (scan_manager_.num_scans() - 1) * 3; // SE2 poses with first pose fixed
+    std::vector<int> scan_id_list = scan_manager.get_all_scan_ids();
+    int states_size = (scan_manager.num_scans() - 1) * 3; // SE2 poses with first pose fixed
 
     // Reset cost
     cost_ = 0.0;
@@ -30,10 +30,10 @@ void Solver::construct_problem(double downsample_factor) {
             lgmath::se2::Transformation T_prior = prior.second.toSE2();
             // T_prior is the transform from scan A to scan B
             // Load in poses
-            lgmath::se2::Transformation T_a = scan_manager_.get_scan(scan_id_a)->pose2d();
-            lgmath::se2::Transformation T_b = scan_manager_.get_scan(scan_id_b)->pose2d();
+            lgmath::se2::Transformation T_a = scan_manager.get_scan(scan_id_a)->pose2d();
+            lgmath::se2::Transformation T_b = scan_manager.get_scan(scan_id_b)->pose2d();
             // Compute error
-            lgmath::se2::Transformation T_err = T_prior * T_a.inverse() * T_b;
+            lgmath::se2::Transformation T_err = T_prior * (T_b.inverse() * T_a).inverse();
             Eigen::Matrix<double, 3, 1> err_vec = T_err.vec();
             // Compute Jacobians
             Eigen::Matrix<double, 3, 3> Ad_T_b_inv = T_b.inverse().adjoint();
@@ -90,9 +90,9 @@ void Solver::construct_problem(double downsample_factor) {
         double voxel_y = static_cast<double>(voxel_idx.second) * vox_map_.res();
         double vox_intensity = vox_map_.at(voxel_idx);
         bool voxel_covered = false;
-        for (int scan_idx = 0; scan_idx < scan_manager_.num_scans(); scan_idx++) {
+        for (int scan_idx = 0; scan_idx < scan_manager.num_scans(); scan_idx++) {
             int scan_id = scan_id_list[scan_idx];
-            auto scan = scan_manager_.get_scan(scan_id);
+            auto scan = scan_manager.get_scan(scan_id);
 
             // Interpolate intensity and Jacobian
             
@@ -108,7 +108,7 @@ void Solver::construct_problem(double downsample_factor) {
             // Weight everything by square root of measurement covariance
             double I_meas_weighted = I_meas / std::sqrt(meas_cov);
             Eigen::Matrix<double, 1, 3> d_e_d_T = - d_I_d_T / std::sqrt(meas_cov); // e = I_vox - I_meas
-            double d_e_d_M = 1 / std::sqrt(meas_cov);
+            double d_e_d_M = 1.0 / std::sqrt(meas_cov);
 
             // Assemble Jacobians and Hessians
             if (scan_idx != 0) {
@@ -117,7 +117,7 @@ void Solver::construct_problem(double downsample_factor) {
                 // H_TT
                 H_TT_.block<3,3>(state_idx, state_idx) += d_e_d_T.transpose() * d_e_d_T;
                 // H_TM
-                H_TM_.block<3,1>(state_idx, v_idx) += d_I_d_T.transpose() * d_e_d_M;
+                H_TM_.block<3,1>(state_idx, v_idx) += d_e_d_T.transpose() * d_e_d_M;
                 // J_T_B
                 J_T_B_.segment<3>(state_idx) += d_e_d_T.transpose() * I_meas_weighted;
             }
@@ -133,57 +133,74 @@ void Solver::construct_problem(double downsample_factor) {
         if (!voxel_covered) {
             // Add zero prior to this voxel
             H_MM_diag_(v_idx) += 1.0 / (opts_.prior_map_std * opts_.prior_map_std);
-            cost_ += 0.5 * std::pow((vox_intensity - 0.0), 2);
+            cost_ += 0.5 * std::pow(vox_intensity, 2);
         }
     }
 }
 
-void Solver::solve() {
-    // Precompute element-wise inverse of the diagonal
-    Eigen::VectorXd H_MM_inv_diag = H_MM_diag_.array().inverse();
+bool Solver::solve() {
+    // H_MM_diag_ is the vector of diagonal elements
+    Eigen::VectorXd H_MM_inv_diag = H_MM_diag_.cwiseInverse();
 
-    // Pre-scale columns of H_TM by H_MM_inv_diag
-    Eigen::MatrixXd H_TM_scaled = H_TM_;
-    H_TM_scaled.array().rowwise() *= H_MM_inv_diag.transpose().array();
-
-    // rhs: J_T_B - H_TM_scaled * J_M_B
-    Eigen::VectorXd rhs = J_T_B_;
-    rhs.noalias() -= H_TM_scaled * J_M_B_;
-
-    // lhs: H_TT - H_TM_scaled * H_TM.transpose()
+    // Compute lhs directly
     Eigen::MatrixXd lhs = H_TT_;
-    lhs.selfadjointView<Eigen::Upper>().rankUpdate(H_TM_scaled, -1.0);
+
+    // Subtract H_TM * H_MM^-1 * H_TM^T efficiently
+    for (int j = 0; j < H_TM_.cols(); ++j) {
+        lhs.noalias() -= H_TM_.col(j) * (H_TM_.col(j).array() * H_MM_inv_diag(j)).matrix().transpose();
+    }
+
+    // Compute rhs
+    Eigen::VectorXd rhs = - H_TM_ * (J_M_B_.array() / H_MM_diag_.array()).matrix() + J_T_B_;
 
     // Regularization
-    lhs.diagonal().array() += 1e-8;
+    // Eigen::VectorXd diag = lhs.diagonal();
+    // lhs.diagonal().array() += lambda_ * diag.array().max(1e-8);
 
-    // Compute alpha scaling based on cost increase
-    // double percent_cost_change = (prev_cost - cost) / prev_cost;
-    // if (percent_cost_change < 0) {
-    //     // Cost increased, reduce step size
-    //     alpha *= 0.8;
-    //     alpha = std::max(alpha, 0.1);
-    // }
+    lhs += 1e-8 * Eigen::MatrixXd::Identity(lhs.rows(), lhs.cols());
 
     // Solve
     del_x_ = lhs.selfadjointView<Eigen::Upper>().ldlt().solve(rhs);
+
+    // // Recompute cost after applying del_x_ on a copy of the scan manager
+    // ba::ScanManager scan_manager_copy = scan_manager_.deep_copy();
+    // update_poses(scan_manager_copy);
+    // construct_problem(scan_manager_copy, 1.0);
+    // update_map();
+
+    // std::cout << "lambda: " << lambda_
+    //         << " |delta|: " << del_x_.norm()
+    //         << " cost: " << cost_ << std::endl;
+
+    // // Update lambda_
+    // if (cost_ < prev_cost_ || del_x_.norm() < opts_.convergence_tol) {
+    //     // Decrease lambda
+    //     lambda_ = std::max(lambda_ * 0.8, 1e-8);
+    //     return true;
+    // } else {
+    //     // Increase lambda
+    //     lambda_ *= 2.0;
+    //     return false;
+    // }
+
+    return true;
 }
 
-void Solver::update_poses() {
+void Solver::update_poses(ba::ScanManager &scan_manager) {
     // Update poses
     if (del_x_.size() == 0) {
         throw std::runtime_error("No pose updates available. Have you run solve()?");
     }
-    if (del_x_.size() != (scan_manager_.num_scans() - 1) * 3) {
+    if (del_x_.size() != (scan_manager.num_scans() - 1) * 3) {
         throw std::runtime_error("Size of pose updates does not match number of scans.");
     }
-    std::vector<int> scan_id_list = scan_manager_.get_all_scan_ids();
-    for (int scan_idx = 1; scan_idx < scan_manager_.num_scans(); scan_idx++) {
+    std::vector<int> scan_id_list = scan_manager.get_all_scan_ids();
+    for (int scan_idx = 1; scan_idx < scan_manager.num_scans(); scan_idx++) {
         // Extract delta for this scan
         int state_idx = (scan_idx - 1) * 3;
         Eigen::Matrix<double, 3, 1> delta_xi = del_x_.segment<3>(state_idx);
         // Load in scan and update pose
-        auto scan = scan_manager_.get_scan(scan_id_list[scan_idx]);
+        auto scan = scan_manager.get_scan(scan_id_list[scan_idx]);
         scan->update_pose(delta_xi);
     }
 }
@@ -204,23 +221,25 @@ void Solver::optimize() {
         double downsample_factor = (iter < opts_.num_coarse_iterations) ? opts_.coarse_downsample : opts_.refine_downsample;
 
         // Construct problem
-        construct_problem(downsample_factor);
+        construct_problem(scan_manager_, downsample_factor);
 
-        // Solve problem
-        solve();
+        // Solve problem, skip updating if solve failed
+        bool success = solve();
+        if (!success) continue;
 
         // Update poses
-        update_poses();
+        update_poses(scan_manager_);
 
         // Update map
         update_map();
 
         std::cout << "Cost: " << cost_ << std::endl;
         std::cout << "Pose RMSE (x, y, yaw): " << scan_manager_.compute_pose_rmse().transpose() << std::endl;
-        if (del_x_.norm() < opts_.convergence_tol) {
+        if (iter != 0 && (del_x_.norm() < opts_.convergence_tol || std::abs(prev_cost_ - cost_) < opts_.convergence_tol)) {
             std::cout << "Converged!" << std::endl;
             break;
         }
+        prev_cost_ = cost_;
     }
 }
 
