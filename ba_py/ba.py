@@ -29,19 +29,24 @@ def plot_cost_history(cost_history, path=None, show=False):
         plt.show()
         plt.close()
 
-def plot_pose_errors(trans_errors, rot_errors, path=None, show=False):
+def plot_pose_errors(rmse_hist, path=None, show=False):
+    rmse_hist = np.array(rmse_hist)
     fig, ax1 = plt.subplots()
 
-    color = 'tab:blue'
+    color_x = 'tab:blue'
+    color_y = 'tab:orange'
     ax1.set_xlabel('Iteration')
-    ax1.set_ylabel('Translational Error (m)', color=color)
-    ax1.plot(trans_errors, marker='o', color=color)
-    ax1.tick_params(axis='y', labelcolor=color)
+    ax1.set_ylabel('Translational Error (m)', color=color_x)
+    ax1.plot(rmse_hist[:, 0], marker='o', color=color_x)
+    ax1.plot(rmse_hist[:, 1], marker='x', color=color_y)
+    ax1.tick_params(axis='y', labelcolor=color_x)
+    # Add legend for x and y
+    ax1.legend(['Translational Error X', 'Translational Error Y'], loc='upper left')
     ax1.grid()
     ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
     color = 'tab:red'
     ax2.set_ylabel('Rotational Error (deg)', color=color)  # we already handled the x-label with ax1
-    ax2.plot(rot_errors, marker='o', color=color)
+    ax2.plot(rmse_hist[:, 2], marker='o', color=color)
     ax2.tick_params(axis='y', labelcolor=color)
     fig.tight_layout()  # otherwise the right y-label is slightly clipped
     if path is not None:
@@ -57,7 +62,7 @@ def main(seq_id):
 
     # Raw measurement parameters
     max_dist = 80.0  # meters
-    gauss_blur_sigma = 2.0  # pixels
+    gauss_blur_sigma = 0.0  # pixels
 
     # Downsample control
     num_init_iter = 0
@@ -74,11 +79,11 @@ def main(seq_id):
     rotation_std = np.deg2rad(2.0)  # radians
 
     # Optimization parameters
-    max_iter = 200
+    max_iter = 1
     tol = 1e-3
 
     # Input type
-    init_poses = 'pogo'  # 'gt' or 'pogo'
+    init_poses = 'gt'  # 'gt' or 'pogo'
     input_type = 'local_map' # 'scan' or 'local_map'
     img_res = 0.1  # meters per pixel
 
@@ -158,8 +163,11 @@ def main(seq_id):
             # Save initial guess for pose
             if idx != 0:
                 vec_noise = np.zeros((6,1))
-                vec_noise[0:2] = np.random.uniform(-translation_std, translation_std, (2,1))  # 0.5 m std dev
-                vec_noise[5] = np.random.uniform(-rotation_std, rotation_std, (1,1))  # 5 deg std dev
+                # vec_noise[0:2] = np.random.uniform(-translation_std, translation_std, (2,1))  # 0.5 m std dev
+                # vec_noise[5] = np.random.uniform(-rotation_std, rotation_std, (1,1))  # 5 deg std dev
+                vec_noise[0] = 1.0
+                vec_noise[1] = 1.0
+                vec_noise[5] = 0.02
                 noise_T = se3op.vec2tran(vec_noise)
                 rel_pose = rel_pose @ noise_T
         elif init_poses == 'pogo':
@@ -174,7 +182,8 @@ def main(seq_id):
         if input_type == 'local_map':
             scan_data = plt.imread(osp.join(scan_path, scan))
             # Apply Gaussian blur
-            scan_data = gaussian_filter(scan_data, sigma=gauss_blur_sigma)
+            if gauss_blur_sigma > 0.0:
+                scan_data = gaussian_filter(scan_data, sigma=gauss_blur_sigma)
             scan = LocalMapScan(rel_pose, scan_data, img_res, idx)
         else:
             scan_data = np.load(osp.join(scan_path, scan))
@@ -200,24 +209,22 @@ def main(seq_id):
     print("Initial poses:\n")
     trans_errors = []
     rot_errors = []
-    avg_rotational_err = 0.0
-    avg_translational_err = 0.0
+    rmse_history = []
+    rmse = np.array([0.0, 0.0, 0.0])
     for scan_id in sorted_pose_keys:
         s = pose_key_to_idx[scan_id]
         print(f"State {s}:\n", scan_loader.get_scan(scan_id).pose)
         # Compute initial error
         gt_pose = gt_poses[scan_id]
         pose_err = se3op.tran2vec(np.linalg.inv(scan_loader.get_scan(scan_id).pose) @ gt_pose).flatten()
-        # print("Initial pose error (x,y,yaw):", pose_err[0], pose_err[1], np.rad2deg(pose_err[5]))
-        avg_translational_err += np.linalg.norm(pose_err[0:2])
-        avg_rotational_err += np.abs(pose_err[5])
-    avg_translational_err /= (num_states - 1)
-    avg_rotational_err /= (num_states - 1)
-    trans_errors.append(avg_translational_err)
-    rot_errors.append(np.rad2deg(avg_rotational_err))
-    print("Average initial translational error (m): {:.4f}, Average initial rotational error (deg): {:.2f}".format(
-        avg_translational_err, np.rad2deg(avg_rotational_err)
-    ))
+        rmse[0] += pose_err[0]**2
+        rmse[1] += pose_err[1]**2
+        rmse[2] += pose_err[5]**2
+    rmse = np.sqrt(rmse / num_states)
+    rmse[2] *= 180.0 / np.pi  # convert to degrees
+    rmse = np.round(rmse, 6)
+    print("Initial RMSE (x, y, yaw):", rmse.transpose())
+    rmse_history.append(rmse)
 
     scan_by_id = {scan.id: scan for scan in scan_loader.scans}
     for iter in range(max_iter):
@@ -285,32 +292,31 @@ def main(seq_id):
                     J_T_B[s_idx*3:(s_idx+1)*3, 0:1] += d_e_d_T.T * I_i_weighted
 
                 # Compute error for cost
-                cost += (vox_int - I_i)**2
+                cost += 0.5 * (vox_int - I_i)**2
 
             if not vox_covered:
                 # Add prior for this voxel
                 H_MM[v_idx, v_idx] += (1/prior_map_std**2)
-                cost += vox_int**2
+                cost += 0.5 * vox_int**2
 
         print("Solving for state updates...")
         # One-time factorization
         H_MM = H_MM.tocsc()
         H_MM_factor = cholesky(H_MM)
 
-        lhs = H_TT - H_TM @ H_MM_factor(H_TM.T) + 1e-8 * np.eye(num_states * 3)
+        lhs = H_TT - H_TM @ H_MM_factor(H_TM.T) + 1e-8 * np.eye((num_states-1) * 3)
         rhs = - H_TM @ H_MM_factor(J_M_B) + J_T_B
         # Scale alpha with iteration
         alpha = max(1.0 / (1.0 + iter), 1.0)
         # alpha = 1.0
-
 
         del_x = alpha * np.linalg.solve(lhs, rhs)
         M = H_MM_factor(J_M_B)
 
         # Update states
         print("Updating states...")
-        avg_translational_err = 0.0
-        avg_rotational_err = 0.0
+
+        rmse = np.array([0.0, 0.0, 0.0])
         for scan_id in sorted_pose_keys:
             s_idx = pose_key_to_idx[scan_id] - 1  # first pose is fixed
             if s_idx < 0:
@@ -319,27 +325,22 @@ def main(seq_id):
             delta_vec_se3 = np.zeros((6,1))
             delta_vec_se3[0:2] = delta_vec[0:2]
             delta_vec_se3[5] = delta_vec[2]
-            # print("Delta vec for state {}: {}".format(s_idx+1, delta_vec_se3.T))
             delta_T = se3op.vec2tran(-delta_vec_se3)
             new_scan_pose = delta_T @ scan_loader.get_scan(scan_id).pose
             scan_loader.get_scan(scan_id).update_pose(new_scan_pose)
-            # print("Updated pose for state {}:\n{}".format(s_idx+1, new_scan_pose))
             gt_pose = gt_poses[scan_id]
             pose_err = se3op.tran2vec(np.linalg.inv(new_scan_pose) @ gt_pose).flatten()
-            # print("Pose error for state {}: x,y,yaw: {:.4f}, {:.4f}, {:.2f} deg".format(
-            #     s_idx+1, pose_err[0], pose_err[1], np.rad2deg(pose_err[5])
-            # ))
-            avg_translational_err += np.linalg.norm(pose_err[0:2])
-            avg_rotational_err += np.abs(pose_err[5])
-        
-        avg_translational_err /= (num_states - 1)
-        avg_rotational_err /= (num_states - 1)
-        trans_errors.append(avg_translational_err)
-        rot_errors.append(np.rad2deg(avg_rotational_err))
-        print("Average translational error (m): {:.4f}, Average rotational error (deg): {:.2f}".format(
-            avg_translational_err, np.rad2deg(avg_rotational_err)
-        ))
-        plot_pose_errors(trans_errors, rot_errors, path=osp.join(voxel_img_output_path, 'pose_errors.png'))
+            rmse[0] += pose_err[0]**2
+            rmse[1] += pose_err[1]**2
+            rmse[2] += pose_err[5]**2
+
+        rmse = np.sqrt(rmse / num_states)
+        rmse[2] *= 180.0 / np.pi  # convert to degrees
+        rmse = np.round(rmse, 6)
+        print("Pose RMSE (x, y, yaw):", rmse.transpose())
+        rmse_history.append(rmse)
+
+        plot_pose_errors(rmse_history, path=osp.join(voxel_img_output_path, 'pose_errors.png'))
 
         # Update map
         for vox_key in sorted_map_keys:
@@ -372,10 +373,10 @@ def main(seq_id):
         pose_err = se3op.tran2vec(np.linalg.inv(scan_loader.get_scan(scan_id).pose) @ gt_pose)
         print("Final pose error (x,y,yaw):", pose_err[0], pose_err[1], np.rad2deg(pose_err[5]))
     
-    vox_map.plot()
-    plot_cost_history(cost_history)
-    plot_pose_errors(trans_errors, rot_errors)
-    plt.show()
+    # vox_map.plot()
+    # plot_cost_history(cost_history)
+    # plot_pose_errors(rmse_history)
+    # plt.show()
 
 if __name__ == '__main__':
     main(kSeqId)
