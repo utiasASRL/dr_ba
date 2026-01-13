@@ -54,6 +54,9 @@ public:
 	// Visualize as pixel image (for debugging)
 	void visualize(double downsample_factor = 1.0) const;
 
+	// Save map as a binary file
+	void save_to_file(const std::string& filepath) const;
+
 private:
 	double res_;
 	ankerl::unordered_dense::map<Index, double> voxels_;

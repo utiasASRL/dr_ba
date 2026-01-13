@@ -129,6 +129,30 @@ void VoxelMap::visualize(double downsample_factor) const {
     cv::destroyAllWindows();
 }
 
+void VoxelMap::save_to_file(const std::string& filepath) const {
+    std::ofstream ofs(filepath, std::ios::binary);
+    if (!ofs) {
+        throw std::runtime_error("Failed to open file for writing: " + filepath);
+    }
+
+    // Write resolution
+    ofs.write(reinterpret_cast<const char*>(&res_), sizeof(res_));
+
+    // Write voxel data
+    for (const auto& kv : voxels_) {
+        int32_t x = kv.first.first;
+        int32_t y = kv.first.second;
+        double intensity = kv.second;
+        // Only save non-zero voxels
+        if (intensity < 0.01) continue;
+        ofs.write(reinterpret_cast<const char*>(&x), sizeof(x));
+        ofs.write(reinterpret_cast<const char*>(&y), sizeof(y));
+        ofs.write(reinterpret_cast<const char*>(&intensity), sizeof(intensity));
+    }
+
+    ofs.close();
+}
+
 
 
 bool VoxelMap::contains(Index idx) const { return voxels_.find(idx) != voxels_.end(); }
