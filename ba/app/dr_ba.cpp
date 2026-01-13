@@ -17,6 +17,19 @@
 
 namespace fs = std::filesystem;
 
+void save_results_to_csv(const std::vector<Eigen::Vector3d>& rmse_history,
+                        const std::vector<double>& cost_history,
+                        const std::string& path) {
+    std::ofstream file(path);
+    file << "cost, rmse_x,rmse_y,rmse_yaw\n";
+
+    for (std::size_t i = 0; i < rmse_history.size(); ++i) {
+        double cost = (i - 1 >= 0) ? cost_history[i - 1] : 0.0;
+        file << cost_history[i] << "," << rmse_history[i](0) << "," << rmse_history[i](1) << "," << rmse_history[i](2) << "\n";
+    }
+}
+
+
 int main() {
     // Load in config from ba/config/dr_ba_config.yaml
     fs::path config_path = fs::path(__FILE__).parent_path().parent_path() / "config" / "dr_ba_config.yaml";
@@ -77,6 +90,7 @@ int main() {
     double num_scans = files.size();
     double num_checked = -1;
     double num_loaded = 0;
+    std::vector<Eigen::Vector3d> rmse_history;
     for (const auto& path : files) {
         if (num_loaded >= opts.num_frames) break;
         num_checked++;
@@ -106,6 +120,12 @@ int main() {
         }
 
         if (num_loaded != 0) {
+            // Temp, only load scans close to frame 0 in translation
+            // double translation_from_0 = (T_est_abs.r_ab_inb() - T_est_abs_0.r_ab_inb()).norm();
+            // if (translation_from_0 > 5.0) {
+            //     continue;
+            // }
+        
             // Check if this pose is a keyframe
             lgmath::se3::Transformation T_kf_rel = T_est_abs.inverse() * T_kf_prev;
             double del_x = T_kf_rel.r_ab_inb()(0);
@@ -174,9 +194,28 @@ int main() {
     std::cout << "Full voxel map has " << vox_map.size() << " voxels." << std::endl;
     std::cout << "Initial pose RMSE (x, y, yaw): " << scan_manager.compute_pose_rmse().transpose() << std::endl;
 
+    rmse_history.push_back(scan_manager.compute_pose_rmse());
+
     std::cout << "Starting optimization..." << std::endl;
     ba::Solver solver(opts, scan_manager, vox_map, pose_priors);
-    solver.optimize();
+    std::vector<double> cost_history = solver.optimize(rmse_history);
+
+    // Save RMSE history to CSV
+    fs::path rmse_path = opts.meas_path / seq_id / "dr_ba_rmse_history.csv";
+    save_results_to_csv(rmse_history, cost_history, rmse_path.string());
+    std::cout << "Saved RMSE history to: " << rmse_path << std::endl;
+
+    // Call Python plot
+    std::string cmd = "python3 /home/dl/Documents/phd/dev/dr_ba/ba/app/plot_errors.py " + rmse_path.string();
+
+    int ret = std::system(cmd.c_str());
+    if (ret != 0) {
+        throw std::runtime_error("Python script failed");
+    }
+
+    fs::path voxel_output_path = opts.meas_path / seq_id / "voxels.bin";
+    vox_map.save_to_file(voxel_output_path.string());
+    std::cout << "Saved voxel map to: " << voxel_output_path << std::endl;
 
     // Visualize final map
     vox_map.visualize();

@@ -215,7 +215,8 @@ void Solver::update_map() {
     }
 }
 
-void Solver::optimize() {
+std::vector<double> Solver::optimize(std::vector<Eigen::Vector3d>& rmse_history) {
+    std::vector<double> cost_history;
     for (int iter = 0; iter < opts_.max_iterations; iter++) {
         std::cout << "Iteration " << iter + 1 << " / " << opts_.max_iterations << std::endl;
         double downsample_factor = (iter < opts_.num_coarse_iterations) ? opts_.coarse_downsample : opts_.refine_downsample;
@@ -227,6 +228,9 @@ void Solver::optimize() {
         bool success = solve();
         if (!success) continue;
 
+        // Save cost
+        cost_history.push_back(cost_);
+
         // Update poses
         update_poses(scan_manager_);
 
@@ -235,12 +239,14 @@ void Solver::optimize() {
 
         std::cout << "Cost: " << cost_ << std::endl;
         std::cout << "Pose RMSE (x, y, yaw): " << scan_manager_.compute_pose_rmse().transpose() << std::endl;
+        rmse_history.push_back(scan_manager_.compute_pose_rmse());
         if (iter != 0 && (del_x_.norm() < opts_.convergence_tol || std::abs(prev_cost_ - cost_) < opts_.convergence_tol)) {
             std::cout << "Converged!" << std::endl;
             break;
         }
         prev_cost_ = cost_;
     }
+    return cost_history;
 }
 
 

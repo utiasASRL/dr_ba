@@ -23,7 +23,7 @@ public:
     bool solve();
     void update_poses(ba::ScanManager &scan_manager);
     void update_map();
-    void optimize();
+    std::vector<double> optimize(std::vector<Eigen::Vector3d>& rmse_history);
 
     // accesor
     double cost() const { return cost_; }
