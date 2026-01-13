@@ -15,6 +15,25 @@ Options load_options(const YAML::Node& config) {
         throw std::runtime_error("Map configuration not found in config file.");
     }
 
+    if (config["output"]) {
+        if (config["output"]["save_result"])
+            opts.save_result = config["output"]["save_result"].as<bool>();
+        else
+            opts.save_result = true;
+        if (config["output"]["output_path"])
+            opts.output_path = std::filesystem::path(config["output"]["output_path"].as<std::string>());
+        else {
+            if (opts.save_result)
+                throw std::runtime_error("Output path not found in config file.");
+        }
+        if (config["output"]["visualize"])
+            opts.visualize_result = config["output"]["visualize"].as<bool>();
+        else
+            opts.visualize_result = true;
+    } else {
+        throw std::runtime_error("Output configuration not found in config file.");
+    }
+
     if (config["input"]) {
         if (config["input"]["data_path"])
             opts.data_path = std::filesystem::path(config["input"]["data_path"].as<std::string>());

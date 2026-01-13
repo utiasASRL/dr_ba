@@ -90,7 +90,7 @@ std::vector<VoxelMap::Index> VoxelMap::get_sorted_keys_downsampled(double downsa
 void VoxelMap::visualize(double downsample_factor) const {
     if (voxels_.empty()) return;
 
-    // 1. Find bounds of the indices
+    // Find bounds of the indices
     int32_t min_x = std::numeric_limits<int32_t>::max();
     int32_t max_x = std::numeric_limits<int32_t>::min();
     int32_t min_y = std::numeric_limits<int32_t>::max();
@@ -108,24 +108,24 @@ void VoxelMap::visualize(double downsample_factor) const {
 
     cv::Mat img(height, width, CV_64F, cv::Scalar(0)); // use double for intensity
 
-    // 2. Fill image
+    // Fill image
     for (const auto &[idx, val] : voxels_) {
         int x = idx.first - min_x;
         int y = idx.second - min_y;
-        img.at<double>(y, x) = val; // row = y, col = x
+        img.at<double>(y, x) = val; // row = y = u, col = x = v
     }
 
-    // 3. Normalize to 0-255 and convert to 8-bit for display
+    // Normalize to 0-255 and convert to 8-bit for display
     cv::Mat img8;
     double minVal, maxVal;
     cv::minMaxLoc(img, &minVal, &maxVal);
     img.convertTo(img8, CV_8U, 255.0 / (maxVal - minVal), -minVal * 255.0 / (maxVal - minVal));
-    // Show image
 
+    // Show image
     cv::namedWindow("Scan", cv::WINDOW_NORMAL);
     cv::resizeWindow("Scan", 480, 480);
     cv::imshow("Scan", img);
-    cv::waitKey(0);      // waits for key press
+    cv::waitKey(0);
     cv::destroyAllWindows();
 }
 

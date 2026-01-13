@@ -19,6 +19,11 @@ struct Options {
     // Map parameters
     double voxel_res = 0.2;        // meters
 
+    // Output parameters
+    fs::path output_path;
+    bool visualize_result = true;
+    bool save_result = true;
+
     // Input parameters
     double max_dist = 80.0;       // meters
     double gauss_blur_sigma = 2.0; // pixels

@@ -1,31 +1,35 @@
 map:
   voxel_res: 1.0  # m
+output:
+  output_path: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results'
+  visualize: true
+  save_result: true
 input:
   data_path: '/home/dl/Documents/phd/data/boreas'
   meas_path: '/home/dl/Documents/phd/dev/dr_ba/output'
   seq_ids:
     - 'boreas-2024-12-03-12-54'
-  max_dist: 100.0  # m
-  gauss_blur_sigma: 5.0  # pixels
+  max_dist: 80.0  # m
+  gauss_blur_sigma: 3.0  # pixels
   init_poses: 'pogo'  # 'pogo' or 'gt'
-  init_translation_std: 0.5  # m (only relevant if init_poses is 'gt')
+  init_translation_std: 1.0  # m (only relevant if init_poses is 'gt')
   init_rotation_std: 1.0  # degrees (only relevant if init_poses is 'gt')
   input_type: 'local_maps' # 'local_maps' or 'scans'
   local_map_res: 0.1  # m/pixel (only relevant if input_type is 'local_map')
 keyframing:
   num_frames: 2
-  max_kf_dist: 15.0  # m
+  max_kf_dist: 10.0  # m
   max_kf_rot: 30.0  # degrees
 optimization:
-  max_iterations: 200
-  convergence_tol: 1e-3
+  max_iterations: 100
+  convergence_tol: 1e-2
   prior_map_std: 0.1 # intensity units
   meas_std: 0.1 # intensity units
   range_factor: 0.002  # factor to scale range uncertainty to intensity uncertainty
-  cumul_thresh: 0.8  # threshold to ignore measurements with too high a cumulative return
+  cumul_thresh: 0.1  # threshold to ignore measurements with too high a cumulative return
   rel_pose_prior:
     use_pose_prior: false
-    translation_std: 0.01  # m
+    translation_std: 0.5  # m
     rotation_std: 0.1  # degrees
   # Downsample control
   num_coarse_iterations: 0

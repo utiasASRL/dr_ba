@@ -5,7 +5,7 @@
 #include <ba/map/voxel_map.hpp>
 #include <Eigen/Dense>
 #include <ankerl/unordered_dense.h>
-
+#include <ba/solver/result.hpp>
 
 namespace ba {
 
@@ -13,8 +13,8 @@ class Solver {
 public:
     using PriorStruct = ankerl::unordered_dense::map<std::pair<int32_t, int32_t>, lgmath::se3::Transformation>;
 
-    Solver(ba::Options opts, ScanManager& scan_manager, VoxelMap& vox_map, PriorStruct pose_priors)
-        : opts_(opts), scan_manager_(scan_manager), vox_map_(vox_map), pose_priors_(pose_priors) {
+    Solver(Options& opts, Result& result, PriorStruct& pose_priors)
+        : opts_(opts), result_(result), scan_manager_(result.scan_manager()), voxel_map_(result.voxel_map()), pose_priors_(pose_priors) {
             cost_ = std::numeric_limits<double>::max();
             prev_cost_ = std::numeric_limits<double>::max();
         }
@@ -23,7 +23,7 @@ public:
     bool solve();
     void update_poses(ba::ScanManager &scan_manager);
     void update_map();
-    std::vector<double> optimize(std::vector<Eigen::Vector3d>& rmse_history);
+    void optimize();
 
     // accesor
     double cost() const { return cost_; }
@@ -31,10 +31,11 @@ public:
     ~Solver() = default;
 
 private:
-    ba::Options opts_;
+    const Options& opts_;
+    Result& result_;
     ScanManager& scan_manager_;
-    VoxelMap& vox_map_;
-    PriorStruct pose_priors_;
+    VoxelMap& voxel_map_;
+    const PriorStruct& pose_priors_;
     
     // Variables to be passed around
     double cost_;

@@ -3,7 +3,7 @@
 
 namespace ba {
 
-void Solver::construct_problem(ba::ScanManager &scan_manager, double downsample_factor) {
+void Solver::construct_problem(ScanManager &scan_manager, double downsample_factor) {
     // Load in constants
     std::vector<int> scan_id_list = scan_manager.get_all_scan_ids();
     int states_size = (scan_manager.num_scans() - 1) * 3; // SE2 poses with first pose fixed
@@ -12,7 +12,7 @@ void Solver::construct_problem(ba::ScanManager &scan_manager, double downsample_
     cost_ = 0.0;
 
     // Downsample desired voxels
-    voxel_keys_ = vox_map_.get_sorted_keys_downsampled(downsample_factor);
+    voxel_keys_ = voxel_map_.get_sorted_keys_downsampled(downsample_factor);
     int voxels_size = static_cast<int>(voxel_keys_.size());
 
     // Initialize matrices
@@ -86,9 +86,9 @@ void Solver::construct_problem(ba::ScanManager &scan_manager, double downsample_
     // Loop through all voxels
     for (int v_idx = 0; v_idx < voxels_size; v_idx++) {
         const auto& voxel_idx = voxel_keys_[v_idx];
-        double voxel_x = static_cast<double>(voxel_idx.first) * vox_map_.res();
-        double voxel_y = static_cast<double>(voxel_idx.second) * vox_map_.res();
-        double vox_intensity = vox_map_.at(voxel_idx);
+        double voxel_x = static_cast<double>(voxel_idx.first) * voxel_map_.res();
+        double voxel_y = static_cast<double>(voxel_idx.second) * voxel_map_.res();
+        double vox_intensity = voxel_map_.at(voxel_idx);
         bool voxel_covered = false;
         for (int scan_idx = 0; scan_idx < scan_manager.num_scans(); scan_idx++) {
             int scan_id = scan_id_list[scan_idx];
@@ -96,7 +96,7 @@ void Solver::construct_problem(ba::ScanManager &scan_manager, double downsample_
 
             // Interpolate intensity and Jacobian
             
-            std::optional<ba::Scan::Measurement> interp_meas = scan->interpolate(voxel_x, voxel_y);
+            std::optional<Scan::Measurement> interp_meas = scan->interpolate(voxel_x, voxel_y);
             // If scan is outside coverage, no intensity will be provided
             if (!interp_meas.has_value()) {
                 continue;
@@ -163,7 +163,7 @@ bool Solver::solve() {
     del_x_ = lhs.selfadjointView<Eigen::Upper>().ldlt().solve(rhs);
 
     // // Recompute cost after applying del_x_ on a copy of the scan manager
-    // ba::ScanManager scan_manager_copy = scan_manager_.deep_copy();
+    // ScanManager scan_manager_copy = scan_manager_.deep_copy();
     // update_poses(scan_manager_copy);
     // construct_problem(scan_manager_copy, 1.0);
     // update_map();
@@ -186,7 +186,7 @@ bool Solver::solve() {
     return true;
 }
 
-void Solver::update_poses(ba::ScanManager &scan_manager) {
+void Solver::update_poses(ScanManager &scan_manager) {
     // Update poses
     if (del_x_.size() == 0) {
         throw std::runtime_error("No pose updates available. Have you run solve()?");
@@ -211,15 +211,17 @@ void Solver::update_map() {
     for (int v = 0; v < voxels_size; ++v) {
         double new_intensity = J_M_B_(v) / H_MM_diag_(v);
         const auto& voxel_idx = voxel_keys_[v];
-        vox_map_.at(voxel_idx) = new_intensity;
+        voxel_map_.at(voxel_idx) = new_intensity;
     }
 }
 
-std::vector<double> Solver::optimize(std::vector<Eigen::Vector3d>& rmse_history) {
-    std::vector<double> cost_history;
+void Solver::optimize() {
+    // Compute initial RMSE
+    result_.add_rmse(scan_manager_.compute_pose_rmse());
+    double downsample_factor = 1.0;
     for (int iter = 0; iter < opts_.max_iterations; iter++) {
         std::cout << "Iteration " << iter + 1 << " / " << opts_.max_iterations << std::endl;
-        double downsample_factor = (iter < opts_.num_coarse_iterations) ? opts_.coarse_downsample : opts_.refine_downsample;
+        downsample_factor = (iter < opts_.num_coarse_iterations) ? opts_.coarse_downsample : opts_.refine_downsample;
 
         // Construct problem
         construct_problem(scan_manager_, downsample_factor);
@@ -229,7 +231,7 @@ std::vector<double> Solver::optimize(std::vector<Eigen::Vector3d>& rmse_history)
         if (!success) continue;
 
         // Save cost
-        cost_history.push_back(cost_);
+        result_.add_cost(cost_);
 
         // Update poses
         update_poses(scan_manager_);
@@ -239,14 +241,17 @@ std::vector<double> Solver::optimize(std::vector<Eigen::Vector3d>& rmse_history)
 
         std::cout << "Cost: " << cost_ << std::endl;
         std::cout << "Pose RMSE (x, y, yaw): " << scan_manager_.compute_pose_rmse().transpose() << std::endl;
-        rmse_history.push_back(scan_manager_.compute_pose_rmse());
+        result_.add_rmse(scan_manager_.compute_pose_rmse());
         if (iter != 0 && (del_x_.norm() < opts_.convergence_tol || std::abs(prev_cost_ - cost_) < opts_.convergence_tol)) {
-            std::cout << "Converged!" << std::endl;
+            std::cout << "Converged from: " << ((del_x_.norm() < opts_.convergence_tol ) ? "small pose update." : "small cost change.") << std::endl;
             break;
         }
         prev_cost_ = cost_;
     }
-    return cost_history;
+    // Construct problem for final cost
+    construct_problem(scan_manager_, downsample_factor);
+    result_.add_cost(cost_);
+    std::cout << "Final Cost: " << cost_ << std::endl;
 }
 
 
