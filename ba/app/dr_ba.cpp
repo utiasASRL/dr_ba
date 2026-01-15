@@ -4,6 +4,7 @@
 #include "ba/utils/ba_config.hpp"
 #include "ba/utils/io_utils.hpp"
 #include "ba/solver/solver.hpp"
+#include "ba/solver/solver_new.hpp"
 #include "ba/solver/result.hpp"
 
 #include <iostream>
@@ -158,7 +159,6 @@ int main() {
         // We've decided this is a keyframe!
         std::cout << "Processing frame " << num_checked << " / " << num_scans << std::endl;
         kf_prev_id = num_checked;
-        num_loaded++;
         T_kf_prev = T_est_abs;
 
         // Get relative gt transform
@@ -195,13 +195,16 @@ int main() {
 
         // Create scan object
         auto scan = std::make_shared<ba::LocalMapScan>(num_checked, opts, T_est_rel, T_gt_rel, img_mat, cumul_img_mat);
+        if (num_loaded == 0) {
+            scan->set_fixed(true); // Fix the first scan's pose
+        }
         scan_manager.add_scan(scan);
         vox_map.init_map(T_est_rel, opts.max_dist);
+        num_loaded++;
     }
 
     std::cout << "Scan manager has " << scan_manager.num_scans() << " scans." << std::endl;
     std::cout << "Full voxel map has " << vox_map.size() << " voxels." << std::endl;
-    std::cout << "Initial pose RMSE (x, y, yaw): " << scan_manager.compute_pose_rmse().transpose() << std::endl;
 
     // Set up result object
     ba::Result result(vox_map, scan_manager, output_run_dir);
