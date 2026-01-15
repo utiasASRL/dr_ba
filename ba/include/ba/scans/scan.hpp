@@ -48,6 +48,10 @@ public:
 		return T_err.vec();
 	}
 
+	// Set fixed flag
+	void set_fixed(bool fixed) { fixed_ = fixed; }
+	bool is_fixed() const { return fixed_; }
+
 	// Clone method for deep copying
 	virtual std::shared_ptr<Scan> clone() const = 0;
 
@@ -68,6 +72,7 @@ protected:
 	double meas_std_;
 	lgmath::se3::Transformation pose_;
 	lgmath::se3::Transformation gt_pose_;
+	bool fixed_ = false;
 };
 
 } // namespace ba
