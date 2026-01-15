@@ -33,8 +33,8 @@ std::optional<Scan::Measurement> LocalMapScan::interpolate(double x, double y) c
 
     // Get intensities at four corners
     double int_ab = local_map_(b, a);
-    double int_a1b = local_map_(b, a + 1);
     double int_ab1 = local_map_(b + 1, a);
+    double int_a1b = local_map_(b, a + 1);
     double int_a1b1 = local_map_(b + 1, a + 1);
 
     // Get weights
