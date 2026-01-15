@@ -218,6 +218,9 @@ void Solver::update_map() {
 void Solver::optimize() {
     // Compute initial RMSE
     result_.add_rmse(scan_manager_.compute_pose_rmse());
+    result_.add_ate(scan_manager_.compute_ate());
+    std::cout << "Initial Pose RMSE (x, y, yaw): " << scan_manager_.compute_pose_rmse().transpose() << std::endl;
+    std::cout << "Initial ATE (m): " << scan_manager_.compute_ate() << std::endl;
     double downsample_factor = 1.0;
     for (int iter = 0; iter < opts_.max_iterations; iter++) {
         std::cout << "Iteration " << iter + 1 << " / " << opts_.max_iterations << std::endl;
@@ -241,8 +244,10 @@ void Solver::optimize() {
 
         std::cout << "Cost: " << cost_ << std::endl;
         std::cout << "Pose RMSE (x, y, yaw): " << scan_manager_.compute_pose_rmse().transpose() << std::endl;
+        std::cout << "ATE (m): " << scan_manager_.compute_ate() << std::endl;
         result_.add_rmse(scan_manager_.compute_pose_rmse());
-        if (iter != 0 && (del_x_.norm() < opts_.convergence_tol || std::abs(prev_cost_ - cost_) < opts_.convergence_tol)) {
+        result_.add_ate(scan_manager_.compute_ate());
+        if (iter != 0 && iter > opts_.num_coarse_iterations && (del_x_.norm() < opts_.convergence_tol || std::abs(prev_cost_ - cost_) < opts_.convergence_tol)) {
             std::cout << "Converged from: " << ((del_x_.norm() < opts_.convergence_tol ) ? "small pose update." : "small cost change.") << std::endl;
             break;
         }
