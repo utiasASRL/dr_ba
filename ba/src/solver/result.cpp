@@ -3,20 +3,37 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <lgmath/se2/Transformation.hpp>
 
 namespace ba {
 
 void Result::save_rmse_cost_to_csv(const fs::path& optional_output_dir) const {
-
-    std::cout << "Number of entries: " << cost_history_.size() << std::endl;
-    std::cout << "Number of RMSE entries: " << rmse_history_.size() << std::endl;
-
     fs::path dir = optional_output_dir.empty() ? csv_path_: optional_output_dir;
 
     std::ofstream file(dir);
-    file << "cost, rmse_x,rmse_y,rmse_yaw\n";
+    file << "cost,ate,rmse_x,rmse_y,rmse_yaw\n";
     for (std::size_t i = 0; i < rmse_history_.size(); ++i) {
-        file << cost_history_[i] << "," << rmse_history_[i](0) << "," << rmse_history_[i](1) << "," << rmse_history_[i](2) << "\n";
+        file << cost_history_[i] << "," << ate_history_[i] << "," << rmse_history_[i](0) << "," << rmse_history_[i](1) << "," << rmse_history_[i](2) << "\n";
+    }
+}
+
+void Result::save_poses_to_csv(const fs::path& optional_output_dir) const {
+    fs::path dir = optional_output_dir.empty() ? poses_path_ : optional_output_dir;
+
+    std::ofstream file(dir);
+    file << "scan_id, x, y, yaw, x_gt, y_gt, yaw_gt\n";
+    std::vector<int> scan_id_list = scan_manager_.get_all_scan_ids();
+    for (int i = 0; i < scan_manager_.num_scans(); ++i) {
+        auto scan = scan_manager_.get_scan(scan_id_list[i]);
+        lgmath::se2::Transformation T_est = scan->pose2d();
+        Eigen::Vector2d t_est = T_est.r_ab_inb();
+        double yaw_est = T_est.vec()(2);
+        lgmath::se2::Transformation T_gt = scan->gt_pose2d();
+        Eigen::Vector2d t_gt = T_gt.r_ab_inb();
+        double yaw_gt = T_gt.vec()(2);
+
+        file << scan->id() << "," << t_est(0) << "," << t_est(1) << "," << yaw_est << ","
+             << t_gt(0) << "," << t_gt(1) << "," << yaw_gt << "\n";
     }
 }
 
