@@ -53,6 +53,7 @@ struct Options {
     int num_coarse_iterations = 5; // number of initial iterations with higher downsampling
     double coarse_downsample = 0.2; // downsampling factor for coarse iterations
     double refine_downsample = 1.0; // downsampling factor for refinement iterations
+    double tile_size = 0.0;     // meters, size of tiles to process separately
 };
 
 Options load_options(const YAML::Node& config);

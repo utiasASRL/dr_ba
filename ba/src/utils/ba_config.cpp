@@ -154,6 +154,8 @@ Options load_options(const YAML::Node& config) {
             opts.refine_downsample = config["optimization"]["refine_downsample"].as<double>();
         else
             throw std::runtime_error("Refine downsample factor not found in config file.");
+        if (config["optimization"]["tile_size"])
+            opts.tile_size = config["optimization"]["tile_size"].as<double>();
     }
 
     return opts;
