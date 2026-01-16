@@ -47,7 +47,7 @@ log:
   save_images: true
   save_local_maps: true
   verbose: true
-  save_scans: true
+  save_scans: false
   max_scan_range: 120.0
 radar:
   beta_corr_fact: 0.944

@@ -183,7 +183,7 @@ def main():
             if os.path.exists(opts['log']['cumulated_returns_path']):
                 os.system('rm -r ' + opts['log']['cumulated_returns_path'])
             os.makedirs(opts['log']['cumulated_returns_path'], exist_ok=True)
-        if config['log']['save_scans']:
+        if config['log']['save_scans'] or config['log']['save_local_maps']:
             scan_output_path = opts['log']['scan_path']
             if os.path.exists(scan_output_path):
                 os.system('rm -r ' + scan_output_path)
