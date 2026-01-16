@@ -108,6 +108,10 @@ Options load_options(const YAML::Node& config) {
             opts.convergence_tol = config["optimization"]["convergence_tol"].as<double>();
         else
             throw std::runtime_error("Convergence tolerance not found in config file.");
+        if (config["optimization"]["alpha"])
+            opts.alpha = config["optimization"]["alpha"].as<double>();
+        if (config["optimization"]["adaptive_alpha"])
+            opts.adaptive_alpha = config["optimization"]["adaptive_alpha"].as<bool>();
         if (config["optimization"]["prior_map_std"])
             opts.prior_map_std = config["optimization"]["prior_map_std"].as<double>();
         else
