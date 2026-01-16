@@ -5,6 +5,7 @@
 #include <vector>
 #include <lgmath/se3/Transformation.hpp>
 #include <Eigen/Dense>
+#include <opencv2/core.hpp>
 
 namespace ba {
 
@@ -27,4 +28,8 @@ namespace ba {
         const std::vector<lgmath::se3::Transformation> &all_poses,
         const std::vector<double> &all_times,
         double query_time);
+
+    // Handle local maps
+    void save_img_bin(const std::filesystem::path &filepath, const cv::Mat &img);
+    cv::Mat load_img_bin(const std::filesystem::path &filepath);
 }

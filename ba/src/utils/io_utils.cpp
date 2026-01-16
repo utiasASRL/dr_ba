@@ -143,5 +143,24 @@ lgmath::se3::Transformation get_interpolated_pose(
 }
 
 
+void save_img_bin(const std::filesystem::path &filepath, const cv::Mat& img) {
+    std::ofstream ofs(filepath, std::ios::binary);
+    int32_t rows = img.rows;
+    int32_t cols = img.cols;
+    ofs.write((char*)&rows, sizeof(rows));
+    ofs.write((char*)&cols, sizeof(cols));
+    ofs.write((char*)img.ptr<float>(), rows * cols * sizeof(float));
+}
+
+cv::Mat load_img_bin(const std::filesystem::path &filepath) {
+    std::ifstream ifs(filepath, std::ios::binary);
+    int32_t rows, cols;
+    ifs.read((char*)&rows, sizeof(rows));
+    ifs.read((char*)&cols, sizeof(cols));
+    cv::Mat img(rows, cols, CV_32F);
+    ifs.read((char*)img.ptr<float>(), rows * cols * sizeof(float));
+    return img;
+}
+
 
 } // namespace ba
