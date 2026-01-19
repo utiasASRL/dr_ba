@@ -11,12 +11,13 @@ add_compile_options(-march=native -O3 -Wall -pedantic)
 find_package(yaml-cpp REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(Threads REQUIRED)
 add_subdirectory(deps/unordered_dense)
 add_subdirectory(deps/lgmath)
 
 # Library
 add_subdirectory(src)
-target_link_libraries(ba unordered_dense::unordered_dense lgmath yaml-cpp Eigen3::Eigen ${OpenCV_LIBS})
+target_link_libraries(ba unordered_dense::unordered_dense lgmath yaml-cpp Eigen3::Eigen ${OpenCV_LIBS} Threads::Threads)
 
 # Enable testing
 enable_testing()
