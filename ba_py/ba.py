@@ -70,20 +70,20 @@ def main(seq_id):
     refine_downsample = 1.0
 
     # Distance-based keyframing
-    max_translation = 15.0  # meters
-    max_rotation = np.deg2rad(15.0)  # radians
-    max_sample = 2
+    max_translation = 30.0  # meters
+    max_rotation = np.deg2rad(30.0)  # radians
+    max_sample = 10
 
     # Init error parameters
     translation_std = 1.0  # meters
     rotation_std = np.deg2rad(2.0)  # radians
 
     # Optimization parameters
-    max_iter = 1
+    max_iter = 2
     tol = 1e-3
 
     # Input type
-    init_poses = 'gt'  # 'gt' or 'pogo'
+    init_poses = 'pogo'  # 'gt' or 'pogo'
     input_type = 'local_map' # 'scan' or 'local_map'
     img_res = 0.1  # meters per pixel
 
@@ -127,6 +127,8 @@ def main(seq_id):
     num_scans = len(os.listdir(scan_path))
     num_frames = 0
     gt_poses = {}
+    gt_poses_same_idx = {}
+    est_poses_same_idx = {}
     for idx, scan in enumerate(sorted(os.listdir(scan_path))):
         if num_frames >= max_sample:
             break
@@ -191,6 +193,8 @@ def main(seq_id):
 
         scan_loader.add_scan(scan)
         vox_map.init_map(rel_pose, max_dist)
+        gt_poses_same_idx[idx] = gt_rel_pose
+        est_poses_same_idx[idx] = rel_pose
 
     # Set up optimization
     print("Starting optimization...")
@@ -207,12 +211,12 @@ def main(seq_id):
     num_states = len(sorted_pose_keys)
     print("Number of states:", num_states)
     print("Initial poses:\n")
-    trans_errors = []
-    rot_errors = []
     rmse_history = []
     rmse = np.array([0.0, 0.0, 0.0])
     for scan_id in sorted_pose_keys:
         s = pose_key_to_idx[scan_id]
+        if s == 0:
+            continue
         print(f"State {s}:\n", scan_loader.get_scan(scan_id).pose)
         # Compute initial error
         gt_pose = gt_poses[scan_id]
@@ -220,11 +224,19 @@ def main(seq_id):
         rmse[0] += pose_err[0]**2
         rmse[1] += pose_err[1]**2
         rmse[2] += pose_err[5]**2
-    rmse = np.sqrt(rmse / num_states)
+    rmse = np.sqrt(rmse / (num_states - 1))
     rmse[2] *= 180.0 / np.pi  # convert to degrees
     rmse = np.round(rmse, 6)
     print("Initial RMSE (x, y, yaw):", rmse.transpose())
     rmse_history.append(rmse)
+
+    # # Compute ATE
+    # gt_poses_same_idx = np.array([gt_poses_same_idx[i] for i in sorted(gt_poses_same_idx.keys())])
+    # est_poses_same_idx = np.array([est_poses_same_idx[i] for i in sorted(est_poses_same_idx.keys())])
+    # ate = utils.get2dATE(gt_poses_same_idx, est_poses_same_idx)
+    # print("Initial ATE (m):", ate)
+    # fdsa
+
 
     scan_by_id = {scan.id: scan for scan in scan_loader.scans}
     for iter in range(max_iter):
@@ -304,11 +316,16 @@ def main(seq_id):
         H_MM = H_MM.tocsc()
         H_MM_factor = cholesky(H_MM)
 
-        lhs = H_TT - H_TM @ H_MM_factor(H_TM.T) + 1e-8 * np.eye((num_states-1) * 3)
+        lhs = H_TT - H_TM @ H_MM_factor(H_TM.T)# + 1e-8 * np.eye((num_states-1) * 3)
         rhs = - H_TM @ H_MM_factor(J_M_B) + J_T_B
         # Scale alpha with iteration
         alpha = max(1.0 / (1.0 + iter), 1.0)
         # alpha = 1.0
+
+
+        print("Rank of lhs:", np.linalg.matrix_rank(lhs))
+        print("Expected rank of lhs:", (num_states - 1) * 3)
+        print("Rank of map update Hessian:", H_MM_factor.L().shape[0])
 
         del_x = alpha * np.linalg.solve(lhs, rhs)
         M = H_MM_factor(J_M_B)
