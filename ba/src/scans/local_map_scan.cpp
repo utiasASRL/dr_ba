@@ -1,21 +1,23 @@
 #include <optional>
 #include <ba/scans/local_map_scan.hpp>
 #include <lgmath/se2/Operations.hpp>
+#include <ba/utils/io_utils.hpp>
 
 namespace ba {
 
 std::optional<Scan::Measurement> LocalMapScan::interpolate(double x, double y) const {
+    if (local_map_.size() == 0) {
+        throw std::runtime_error("Local map data not loaded for scan ID: " + std::to_string(id()));
+    }
     // Check coverage first
     if (!check_coverage_at_point(x, y)) {
         return std::nullopt;
     }
-    
     // Get pixel coordinates and Jacobian
     Eigen::Matrix<double, 2, 3> d_g_d_T;
     PixelCoords p = coord_to_pixel(x, y, &d_g_d_T);
     double u = p.first;
     double v = p.second;
-    double range = std::sqrt(std::pow(x, 2) + std::pow(y, 2));
 
     // Get root pixel coords
     Index root_px = get_root_pixel_coords(x, y);
@@ -59,7 +61,8 @@ std::optional<Scan::Measurement> LocalMapScan::interpolate(double x, double y) c
     double raw_meas_cov = meas_std_ * meas_std_;
     double covariance = (w0 * w0 + w1 * w1 + w2 * w2 + w3 * w3) * raw_meas_cov;
     // Add range-dependent uncertainty
-    covariance += std::pow(range_factor_ * range, 2);
+    double range2 = x * x + y * y;
+    covariance += (range_factor_ * range_factor_) * range2;
 
     // Form measurement
     Measurement meas;
@@ -85,10 +88,11 @@ LocalMapScan::PixelCoords LocalMapScan::coord_to_pixel(double x, double y, Eigen
     D << 0, 1/res_, 0,
          -1/res_, 0, 0;
     Eigen::Matrix<double, 3, 3> pose2d_inv_mat = pose_.toSE2().inverse().matrix();
-    Eigen::Vector2d p = D * pose2d_inv_mat * Eigen::Vector3d(x, y, 1.0) + 0.5 * Eigen::Vector2d(img_width_ - 1, img_height_ - 1);
+    Eigen::Matrix<double,  3, 1> p_hom = pose2d_inv_mat * Eigen::Vector3d(x, y, 1.0);
+    Eigen::Vector2d p = D * p_hom + 0.5 * Eigen::Vector2d(img_width_ - 1, img_height_ - 1);
 
     if (jacobian) {
-        *jacobian = D * pose2d_inv_mat * lgmath::se2::point2fs(Eigen::Vector2d(x, y), 1.0);
+        *jacobian = D * lgmath::se2::point2fs(p_hom.head<2>(), 1.0);
     }
 
     return {p(0), p(1)};
@@ -99,6 +103,17 @@ LocalMapScan::Index LocalMapScan::get_root_pixel_coords(double x, double y) cons
     int px = static_cast<int>(std::floor(p.first));
     int py = static_cast<int>(std::floor(p.second));
     return {px, py};
+}
+
+void LocalMapScan::load_data() {
+    if (local_map_.size() == 0) {
+        cv::Mat img = load_img_bin(img_path_);
+        cv::cv2eigen(img, local_map_);
+    }
+    if (cumul_img_path_.has_value() && cumul_img_.size() == 0) {
+        cv::Mat img = load_img_bin(cumul_img_path_.value());
+        cv::cv2eigen(img, cumul_img_);
+    }
 }
 
 } // namespace ba

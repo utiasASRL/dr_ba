@@ -17,15 +17,16 @@ ba::Options create_test_options() {
 TEST(LocalMapScanTests, ValidateCoordToPixel) {
     // Create a simple local map (3x3)
     // Here the pixel coordinates line up with the radar coordinates
-    Eigen::MatrixXd local_map(3, 3);
+    Eigen::MatrixXf local_map(3, 3);
 
     // Define scan parameters
+    int64_t timestamp = 1;
     int scan_id = 1;
     lgmath::se3::Transformation pose;
     ba::Options opts = create_test_options();
 
     // Create LocalMapScan instance
-    ba::LocalMapScan scan(scan_id, opts, pose, pose, local_map);
+    ba::LocalMapScan scan(timestamp, scan_id, opts, pose, pose, local_map);
 
     // Test point at in world coordinates
     // This point should be top left corner of the image
@@ -38,10 +39,10 @@ TEST(LocalMapScanTests, ValidateCoordToPixel) {
     EXPECT_EQ(px.second, 0.0);
 
     // Now let's try an imperfect alignment (even number of pixels)
-    local_map = Eigen::MatrixXd(4, 4);
+    local_map = Eigen::MatrixXf(4, 4);
 
     // The same world coordinates should now map to pixel (0.5, 0.5)
-    ba::LocalMapScan scan2(scan_id, opts, pose, pose, local_map);
+    ba::LocalMapScan scan2(timestamp, scan_id, opts, pose, pose, local_map);
     px = scan2.coord_to_pixel(x_world, y_world);
     EXPECT_EQ(px.first, 0.5);
     EXPECT_EQ(px.second, 0.5);
@@ -49,15 +50,16 @@ TEST(LocalMapScanTests, ValidateCoordToPixel) {
 
 TEST(LocalMapScanTests, ValidateRootPixelCoords) {
     // Create a simple local map (3x3)
-    Eigen::MatrixXd local_map(3, 3);
+    Eigen::MatrixXf local_map(3, 3);
 
     // Define scan parameters
+    int64_t timestamp = 1;
     int scan_id = 1;
     lgmath::se3::Transformation pose;
     ba::Options opts = create_test_options();
 
     // Create LocalMapScan instance
-    ba::LocalMapScan scan(scan_id, opts, pose, pose, local_map);
+    ba::LocalMapScan scan(timestamp, scan_id, opts, pose, pose, local_map);
 
     // First try the top left corner, this should correspond to pixel (0,0)
     // so the root pixel coords should also be (0,0)
@@ -87,16 +89,17 @@ TEST(LocalMapScanTests, ValidateRootPixelCoords) {
 TEST(LocalMapScanTests, ValidateCoverageCheck) {
     // Create a simple local map (11x11) with arbitrary values
     // This spans from -5 to +5 in both x and y in world coordinates
-    Eigen::MatrixXd local_map(11, 11);
+    Eigen::MatrixXf local_map(11, 11);
     local_map.setRandom();
 
     // Define scan parameters
+    int64_t timestamp = 1;
     int scan_id = 1;
     lgmath::se3::Transformation pose;
     ba::Options opts = create_test_options();
 
     // Create LocalMapScan instance
-    ba::LocalMapScan scan(scan_id, opts, pose, pose, local_map);
+    ba::LocalMapScan scan(timestamp, scan_id, opts, pose, pose, local_map);
 
     // Test point well within bounds
     double x_in = 0.0;
@@ -128,63 +131,64 @@ TEST(LocalMapScanTests, ValidateCoverageCheck) {
 
 TEST(LocalMapScanTests, ValidateInterpolation) {
     // Define scan parameters
+    int64_t timestamp = 1;
     int scan_id = 1;
     lgmath::se3::Transformation pose;
     ba::Options opts = create_test_options();
 
     // Create a simple local map (3x3) with identical intensity values
-    Eigen::MatrixXd local_map(3, 3);
+    Eigen::MatrixXf local_map(3, 3);
     local_map << 1.0, 1.0, 1.0,
                  1.0, 1.0, 1.0,
                  1.0, 1.0, 1.0;
-    ba::LocalMapScan scan(scan_id, opts, pose, pose, local_map);
+    ba::LocalMapScan scan(timestamp, scan_id, opts, pose, pose, local_map);
     // Test interpolation within the local map, it should produce 1.0 everywhere
     double x_query = 0.5;
     double y_query = 0.5;
     std::optional<ba::Scan::Measurement> meas = scan.interpolate(x_query, y_query);
     ASSERT_TRUE(meas.has_value());
-    EXPECT_DOUBLE_EQ(meas->intensity, 1.0);
+    EXPECT_FLOAT_EQ(meas->intensity, 1.0);
 
     // Test another point within map
     x_query = -0.5;
     y_query = -0.5;
     meas = scan.interpolate(x_query, y_query);
     ASSERT_TRUE(meas.has_value());
-    EXPECT_DOUBLE_EQ(meas->intensity, 1.0);
+    EXPECT_FLOAT_EQ(meas->intensity, 1.0);
 
     // Make the map non-uniform
     local_map << 0.0, 1.0, 0.0,
                 1.0, 0.0, 1.0,
                 0.0, 1.0, 0.0;
-    ba::LocalMapScan scan2(scan_id, opts, pose, pose, local_map);
+    ba::LocalMapScan scan2(timestamp, scan_id, opts, pose, pose, local_map);
 
     // Test point at center (0,0), should be exactly 0.0
     x_query = 0.0;
     y_query = 0.0;
     meas = scan2.interpolate(x_query, y_query);
     ASSERT_TRUE(meas.has_value());
-    EXPECT_DOUBLE_EQ(meas->intensity, 0.0);
+    EXPECT_FLOAT_EQ(meas->intensity, 0.0);
 
     // Test point at (0.5, 0.5), should be 0.5
     x_query = 0.5;
     y_query = 0.5;
     meas = scan2.interpolate(x_query, y_query);
     ASSERT_TRUE(meas.has_value());
-    EXPECT_DOUBLE_EQ(meas->intensity, 0.5);
+    EXPECT_FLOAT_EQ(meas->intensity, 0.5);
 
     // Test point at (0.5, 0.0), should also be 0.5
     x_query = 0.5;
     y_query = 0.0;
     meas = scan2.interpolate(x_query, y_query);
     ASSERT_TRUE(meas.has_value());
-    EXPECT_DOUBLE_EQ(meas->intensity, 0.5);
+    EXPECT_FLOAT_EQ(meas->intensity, 0.5);
 
     // Test point at (0.0, 0.25), should be 0.25
     x_query = 0.0;
     y_query = 0.25;
     meas = scan2.interpolate(x_query, y_query);
     ASSERT_TRUE(meas.has_value());
-    EXPECT_DOUBLE_EQ(meas->intensity, 0.25);
+    EXPECT_FLOAT_EQ(meas->intensity, 0.25);
 
     // Test point outside bounds, should return nullopt
     x_query = 2.0;

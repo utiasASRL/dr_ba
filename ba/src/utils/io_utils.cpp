@@ -93,6 +93,31 @@ void load_pogo_poses_and_times(const std::filesystem::path &path, std::vector<lg
     }
 }
 
+void load_dro_poses_and_times(const std::filesystem::path &path, std::vector<lgmath::se3::Transformation> &all_poses, std::vector<double> &all_times) {
+    // Full path is in odometry_2d with seq_id.txt file
+    std::filesystem::path full_path = path / "odometry_2d" / (path.filename().string() + ".txt");
+    std::ifstream ifs(full_path, std::ios::in);
+    // Clear header line
+    std::string line;
+    std::getline(ifs, line);
+    // Loop through all gt data
+    while (std::getline(ifs, line)) {
+        std::stringstream ss(line);
+        std::vector<double> data;
+        for (std::string str; std::getline(ss, str, ' ');)
+        data.push_back(std::stod(str));
+
+        // Store pogo pose
+        Eigen::Matrix4d T_ab_mat = Eigen::Matrix4d::Identity();
+        T_ab_mat.block<3, 1>(0, 3) << data[1], data[2], 0.0;
+        T_ab_mat.block<2, 2>(0, 0) << cos(data[3]), -sin(data[3]),
+                                   sin(data[3]),  cos(data[3]);
+        lgmath::se3::Transformation T_ab = lgmath::se3::Transformation(T_ab_mat);
+        all_poses.push_back(T_ab);
+        all_times.push_back(data[0] / 1e6);  // convert to seconds
+    }
+}
+
 lgmath::se3::Transformation get_interpolated_pose(
     const std::vector<lgmath::se3::Transformation> &all_poses,
     const std::vector<double> &all_times,
@@ -154,11 +179,37 @@ void save_img_bin(const std::filesystem::path &filepath, const cv::Mat& img) {
 
 cv::Mat load_img_bin(const std::filesystem::path &filepath) {
     std::ifstream ifs(filepath, std::ios::binary);
+    if (!ifs.is_open()) {
+        throw std::runtime_error("Failed to open image file: " + filepath.string());
+    }
+    
     int32_t rows, cols;
     ifs.read((char*)&rows, sizeof(rows));
     ifs.read((char*)&cols, sizeof(cols));
+    
+    if (!ifs.good()) {
+        throw std::runtime_error("Failed to read image dimensions from file: " + filepath.string());
+    }
+    
+    if (rows <= 0 || cols <= 0) {
+        throw std::runtime_error("Invalid image dimensions from file " + filepath.string() + 
+                                ": rows=" + std::to_string(rows) + ", cols=" + std::to_string(cols));
+    }
+    
+    // Check for unreasonably large dimensions (e.g., > 100,000 pixels in any dimension)
+    if (rows > 100000 || cols > 100000) {
+        throw std::runtime_error("Image dimensions suspiciously large from file " + filepath.string() + 
+                                ": rows=" + std::to_string(rows) + ", cols=" + std::to_string(cols) + 
+                                ". This may indicate file corruption.");
+    }
+    
     cv::Mat img(rows, cols, CV_32F);
     ifs.read((char*)img.ptr<float>(), rows * cols * sizeof(float));
+    
+    if (!ifs.good()) {
+        throw std::runtime_error("Failed to read image data from file: " + filepath.string());
+    }
+    
     return img;
 }
 

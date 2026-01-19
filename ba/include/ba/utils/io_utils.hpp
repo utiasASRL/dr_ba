@@ -23,6 +23,9 @@ namespace ba {
     // Load pogo poses and timestamps from pogo output pose file. Time in seconds.
     void load_pogo_poses_and_times(const std::filesystem::path &path, std::vector<lgmath::se3::Transformation> &all_poses, std::vector<double> &all_times);
 
+    // Load DRO poses and timestamps from dro output pose file. Time in seconds.
+    void load_dro_poses_and_times(const std::filesystem::path &path, std::vector<lgmath::se3::Transformation> &all_poses, std::vector<double> &all_times);
+
     // Get interpolated pose at query time using linear interpolation for translation and SLERP for rotation
     lgmath::se3::Transformation get_interpolated_pose(
         const std::vector<lgmath::se3::Transformation> &all_poses,

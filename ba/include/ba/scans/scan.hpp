@@ -24,6 +24,8 @@ public:
 	// Identification
 	int id() const { return id_; }
 
+	int64_t timestamp() const { return timestamp_; }
+
 	// Pose accessors
 	const lgmath::se3::Transformation &pose() const { return pose_; }
 	const lgmath::se2::Transformation pose2d() const { return pose_.toSE2(); }
@@ -33,7 +35,7 @@ public:
 	// Update pose
 	void update_pose(const Eigen::Matrix<double, 6, 1> &delta_xi) {
 		lgmath::se3::Transformation T_update((-delta_xi).eval());
-		pose_ = T_update * pose_;
+		pose_ = pose_ * T_update;
 	}
 
 	void update_pose(const Eigen::Matrix<double, 3, 1> &delta_xi) {
@@ -47,6 +49,9 @@ public:
 		lgmath::se3::Transformation T_err = pose_.inverse() * gt_pose_;
 		return T_err.vec();
 	}
+
+	void set_ate_error(double ate) { ate_error_ = ate; }
+	double get_ate_error() const { return ate_error_; }
 
 	// Set fixed flag
 	void set_fixed(bool fixed) { fixed_ = fixed; }
@@ -63,15 +68,22 @@ public:
 	// Coverage check at a query point in world frame
 	virtual bool check_coverage_at_point(double x, double y) const = 0;
 
-protected:
-	Scan(int scan_id, const Options &opts, const lgmath::se3::Transformation &pose,
-		 const lgmath::se3::Transformation &gt_pose)
-		: id_(scan_id), meas_std_(opts.meas_std), pose_(pose), gt_pose_(gt_pose) {}
+	// Methods for loading/unloading heavy data
+	virtual void load_data() = 0;
+	virtual void unload_data() = 0;
+	virtual bool data_loaded() const = 0;
 
+protected:
+	Scan(int64_t timestamp, int scan_id, const Options &opts, const lgmath::se3::Transformation &pose,
+		 const lgmath::se3::Transformation &gt_pose)
+		: timestamp_(timestamp), id_(scan_id), meas_std_(opts.meas_std), pose_(pose), gt_pose_(gt_pose) {}
+
+	int64_t timestamp_;
 	int id_;
 	double meas_std_;
 	lgmath::se3::Transformation pose_;
 	lgmath::se3::Transformation gt_pose_;
+	double ate_error_ = 0.0;
 	bool fixed_ = false;
 };
 

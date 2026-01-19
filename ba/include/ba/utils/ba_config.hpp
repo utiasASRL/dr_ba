@@ -37,6 +37,7 @@ struct Options {
     int num_frames = 5;
     double max_kf_dist = 2.0;    // meters
     double max_kf_rot = 10.0;    // degrees
+    bool fix_first_scan = true;
 
     // Optimization parameters
     int max_iterations = 20;
@@ -54,6 +55,12 @@ struct Options {
     double coarse_downsample = 0.2; // downsampling factor for coarse iterations
     double refine_downsample = 1.0; // downsampling factor for refinement iterations
     double tile_size = 0.0;     // meters, size of tiles to process separately
+    int max_loaded_scans = 0;   // max number of scans to keep loaded in memory at once (>0 all)
+
+    // Mapping parameters
+    std::string pose_source = "gt"; // 'estimate', 'gt', 'pogo', 'dro'
+    fs::path estimate_location;
+    std::vector<std::pair<int, int>> frame_ranges; // pairs of start and end frame indices
 };
 
 Options load_options(const YAML::Node& config);

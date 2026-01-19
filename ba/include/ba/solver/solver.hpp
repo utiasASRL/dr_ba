@@ -6,49 +6,50 @@
 #include <Eigen/Dense>
 #include <ankerl/unordered_dense.h>
 #include <ba/solver/result.hpp>
+#include <ba/problem/problem.hpp>
 
 namespace ba {
 
 class Solver {
 public:
-    using PriorStruct = ankerl::unordered_dense::map<std::pair<int32_t, int32_t>, lgmath::se3::Transformation>;
 
-    Solver(Options& opts, Result& result, PriorStruct& pose_priors)
-        : opts_(opts), result_(result), scan_manager_(result.scan_manager()), voxel_map_(result.voxel_map()), pose_priors_(pose_priors) {
+    Solver(Problem& problem)
+        : problem_(problem),
+          opts_(problem.opts()),
+          result_(problem.result()),
+          scan_manager_(problem.scan_manager()),
+          voxel_map_(problem.voxel_map()),
+          pose_priors_(problem.pose_priors())
+        {
             cost_ = std::numeric_limits<double>::max();
             prev_cost_ = std::numeric_limits<double>::max();
+            alpha_ = opts_.alpha;
         }
-
-    void construct_problem(ba::ScanManager &scan_manager, double downsample_factor = 1.0);
-    bool solve();
-    void update_poses(ba::ScanManager &scan_manager);
-    void update_map();
-    void optimize();
-
-    // accesor
-    double cost() const { return cost_; }
 
     ~Solver() = default;
 
-private:
+    // Functions to be fulfilled by derived classes
+    virtual void construct_problem(double downsample_factor = 1.0) = 0;
+    virtual bool solve() = 0;
+    virtual void update_poses() = 0;
+    virtual void update_map() = 0;
+    virtual void optimize() = 0;
+
+    // Accessors
+    double cost() const { return cost_; }
+
+protected:
+    Problem& problem_;
     const Options& opts_;
     Result& result_;
     ScanManager& scan_manager_;
     VoxelMap& voxel_map_;
-    const PriorStruct& pose_priors_;
+    const Problem::PriorMap& pose_priors_;
     
     // Variables to be passed around
     double cost_;
     double prev_cost_;
-    double lambda_ = 1.0;
-    std::vector<ba::VoxelMap::Index> voxel_keys_;
-    Eigen::VectorXd del_x_;
-    Eigen::MatrixXd H_TT_;
-    Eigen::VectorXd H_MM_diag_;
-    Eigen::MatrixXd H_TM_;
-    Eigen::VectorXd J_M_B_;
-    Eigen::VectorXd J_T_B_;
-
+    double alpha_;
 };
 
 

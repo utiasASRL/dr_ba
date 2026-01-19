@@ -35,7 +35,7 @@ TEST(VoxelMapTests, ValidateInitMap) {
     ba::VoxelMap voxel_map(1.0);
     lgmath::se2::Transformation pose(Eigen::Vector3d(0.0, 0.0, 0.0));
     double max_dist = 2.0;
-    voxel_map.init_map(pose, max_dist);
+    voxel_map.init_map(pose, max_dist, 0);
 
     // Expect voxels to be initialized in a square window around (0,0) within max_dist
     int expected_voxel_count = 0;
