@@ -88,7 +88,7 @@ Each row contains the following columns:
 
 In the root of the repository, run the following command:
 ```bash
-python coarse_registration/coarse_registration.py
+python coarse_registration/coarse_registrations.py
 ```
 
 It will generate a CSV of coarse registration results in the `output/<SEQ-NAME>/coarse_registration.csv` folder.
