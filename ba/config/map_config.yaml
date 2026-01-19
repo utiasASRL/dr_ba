@@ -3,44 +3,50 @@ map:
 output:
   output_path: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results'
   visualize: true
-  save_result: true
+  save_result: false
 input:
   data_path: '/home/dl/Documents/phd/data/boreas'
   meas_path: '/home/dl/Documents/phd/dev/dr_ba/output'
   seq_ids:
     - 'boreas-2024-12-03-12-54'
     # - 'boreas-2024-12-05-14-12'
-  max_dist: 80.0  # m
-  gauss_blur_sigma: 3.0  # pixels
-  init_poses: 'pogo'  # 'pogo' or 'gt', 'dro'
-  init_translation_std: 1.2  # m
-  init_rotation_std: 1.2  # degrees
+  max_dist: 100.0  # m
+  gauss_blur_sigma: 0.0  # pixels
+  init_poses: 'dro'  # 'pogo' or 'gt', 'dro'
+  init_translation_std: 0.0  # m
+  init_rotation_std: 0.0  # degrees
   input_type: 'local_maps' # 'local_maps' or 'scans'
   local_map_res: 0.1  # m/pixel (only relevant if input_type is 'local_map')
 keyframing:
-  num_frames: 20
-  max_kf_dist: 0.0  # m
+  num_frames: -1
+  max_kf_dist: 5.0  # m
   max_kf_rot: 30.0  # degrees
   fix_first_scan: true
 optimization:
-  max_iterations: 100
+  max_iterations: 2
   convergence_tol: 1e-3
   alpha: 1.0  # step size
   adaptive_alpha: true # decrease alpha if cost does not decrease
   prior_map_std: 0.1 # intensity units
   meas_std: 0.1 # intensity units
-  range_factor: 0.0005  # factor to scale range uncertainty to intensity uncertainty
-  cumul_thresh: 0.2  # threshold to ignore measurements with too high a cumulative return
+  range_factor: 0.002  # factor to scale range uncertainty to intensity uncertainty
+  cumul_thresh: 10.5  # threshold to ignore measurements with too high a cumulative return
   rel_pose_prior:
     use_pose_prior: false
     translation_std: 100.0  # m
     rotation_std: 0.1  # degrees
   # Downsample control
-  num_coarse_iterations: 0
-  coarse_downsample: 1.0
+  num_coarse_iterations: 10
+  coarse_downsample: 0.2
   refine_downsample: 1.0
-  tile_size: 10.0  # m, size of tiles to process separately
-  max_loaded_scans: 200  # max number of scans to keep loaded in memory at once (>0 all)
+  tile_size: 15.0  # m, size of tiles to process separately
+  max_loaded_scans: 0  # max number of scans to keep loaded in memory at once (>0 all)
 mapping:
   pose_source: 'estimate' # 'estimate, 'gt', 'pogo', 'dro'
-  estimate_location: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results/run_96'
+  estimate_location: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results/run_98'
+  frame_ranges:
+    # - [0, 50]
+    # - [300, 500]
+    # - [3650, 3850]
+    - [365, 470]
+    - [3670, 3780]
