@@ -37,10 +37,13 @@ struct Options {
     int num_frames = 5;
     double max_kf_dist = 2.0;    // meters
     double max_kf_rot = 10.0;    // degrees
+    bool fix_first_scan = true;
 
     // Optimization parameters
     int max_iterations = 20;
     double convergence_tol = 1e-3;
+    double alpha = 0.5;        // step size
+    bool adaptive_alpha = true; // decrease alpha if cost does not decrease
     double prior_map_std = 1e-3; // intensity units
     double meas_std = 1.0;       // intensity units
     bool use_rel_pose_prior = true;
@@ -51,6 +54,13 @@ struct Options {
     int num_coarse_iterations = 5; // number of initial iterations with higher downsampling
     double coarse_downsample = 0.2; // downsampling factor for coarse iterations
     double refine_downsample = 1.0; // downsampling factor for refinement iterations
+    double tile_size = 0.0;     // meters, size of tiles to process separately
+    int max_loaded_scans = 0;   // max number of scans to keep loaded in memory at once (>0 all)
+
+    // Mapping parameters
+    std::string pose_source = "gt"; // 'estimate', 'gt', 'pogo', 'dro'
+    fs::path estimate_location;
+    std::vector<std::pair<int, int>> frame_ranges; // pairs of start and end frame indices
 };
 
 Options load_options(const YAML::Node& config);

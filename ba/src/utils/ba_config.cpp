@@ -95,6 +95,8 @@ Options load_options(const YAML::Node& config) {
             opts.max_kf_rot = config["keyframing"]["max_kf_rot"].as<double>();
         else
             throw std::runtime_error("Max keyframe rotation not found in config file.");
+        if (config["keyframing"]["fix_first_scan"])
+            opts.fix_first_scan = config["keyframing"]["fix_first_scan"].as<bool>();
     } else {
         throw std::runtime_error("Keyframing configuration not found in config file.");
     }
@@ -108,6 +110,10 @@ Options load_options(const YAML::Node& config) {
             opts.convergence_tol = config["optimization"]["convergence_tol"].as<double>();
         else
             throw std::runtime_error("Convergence tolerance not found in config file.");
+        if (config["optimization"]["alpha"])
+            opts.alpha = config["optimization"]["alpha"].as<double>();
+        if (config["optimization"]["adaptive_alpha"])
+            opts.adaptive_alpha = config["optimization"]["adaptive_alpha"].as<bool>();
         if (config["optimization"]["prior_map_std"])
             opts.prior_map_std = config["optimization"]["prior_map_std"].as<double>();
         else
@@ -150,6 +156,30 @@ Options load_options(const YAML::Node& config) {
             opts.refine_downsample = config["optimization"]["refine_downsample"].as<double>();
         else
             throw std::runtime_error("Refine downsample factor not found in config file.");
+        if (config["optimization"]["tile_size"])
+            opts.tile_size = config["optimization"]["tile_size"].as<double>();
+        if (config["optimization"]["max_loaded_scans"])
+            opts.max_loaded_scans = config["optimization"]["max_loaded_scans"].as<int>();
+    }
+
+    // Mapping parameters
+    if (config["mapping"]) {
+        if (config["mapping"]["pose_source"])
+            opts.pose_source = config["mapping"]["pose_source"].as<std::string>();
+        if (config["mapping"]["estimate_location"])
+            opts.estimate_location = std::filesystem::path(config["mapping"]["estimate_location"].as<std::string>());
+        if (config["mapping"]["frame_ranges"]) {
+            opts.frame_ranges.clear();
+            for (const auto& range_node : config["mapping"]["frame_ranges"]) {
+                if (range_node.IsSequence() && range_node.size() == 2) {
+                    int start_frame = range_node[0].as<int>();
+                    int end_frame = range_node[1].as<int>();
+                    opts.frame_ranges.emplace_back(start_frame, end_frame);
+                } else {
+                    throw std::runtime_error("Invalid frame range format in config file.");
+                }
+            }
+        }
     }
 
     return opts;

@@ -1,6 +1,8 @@
 import numpy as np
 import random
 import matplotlib.pyplot as plt
+import struct
+
 
 class Map:
     class Voxel:
@@ -18,6 +20,7 @@ class Map:
     def __init__(self, res=0.2):
         self.res = res
         self.voxels = {} # key: (x_idx, y_idx), value: Voxel
+        self.poses = []
 
     def index(self, x, y):
         x_idx = int(np.floor(x / self.res))
@@ -123,6 +126,33 @@ class Map:
         idx = self.index(x, y)
         return self.voxels.get(idx, 0)
 
+    def load_from_binary(self, file_path):
+        with open(file_path, "rb") as f:
+            # Metadata (explicit little-endian, no padding)
+            self.res, = struct.unpack("<d", f.read(8))
+            num_poses, = struct.unpack("<I", f.read(4))
+            num_voxels, = struct.unpack("<I", f.read(4))
+
+            # Poses: int32 + 4 doubles = 28 bytes
+            pose_struct = struct.Struct("<idddd")
+            for _ in range(num_poses):
+                pose_id, x, y, yaw, ate = pose_struct.unpack(f.read(pose_struct.size))
+                ate = np.round(ate, 5)
+                self.poses.append((pose_id, x, y, yaw, ate))
+
+            # Voxels: int32, int32, double = 16 bytes
+            voxel_struct = struct.Struct("<iid")
+            voxels_read = 0
+            for _ in range(num_voxels):
+                data = f.read(voxel_struct.size)
+                if len(data) < voxel_struct.size:
+                    print(f"[WARN] File incomplete. Read {voxels_read}/{num_voxels} voxels")
+                    break
+                x, y, intensity = voxel_struct.unpack(data)
+                self.voxels[(x, y)] = self.Voxel(intensity)
+                voxels_read += 1
+
+
     def plot(self, save_path=None, iter=None, show=False):
         if not self.voxels:
             return
@@ -153,7 +183,7 @@ class Map:
         img[ix - ix_min, iy - iy_min] = vals
 
         # --- plotting ---
-        fig, ax = plt.subplots(facecolor="black")
+        fig, ax = plt.subplots(facecolor="black", figsize=(10, 8))
         ax.set_facecolor("black")
 
         im = ax.imshow(
@@ -175,6 +205,17 @@ class Map:
         cbar.set_label("Intensity", color="white")
         cbar.ax.yaxis.set_tick_params(color="white")
         plt.setp(cbar.ax.get_yticklabels(), color="white")
+
+        # Plot poses overlaid if available
+        if self.poses:
+            pose_xs = [p[1] for p in self.poses]
+            pose_ys = [p[2] for p in self.poses]
+            ate = [p[4] for p in self.poses]
+            sc = ax.scatter(pose_xs, pose_ys, c=ate, cmap='hot', s=20, edgecolors='k', label='Poses')
+            cbar_ate = plt.colorbar(sc, ax=ax)
+            cbar_ate.set_label("ATE", color="white")
+            cbar_ate.ax.yaxis.set_tick_params(color="white")
+            plt.setp(cbar_ate.ax.get_yticklabels(), color="white")
 
         ax.set_xlim(ix_min * self.res, (ix_max + 1) * self.res)
         ax.set_ylim(iy_min * self.res, (iy_max + 1) * self.res)

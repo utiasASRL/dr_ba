@@ -6,15 +6,26 @@
 #include <ba/scans/scan.hpp>
 #include <ankerl/unordered_dense.h>
 #include <iostream>
+#include <queue>
 
 namespace ba {
 
 class ScanManager {
 public:
-    ScanManager() = default;
+    ScanManager(int max_loaded_scans = 0) {
+        if (max_loaded_scans >= 1) {
+            max_loaded_scans_ = static_cast<size_t>(max_loaded_scans);
+        } else {
+            // Set equal to max int to effectively disable limit
+            max_loaded_scans_ = std::numeric_limits<size_t>::max();
+        }
+        
+    }
+
     void add_scan(std::shared_ptr<Scan> scan) {
+        id_to_idx_[scan->id()] = num_scans();
+        idx_to_id_.push_back(scan->id());
         scans_.emplace(scan->id(), scan);
-        scan_id_list_.push_back(scan->id());
     }
 
     std::shared_ptr<Scan> get_scan(int scan_id) {
@@ -29,6 +40,10 @@ public:
         return static_cast<int>(scans_.size());
     }
 
+    int queue_size() const {
+        return static_cast<int>(loaded_scan_queue_.size());
+    }
+
     int num_active_scans() const {
         int count = 0;
         for (const auto& kv : scans_) {
@@ -39,8 +54,54 @@ public:
         return count;
     }
 
+    void load_data(std::vector<int> scan_ids = {}) {
+        std::vector<int> load_scan_ids;
+        if (scan_ids.empty()) {
+            load_scan_ids = idx_to_id_;
+        } else {
+            load_scan_ids = scan_ids;
+        }
+        // Ensure we do not exceed max_loaded_scans_
+        if (load_scan_ids.size() > max_loaded_scans_) {
+            throw std::runtime_error("ScanManager: Trying to load " + std::to_string(scans_.size()) + 
+                                        " scans with max_loaded_scans set to " + std::to_string(max_loaded_scans_));
+        }
+
+        // Load scans, unloading old scans if necessary
+        for (int scan_id : load_scan_ids) {
+            auto scan = scans_.at(scan_id);
+            if (scan->data_loaded()) {
+                continue; // already loaded
+            }
+            if (loaded_scan_queue_.size() >= max_loaded_scans_) {
+                // Unload oldest scan
+                int unload_scan_id = loaded_scan_queue_.front();
+                loaded_scan_queue_.pop();
+                scans_.at(unload_scan_id)->unload_data();
+            }
+            scan->load_data();
+            loaded_scan_queue_.push(scan_id);
+        }
+    }
+
+    void unload_all_data() {
+        while (!loaded_scan_queue_.empty()) {
+            int scan_id = loaded_scan_queue_.front();
+            loaded_scan_queue_.pop();
+            scans_.at(scan_id)->unload_data();
+        }
+    }
+
     std::vector<int> get_all_scan_ids() const {
-        return scan_id_list_;
+        return idx_to_id_;
+    }
+
+    int idx_to_id(int scan_idx) const {
+        return idx_to_id_.at(scan_idx);
+    }
+
+    int id_to_idx(int scan_id) const {
+        return id_to_idx_.at(scan_id);
     }
 
     // Compute RMSE of all scan poses compared to groundtruth (SE2: x, y, yaw)
@@ -113,6 +174,9 @@ public:
         // Compute ATE
         double ate = 0.0;
         for (int i = 0; i < num_scans(); ++i) {
+            double ate_contribution = (est_aligned.col(i) - gt_positions.col(i)).squaredNorm();
+            int pose_id = idx_to_id_.at(i);
+            scans_.at(pose_id)->set_ate_error(std::sqrt(ate_contribution));
             ate += (est_aligned.col(i) - est_positions.col(i)).squaredNorm();
         }
         ate = std::sqrt(ate / static_cast<double>(num_scans()));
@@ -122,7 +186,7 @@ public:
 
     ScanManager deep_copy() const {
         ScanManager copy;
-        for (const auto& scan_id : scan_id_list_) {
+        for (const auto& scan_id : idx_to_id_) {
             const auto& scan = scans_.at(scan_id);
             auto scan_clone = scan->clone();
             copy.add_scan(scan_clone);
@@ -132,7 +196,10 @@ public:
 
 private:
     ankerl::unordered_dense::map<int, std::shared_ptr<Scan>> scans_;
-    std::vector<int> scan_id_list_;
+    std::vector<int> idx_to_id_;                  // scan_idx -> scan_id
+    std::unordered_map<int, std::size_t> id_to_idx_; // scan_id -> scan_idx
+    std::queue<int> loaded_scan_queue_;
+    size_t max_loaded_scans_ = 0; // 0 means no limit
 };
 
 

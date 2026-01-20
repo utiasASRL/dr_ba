@@ -5,10 +5,20 @@
 #include <stdexcept>
 #include <opencv2/opencv.hpp>
 #include <iostream>
+#include <lgmath/so2/Rotation.hpp>
 
 namespace ba {
 
 VoxelMap::VoxelMap(double res) : res_(res) {}
+VoxelMap::VoxelMap(const std::string& filepath) {
+    load_from_file(filepath);
+}
+
+VoxelMap::Coord VoxelMap::voxel_to_coord(Index idx) const {
+    double x = static_cast<double>(idx.first) * res_;
+    double y = static_cast<double>(idx.second) * res_;
+    return {x, y};
+}
 
 auto VoxelMap::index(double x, double y) const -> Index {
 	const int32_t a = static_cast<int32_t>(std::floor(x / res_));
@@ -39,7 +49,24 @@ void VoxelMap::randomize(uint32_t seed) {
 	for (auto& kv : voxels_) kv.second = dist(rng);
 }
 
-void VoxelMap::init_map(const lgmath::se3::Transformation& pose, double max_dist) {
+void VoxelMap::init_voxel(Index idx) {
+    if (contains(idx)) return;
+    voxels_.emplace(idx, 0.0);
+    // Update bounds
+    if (size() == 1) {
+        Coord coord = voxel_to_coord(idx);
+        x_bounds_ = {coord.first, coord.first};
+        y_bounds_ = {coord.second, coord.second};
+    } else {
+        Coord coord = voxel_to_coord(idx);
+        x_bounds_.first = std::min(x_bounds_.first, coord.first);
+        x_bounds_.second = std::max(x_bounds_.second, coord.first);
+        y_bounds_.first = std::min(y_bounds_.first, coord.second);
+        y_bounds_.second = std::max(y_bounds_.second, coord.second);
+    }
+}
+
+void VoxelMap::init_map(const lgmath::se3::Transformation& pose, double max_dist, int pose_id) {
     const Eigen::Matrix<double, 4, 4> pose_mat = pose.matrix();
 	const double x_center = pose_mat(0, 3);
 	const double y_center = pose_mat(1, 3);
@@ -51,13 +78,16 @@ void VoxelMap::init_map(const lgmath::se3::Transformation& pose, double max_dist
                 continue;
             }
 			const Index idx{center.first + da, center.second + db};
-			if (!contains(idx)) voxels_.emplace(idx, 0.0);
+            init_voxel(idx);
 		}
 	}
+    // Store pose
+    poses_.push_back(pose.toSE2());
+    pose_ids_.push_back(pose_id);
 }
 
-void VoxelMap::init_map(const lgmath::se2::Transformation& pose, double max_dist) {
-    init_map(pose.toSE3(), max_dist);
+void VoxelMap::init_map(const lgmath::se2::Transformation& pose, double max_dist, int pose_id) {
+    init_map(pose.toSE3(), max_dist, pose_id);
 }
 
 std::vector<VoxelMap::Index> VoxelMap::get_sorted_keys_downsampled(double downsample_factor) const {
@@ -129,22 +159,44 @@ void VoxelMap::visualize(double downsample_factor) const {
     cv::destroyAllWindows();
 }
 
-void VoxelMap::save_to_file(const std::string& filepath) const {
+void VoxelMap::save_to_file(const std::string& filepath, ScanManager& scan_manager) const {
     std::ofstream ofs(filepath, std::ios::binary);
     if (!ofs) {
         throw std::runtime_error("Failed to open file for writing: " + filepath);
     }
+    // Pre-compute ATE per scan
+    scan_manager.compute_ate();
 
-    // Write resolution
+    // Write metadata
     ofs.write(reinterpret_cast<const char*>(&res_), sizeof(res_));
+    uint32_t num_poses = static_cast<uint32_t>(poses_.size());
+    ofs.write(reinterpret_cast<const char*>(&num_poses), sizeof(num_poses));
+    uint32_t num_voxels = static_cast<uint32_t>(voxels_.size());
+    ofs.write(reinterpret_cast<const char*>(&num_voxels), sizeof(num_voxels));
+    // Write poses, pose ids, and ate (for evaluating map quality)
+    for (int i = 0; i < poses_.size(); ++i) {
+        int32_t pose_id = pose_ids_[i];
+        ofs.write(reinterpret_cast<const char*>(&pose_id), sizeof(pose_id));
+        const auto& pose = poses_[i];
+        double x = pose.r_ab_inb()(0);
+        double y = pose.r_ab_inb()(1);
+        double yaw = pose.vec()(2);
+        ofs.write(reinterpret_cast<const char*>(&x), sizeof(x));
+        ofs.write(reinterpret_cast<const char*>(&y), sizeof(y));
+        ofs.write(reinterpret_cast<const char*>(&yaw), sizeof(yaw));
+        // Get ATE
+        auto scan = scan_manager.get_scan(pose_id);
+        double ate = scan->get_ate_error();
+        // Zero out ate less than 1e-6 to avoid numerical issues
+        if (std::abs(ate) < 1e-6) ate = 0.0;
+        ofs.write(reinterpret_cast<const char*>(&ate), sizeof(ate));
+    }
 
     // Write voxel data
     for (const auto& kv : voxels_) {
         int32_t x = kv.first.first;
         int32_t y = kv.first.second;
         double intensity = kv.second;
-        // Only save non-zero voxels
-        if (intensity < 0.01) continue;
         ofs.write(reinterpret_cast<const char*>(&x), sizeof(x));
         ofs.write(reinterpret_cast<const char*>(&y), sizeof(y));
         ofs.write(reinterpret_cast<const char*>(&intensity), sizeof(intensity));
@@ -153,7 +205,83 @@ void VoxelMap::save_to_file(const std::string& filepath) const {
     ofs.close();
 }
 
+void VoxelMap::load_poses_from_file(const std::string& filepath) {
+    std::ifstream ifs(filepath, std::ios::binary);
+    if (!ifs) {
+        throw std::runtime_error("Failed to open file for reading: " + filepath);
+    }
+    clear_pose_data();
+    // Read metadata
+    ifs.read(reinterpret_cast<char*>(&res_), sizeof(res_));
+    uint32_t num_poses = 0;
+    ifs.read(reinterpret_cast<char*>(&num_poses), sizeof(num_poses));
+    // Skip voxel count
+    uint32_t num_voxels = 0;
+    ifs.read(reinterpret_cast<char*>(&num_voxels), sizeof(num_voxels));
+    // Read poses
+    for (uint32_t i = 0; i < num_poses; ++i) {
+        int pose_id;
+        ifs.read(reinterpret_cast<char*>(&pose_id), sizeof(pose_id));
+        pose_ids_.push_back(pose_id);
+        double x, y, yaw;
+        ifs.read(reinterpret_cast<char*>(&x), sizeof(x));
+        ifs.read(reinterpret_cast<char*>(&y), sizeof(y));
+        ifs.read(reinterpret_cast<char*>(&yaw), sizeof(yaw));
+        lgmath::so2::Rotation C(yaw);
+        Eigen::Vector2d r;
+        r << x, y;
+        lgmath::se2::Transformation pose(C.matrix(), -C.matrix().transpose() * r);
+        poses_.push_back(pose);
+        // Skip ATE
+        // double ate;
+        // ifs.read(reinterpret_cast<char*>(&ate), sizeof(ate));
+    }
+    ifs.close();
+}
 
+void VoxelMap::load_from_file(const std::string& filepath) {
+    std::ifstream ifs(filepath, std::ios::binary);
+    if (!ifs) {
+        throw std::runtime_error("Failed to open file for reading: " + filepath);
+    }
+    // Read metadata
+    ifs.read(reinterpret_cast<char*>(&res_), sizeof(res_));
+    uint32_t num_poses = 0;
+    ifs.read(reinterpret_cast<char*>(&num_poses), sizeof(num_poses));
+    uint32_t num_voxels = 0;
+    ifs.read(reinterpret_cast<char*>(&num_voxels), sizeof(num_voxels));
+    // Read poses
+    poses_.clear();
+    for (uint32_t i = 0; i < num_poses; ++i) {
+        int pose_id;
+        ifs.read(reinterpret_cast<char*>(&pose_id), sizeof(pose_id));
+        pose_ids_.push_back(pose_id);
+        double x, y, yaw;
+        ifs.read(reinterpret_cast<char*>(&x), sizeof(x));
+        ifs.read(reinterpret_cast<char*>(&y), sizeof(y));
+        ifs.read(reinterpret_cast<char*>(&yaw), sizeof(yaw));
+        lgmath::so2::Rotation C(yaw);
+        Eigen::Vector2d r;
+        r << x, y;
+        lgmath::se2::Transformation pose(C.matrix(), -C.matrix().transpose() * r);
+        poses_.push_back(pose);
+        // Skip ATE
+        double ate;
+        ifs.read(reinterpret_cast<char*>(&ate), sizeof(ate));
+    }
+    // Read voxel data
+    voxels_.clear();
+    std::cout << "Loading " << num_voxels << " voxels from file: " << filepath << std::endl;
+    for (uint32_t i = 0; i < num_voxels; ++i) {
+        int32_t x, y;
+        double intensity;
+        ifs.read(reinterpret_cast<char*>(&x), sizeof(x));
+        ifs.read(reinterpret_cast<char*>(&y), sizeof(y));
+        ifs.read(reinterpret_cast<char*>(&intensity), sizeof(intensity));
+        voxels_[{x, y}] = intensity;
+    }
+    ifs.close();
+}
 
 bool VoxelMap::contains(Index idx) const { return voxels_.find(idx) != voxels_.end(); }
 
