@@ -5,6 +5,10 @@
 #include <chrono>
 
 
+bool fileExists(const std::string& filename) {
+    std::ifstream file(filename);
+    return file.good();
+}
 
 
 int main()
@@ -76,8 +80,10 @@ int main()
     std::vector<std::pair<int64_t, std::array<double, 3>>> odometry_data = readOdometry(odometry_file);
 
     std::vector<double> bias_priors;
-    if(opts.estimate_bias) {
-        bias_priors = readBiases("output/" + seq_id + "/other_log/gyro_bias.txt");
+    std::string bias_file = "output/" + seq_id + "/other_log/gyro_bias.txt";
+    if(opts.estimate_bias && fileExists(bias_file))
+    {
+        bias_priors = readBiases(bias_file);
     }
     else
     {
