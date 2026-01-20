@@ -553,6 +553,7 @@ def getSeqType(seq_id):
         'boreas-2025-01-08-11-22': 'Glenshield',
         'boreas-2025-01-08-11-44': 'Glenshield',
         'boreas-2025-01-08-12-28': 'Glenshield',
+        'boreas-2024-12-05-14-25': 'Glenshield',
 
         'boreas-2024-12-03-13-13': 'Highway',
         'boreas-2024-12-03-13-34': 'Highway',
@@ -588,6 +589,24 @@ def getSeqType(seq_id):
         'boreas-2021-10-15-12-35': 'Original_train',
         'boreas-2021-11-14-09-47': 'Original_train',
         'boreas-2021-11-23-14-27': 'Original_train',
+
+        'boreas-2025-07-18-10-00': 'Forest',
+        'boreas-2025-07-18-10-33': 'Forest',
+        'boreas-2025-07-18-11-00': 'Forest',
+        'boreas-2025-07-18-11-25': 'Forest',
+        'boreas-2025-07-18-11-53': 'Forest',
+
+        'boreas-2025-07-18-14-55': 'Farm',
+        'boreas-2025-07-18-15-12': 'Farm',
+        'boreas-2025-07-18-15-30': 'Farm',
+        'boreas-2025-07-18-15-48': 'Farm',
+        'boreas-2025-07-18-16-05': 'Farm',
+
+        'boreas-2025-08-06-06-33': 'Urban',
+        'boreas-2025-08-06-07-05': 'Urban',
+        'boreas-2025-08-06-07-41': 'Urban',
+        'boreas-2025-08-06-08-35': 'Urban',
+        'boreas-2025-08-06-10-48': 'Urban',
     }
     if seq_id in seqs:
         return seqs[seq_id]
