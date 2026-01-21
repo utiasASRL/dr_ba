@@ -49,6 +49,22 @@ void VoxelMap::randomize(uint32_t seed) {
 	for (auto& kv : voxels_) kv.second = dist(rng);
 }
 
+void VoxelMap::overwrite(Scan& scan) {
+    for (const auto& kv : voxels_) {
+        double voxel_x = static_cast<double>(kv.first.first) * res_;
+        double voxel_y = static_cast<double>(kv.first.second) * res_;
+        // Interpolate intensity and Jacobian
+        std::optional<Scan::Measurement> interp_meas = scan.interpolate(voxel_x, voxel_y);
+        // If scan is outside coverage, no intensity will be provided
+        if (!interp_meas.has_value()) {
+            continue;
+        }
+
+        double I_meas = interp_meas->intensity;
+        voxels_[kv.first] = I_meas;
+    }
+}
+
 void VoxelMap::init_voxel(Index idx) {
     if (contains(idx)) return;
     voxels_.emplace(idx, 0.0);
@@ -88,6 +104,27 @@ void VoxelMap::init_map(const lgmath::se3::Transformation& pose, double max_dist
 
 void VoxelMap::init_map(const lgmath::se2::Transformation& pose, double max_dist, int pose_id) {
     init_map(pose.toSE3(), max_dist, pose_id);
+}
+
+std::vector<VoxelMap::Index> VoxelMap::get_voxels_in_range(const lgmath::se2::Transformation& pose, double max_dist) const {
+    std::vector<Index> indices;
+    const Eigen::Matrix<double, 3, 3> pose_mat = pose.matrix();
+    const double x_center = pose_mat(0, 2);
+    const double y_center = pose_mat(1, 2);
+    const auto center = index(x_center, y_center);
+    const int32_t n = static_cast<int32_t>(std::ceil(max_dist / res_));
+    for (int32_t da = -n; da <= n; ++da) {
+        for (int32_t db = -n; db <= n; ++db) {
+            if (std::sqrt(std::pow(da * res_, 2) + std::pow(db * res_, 2)) > max_dist) {
+                continue;
+            }
+            const Index idx{center.first + da, center.second + db};
+            if (contains(idx)) {
+                indices.push_back(idx);
+            }
+        }
+    }
+    return indices;
 }
 
 std::vector<VoxelMap::Index> VoxelMap::get_sorted_keys_downsampled(double downsample_factor) const {
@@ -174,7 +211,7 @@ void VoxelMap::save_to_file(const std::string& filepath, ScanManager& scan_manag
     uint32_t num_voxels = static_cast<uint32_t>(voxels_.size());
     ofs.write(reinterpret_cast<const char*>(&num_voxels), sizeof(num_voxels));
     // Write poses, pose ids, and ate (for evaluating map quality)
-    for (int i = 0; i < poses_.size(); ++i) {
+    for (size_t i = 0; i < poses_.size(); ++i) {
         int32_t pose_id = pose_ids_[i];
         ofs.write(reinterpret_cast<const char*>(&pose_id), sizeof(pose_id));
         const auto& pose = poses_[i];
@@ -232,9 +269,8 @@ void VoxelMap::load_poses_from_file(const std::string& filepath) {
         r << x, y;
         lgmath::se2::Transformation pose(C.matrix(), -C.matrix().transpose() * r);
         poses_.push_back(pose);
-        // Skip ATE
-        // double ate;
-        // ifs.read(reinterpret_cast<char*>(&ate), sizeof(ate));
+        double ate;
+        ifs.read(reinterpret_cast<char*>(&ate), sizeof(ate));
     }
     ifs.close();
 }
@@ -265,7 +301,6 @@ void VoxelMap::load_from_file(const std::string& filepath) {
         r << x, y;
         lgmath::se2::Transformation pose(C.matrix(), -C.matrix().transpose() * r);
         poses_.push_back(pose);
-        // Skip ATE
         double ate;
         ifs.read(reinterpret_cast<char*>(&ate), sizeof(ate));
     }

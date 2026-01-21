@@ -51,12 +51,17 @@ public:
 	void zero_out();
 
 	// Fill all existing voxels with random values in [min_val, max_val]
-	void randomize(uint32_t seed = 0) /* deterministic if seed!=0 */;
+	void randomize(uint32_t seed = 0); /* deterministic if seed!=0 */
+
+	void overwrite(Scan& scan);
 
 	// Initialize empty voxels in a square window around pose within max_dist
 	// If SE3 pose provided, only the SE2 components are used
 	void init_map(const lgmath::se2::Transformation& pose, double max_dist, int pose_id);
 	void init_map(const lgmath::se3::Transformation& pose, double max_dist, int pose_id);
+
+	// Get all voxel indices within max_dist of a given pose
+	std::vector<Index> get_voxels_in_range(const lgmath::se2::Transformation& pose, double max_dist) const;
 
 	// Return sorted voxel keys downsampled by factor in [0,1]; 1.0 means no downsample
 	std::vector<Index> get_sorted_keys_downsampled(double downsample_factor = 1.0) const;
