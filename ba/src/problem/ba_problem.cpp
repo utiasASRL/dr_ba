@@ -9,12 +9,8 @@ namespace ba {
 void BAProblem::init_scans() {
     std::string seq_id = opts_.seq_ids[0];
     // Set up temporary folder for Gaussian-blurred images to be stored
-    fs::path temp_dir = fs::temp_directory_path() / "dr_ba_temp_gauss_blur";
+    fs::path temp_dir = fs::temp_directory_path() / "dr_ba_temp_gauss_blur" / seq_id;
     fs::create_directories(temp_dir);
-    // Clean up temp folder if it already exists
-    for (const auto& entry : fs::directory_iterator(temp_dir)) {
-        fs::remove_all(entry.path());
-    }
 
     // Load groundtruth poses
     std::vector<lgmath::se3::Transformation> all_gt_poses;
@@ -71,6 +67,10 @@ void BAProblem::init_scans() {
     int num_loaded = 0;
     int max_number_frames = opts_.num_frames > 0 ? opts_.num_frames : files.size();
     for (const auto& path : files) {
+        // Only consider files ending with .png
+        if (path.extension() != ".png") {
+            continue;
+        }
         if (num_loaded >= max_number_frames) break;
         num_checked++;
 
@@ -136,41 +136,49 @@ void BAProblem::init_scans() {
         lgmath::se3::Transformation T_gt_rel = T_gt_abs_0.inverse() * T_gt_abs;
 
         // TODO: Add support for more than just local_maps
-        if (opts_.input_type != "local_maps") {
+        if (opts_.input_type != "scans" && opts_.input_type != "local_maps") {
             throw std::invalid_argument("Input type " + opts_.input_type + " not supported yet.");
         }
 
+
         // Load in image as Eigen matrix
-        cv::Mat img = cv::imread(path.string(), cv::IMREAD_GRAYSCALE);
-        // Apply Gaussian blur
-        if (opts_.gauss_blur_sigma > 0.0) {
-            int ksize = static_cast<int>(std::ceil(opts_.gauss_blur_sigma * 6)) | 1; // kernel size should be odd
-            cv::GaussianBlur(img, img, cv::Size(ksize, ksize), opts_.gauss_blur_sigma);
+        fs::path temp_img_path = temp_dir / (std::to_string(num_checked) + "_" + std::to_string(opts_.gauss_blur_sigma) + ".png");
+        if (!fs::exists(temp_img_path)) {
+            // Only process if the temp image does not already exist
+            cv::Mat img = cv::imread(path.string(), cv::IMREAD_GRAYSCALE);
+            // Apply Gaussian blur
+            if (opts_.gauss_blur_sigma > 0.0) {
+                int ksize = static_cast<int>(std::ceil(opts_.gauss_blur_sigma * 6)) | 1; // kernel size should be odd
+                cv::GaussianBlur(img, img, cv::Size(ksize, ksize), opts_.gauss_blur_sigma);
+            }
+            // Convert to CV_32F and normalize to [0, 1]
+            img.convertTo(img, CV_32F, 1.0 / 255.0);
+            // Save blurred image to temp directory for easy loading
+            ba::save_img_bin(temp_img_path, img);
+            cv::imwrite(temp_img_path, img_u8);
         }
-        // Convert to CV_32F and normalize to [0, 1]
-        img.convertTo(img, CV_32F, 1.0 / 255.0);
-        // Save blurred image to temp directory for easy loading
-        fs::path temp_img_path = temp_dir / (std::to_string(num_checked) + ".png");
-        ba::save_img_bin(temp_img_path, img);
 
         // Load in cumulative return image
-        fs::path cumul_path = cumul_files[num_checked];
-        cv::Mat cumul_img = cv::imread(cumul_path.string(), cv::IMREAD_GRAYSCALE);
-        // Convert to CV_32F and normalize to [0, 1]
-        cumul_img.convertTo(cumul_img, CV_32F, 1.0 / 255.0);
-        // Save cumulative image to temp directory for easy loading
-        std::optional<fs::path> temp_cumul_img_path = temp_dir / (std::to_string(num_checked) + "_cumul.png");
-        ba::save_img_bin(temp_cumul_img_path.value(), cumul_img);
+        std::optional<fs::path> temp_cumul_img_path = temp_dir / (std::to_string(num_checked) + "_" + std::to_string(opts_.gauss_blur_sigma) + "_cumul.png");
+        if (!fs::exists(temp_cumul_img_path.value())) {
+            fs::path cumul_path = cumul_files[num_checked];
+            cv::Mat cumul_img = cv::imread(cumul_path.string(), cv::IMREAD_GRAYSCALE);
+            // Convert to CV_32F and normalize to [0, 1]
+            cumul_img.convertTo(cumul_img, CV_32F, 1.0 / 255.0);
+            // Save cumulative image to temp directory for easy loading
+            ba::save_img_bin(temp_cumul_img_path.value(), cumul_img);
+        }
+
+        // Create scan object
+        if (!opts_.use_cumul_thresh) {
+            // We won't be using cumulative return, so don't provide a path
+            temp_cumul_img_path = std::nullopt;
+        }
 
         // Project relative matrices to SE2
         T_est_rel = T_est_rel.toSE2().toSE3();
         T_gt_rel = T_gt_rel.toSE2().toSE3();
 
-        // Create scan object
-        if (opts_.cumul_thresh > 1.0 || opts_.cumul_thresh < 0.0) {
-            // We won't be using cumulative return, so don't provide a path
-            temp_cumul_img_path = std::nullopt;
-        }
         auto scan = std::make_shared<ba::LocalMapScan>(timestamp, num_checked, opts_, T_est_rel, T_gt_rel, temp_img_path, temp_cumul_img_path);
         if (opts_.fix_first_scan && num_loaded == 0) {
             scan->set_fixed(true); // Fix the first scan's pose
