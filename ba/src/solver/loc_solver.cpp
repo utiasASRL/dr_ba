@@ -1,0 +1,222 @@
+#include <ba/solver/loc_solver.hpp>
+#include <ba/problem/loc_problem.hpp>
+#include <iostream>
+#include <chrono>
+#include <algorithm>
+#include <fstream>
+
+namespace ba {
+
+void LocSolver::construct_problem(const std::shared_ptr<Scan>& scan) {
+    // // Reset cost
+    // cost_ = 0.0;
+
+    // // Initialize matrices
+    // lhs_.setZero(3, 3);
+    // rhs_.setZero(3);
+
+    // // Loop through all voxels in the scan's coverage
+    // for (const auto& voxel_idx : voxel_keys_) {
+    //     double voxel_x = static_cast<double>(voxel_idx.first) * voxel_map_.res();
+    //     double voxel_y = static_cast<double>(voxel_idx.second) * voxel_map_.res();
+    //     double vox_intensity = voxel_map_.at(voxel_idx);
+
+    //     // Interpolate intensity and Jacobian
+    //     std::optional<Scan::Measurement> interp_meas = scan->interpolate(voxel_x, voxel_y);
+    //     // If scan is outside coverage, no intensity will be provided
+    //     if (!interp_meas.has_value()) {
+    //         continue;
+    //     }
+
+    //     // Weight everything by square root of measurement covariance
+    //     double I_meas = interp_meas->intensity;
+    //     double meas_cov = interp_meas->covariance;
+    //     Eigen::Matrix<double, 1, 3> d_beta_d_T = - interp_meas->jacobian;// / std::sqrt(meas_cov);
+
+    //     double err = vox_intensity - I_meas;
+
+    //     if (err > 0.2) {
+    //         continue;
+    //     }
+
+    //     lhs_ += d_beta_d_T.transpose() * d_beta_d_T;
+    //     rhs_ += d_beta_d_T.transpose() * err;
+
+    //     // Compute cost
+    //     cost_ += 0.5 * std::pow(err, 2) / meas_cov;
+    // }
+}
+
+void LocSolver::construct_problem(double downsample_factor) {
+    // Implementation as above
+}
+
+bool LocSolver::solve() {
+    return true;
+}
+
+void LocSolver::update_poses() {
+}
+
+void LocSolver::update_map() {
+    // No map updating needed for localization solver
+}
+
+void LocSolver::optimize() {
+    // Ensure problem is initialized
+    if (!problem_.is_initialized()) {
+        problem_.initialize();
+    }
+    fs::path output_file = opts_.output_path / "loc_results.csv";
+
+    // Initialize timer stuff
+    double avg_solve_time = 0.0;
+    auto start = std::chrono::high_resolution_clock::now();
+
+    Eigen::Vector3d avg_pose_error(0.0, 0.0, 0.0);
+    std::vector<int> scan_id_list = scan_manager_.get_all_scan_ids();
+
+    // Initialize pose using gt
+    // Cast to LocProblem to access derived class methods
+    auto& loc_problem = static_cast<LocProblem&>(problem_);
+    lgmath::se3::Transformation nearest_map_gt_pose = loc_problem.gt_map_poses().at(0);
+    lgmath::se3::Transformation nearest_map_est_pose = loc_problem.voxel_map().poses().at(0).toSE3();
+    lgmath::se3::Transformation loc_init_pose = loc_problem.gt_poses().at(0);
+    // Get the initial pose within the map frame
+    lgmath::se3::Transformation curr_pose = nearest_map_gt_pose.inverse() * loc_init_pose;
+    std::cout << "scan id list size: " << scan_id_list.size() << std::endl;
+    for (size_t i = 0; i < scan_id_list.size(); i++) {
+        int scan_id = scan_id_list.at(i);
+        auto scan = scan_manager_.get_scan(scan_id);
+        scan->set_pose(curr_pose);
+        std::cout << "----------------------------------------" << std::endl;
+        // Get voxels in range of initial pose
+        voxel_keys_ = voxel_map_.get_voxels_in_range(scan->pose2d(), opts_.max_dist);
+        std::cout << "Optimizing scan ID: " << scan_id << "/" << scan_manager_.num_scans() - 1
+                  << " with " << voxel_keys_.size() << " voxels in range." << std::endl;
+
+        for (int iter = 0; iter < opts_.max_iterations; iter++) {
+            // Reset cost
+            cost_ = 0.0;
+
+            // Construct problem
+            // Initialize matrices
+            lhs_.setZero(3, 3);
+            rhs_.setZero(3);
+
+            // Loop through all voxels in the scan's coverage
+            for (const auto& voxel_idx : voxel_keys_) {
+                double voxel_x = static_cast<double>(voxel_idx.first) * voxel_map_.res();
+                double voxel_y = static_cast<double>(voxel_idx.second) * voxel_map_.res();
+                double vox_intensity = voxel_map_.at(voxel_idx);
+
+                // Interpolate intensity and Jacobian
+                std::optional<Scan::Measurement> interp_meas = scan->interpolate(voxel_x, voxel_y);
+                // If scan is outside coverage, no intensity will be provided
+                if (!interp_meas.has_value()) {
+                    continue;
+                }
+
+                // Weight everything by square root of measurement covariance
+                double I_meas = interp_meas->intensity;
+                double meas_cov = interp_meas->covariance;
+                Eigen::Matrix<double, 1, 3> d_beta_d_T = - interp_meas->jacobian / std::sqrt(meas_cov);
+
+                double err = (vox_intensity - I_meas) / std::sqrt(meas_cov);
+
+                lhs_ += d_beta_d_T.transpose() * d_beta_d_T;
+                rhs_ += d_beta_d_T.transpose() * err;
+
+                // Compute cost
+                cost_ += 0.5 * std::pow(err, 2) ;
+            }
+
+            // Solve problem
+            Eigen::Vector3d delta_xi = - alpha_ * lhs_.inverse() * rhs_;
+
+            // Update poses
+            scan->update_pose(delta_xi);
+
+            if (iter != 0 && (delta_xi.norm() < opts_.convergence_tol || std::abs(prev_cost_ - cost_) < opts_.convergence_tol)) {
+                std::cout << "Converged from: " << ((delta_xi.norm() < opts_.convergence_tol ) ? "small pose update." : "small cost change.") << std::endl;
+                break;
+            }
+
+            prev_cost_ = cost_;
+        }
+        scan->unload_data();
+        curr_pose = scan->pose();
+
+        // Compute errors
+        // First, find nearest map pose to the scan's estimated pose
+        double min_dist = std::numeric_limits<double>::max();
+        int best_map_idx = -1;
+        for (size_t j = 0; j < loc_problem.gt_map_poses().size(); j++) {
+            lgmath::se3::Transformation map_est_pose = loc_problem.voxel_map().poses().at(j).toSE3();
+            double dist = (map_est_pose.r_ab_inb().head<2>() - scan->pose().r_ab_inb().head<2>()).norm();
+            if (dist < min_dist) {
+                min_dist = dist;
+                nearest_map_gt_pose = loc_problem.gt_map_poses().at(j);
+                // Also get the estimated map pose
+                nearest_map_est_pose = map_est_pose;
+                best_map_idx = static_cast<int>(j);
+            }
+        }
+        // Compute estimated pose within local map
+        lgmath::se3::Transformation loc_est_pose = nearest_map_est_pose.inverse() * scan->pose();
+        scan->set_pose(loc_est_pose);
+
+        // Compute gt pose within local map
+        lgmath::se3::Transformation loc_gt_pose = nearest_map_gt_pose.inverse() * loc_problem.gt_poses().at(i);
+        scan->set_gt_pose(loc_gt_pose);
+
+        if (opts_.save_result) {
+            // Save results to CSV
+            std::ofstream ofs;
+            if (i == 0) {
+                ofs.open(output_file, std::ios::out);
+                ofs << "map_id,scan_id,est_x,est_y,est_yaw,gt_x,gt_y,gt_yaw\n";
+            } else {
+                ofs.open(output_file, std::ios::out | std::ios::app);
+            }
+            Eigen::Matrix<double, 2, 1> loc_est_pose_xy = scan->pose2d().r_ab_inb();
+            Eigen::Matrix<double, 2, 1> loc_gt_pose_xy = scan->gt_pose2d().r_ab_inb();
+            double loc_est_yaw = scan->pose2d().vec()(2);
+            double loc_gt_yaw = scan->gt_pose2d().vec()(2);
+            ofs << loc_problem.voxel_map().pose_ids().at(best_map_idx) << ","
+                << scan->id() << ","
+                << loc_est_pose_xy(0) << "," << loc_est_pose_xy(1) << "," << loc_est_yaw << ","
+                << loc_gt_pose_xy(0) << "," << loc_gt_pose_xy(1) << "," << loc_gt_yaw << "\n";
+            ofs.close();
+        }
+
+        Eigen::Matrix<double, 6, 1> pose_error = scan->pose_error();
+        // std::cout << "Final scan pose: \n" << scan->pose() << std::endl;
+        // std::cout << "GT scan pose: \n" << scan->gt_pose() << std::endl;
+        std::cout << "Final pose error (m, m, deg): " << pose_error(0) << ", " << pose_error(1) << ", " << pose_error(5) * 180.0 / M_PI << std::endl;
+        avg_pose_error(0) += pose_error(0) * pose_error(0);
+        avg_pose_error(1) += pose_error(1) * pose_error(1);
+        avg_pose_error(2) += pose_error(5) * pose_error(5);
+
+        // Propagate curr_pose using DRO estimates
+        if (i == scan_id_list.size() - 1) {
+            break;
+        }
+        lgmath::se3::Transformation dro_rel_pose;
+        lgmath::se3::Transformation curr_dro_pose = loc_problem.dro_poses().at(i);
+        lgmath::se3::Transformation next_dro_pose = loc_problem.dro_poses().at(i + 1);
+        dro_rel_pose = curr_dro_pose.inverse() * next_dro_pose;
+        curr_pose = curr_pose * dro_rel_pose;
+
+        // break;
+    }
+
+    avg_pose_error /= static_cast<double>(scan_id_list.size());
+    avg_pose_error = avg_pose_error.cwiseSqrt();
+    avg_pose_error(2) = avg_pose_error(2) * 180.0 / M_PI;
+    std::cout << "----------------------------------------" << std::endl;
+    std::cout << "RMSE over all scans (m, m, deg):\n" << avg_pose_error.transpose() << std::endl;
+}
+
+
+} // namespace ba

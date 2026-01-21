@@ -1,5 +1,5 @@
 data:
-  data_path: /home/dl/Documents/phd/data/boreas/boreas-2024-12-03-12-54
+  data_path: /home/dl/Documents/phd/data/boreas/boreas-2025-07-18-15-12
   multi_sequence: false
 direct:
   local_map_res: 0.1
@@ -31,7 +31,7 @@ estimation:
   direct_cost: true
   doppler_cost: true
   estimate_doppler_vy_bias: true
-  gyro_bias_estimation: true
+  gyro_bias_estimation: false
   max_acceleration: 10.0
   use_gyro: true
   vy_bias_prior: 0.11
@@ -45,9 +45,9 @@ imu:
 log:
   display: false
   max_scan_range: 150.0
-  save_images: true
+  save_images: false
   save_local_maps: true
-  save_scans: true
+  save_scans: false
   verbose: true
 radar:
   beta_corr_fact: 0.944
