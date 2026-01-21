@@ -19,6 +19,7 @@ public:
     // Immutable accessors
     const std::vector<double>& cost_history() const { return cost_history_; }
     const std::vector<Eigen::Vector3d>& rmse_history() const { return rmse_history_; }
+    const std::string output_dir() const { return output_dir_.string(); }
 
     // Mutable accessors
     VoxelMap& voxel_map() { return voxel_map_; }
