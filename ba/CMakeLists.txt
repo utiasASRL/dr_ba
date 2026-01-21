@@ -12,6 +12,7 @@ find_package(yaml-cpp REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Threads REQUIRED)
+find_package(OpenMP REQUIRED)
 add_subdirectory(deps/unordered_dense)
 add_subdirectory(deps/lgmath)
 
