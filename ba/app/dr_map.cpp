@@ -1,23 +1,12 @@
 #include <ba/map/voxel_map.hpp>
 #include <ba/scans/manager.hpp>
-#include <ba/scans/local_map_scan.hpp>
 #include "ba/utils/ba_config.hpp"
-#include "ba/utils/io_utils.hpp"
-#include "ba/solver/solver.hpp"
-#include "ba/solver/drba_solver.hpp"
 #include "ba/solver/result.hpp"
-
+#include <ba/solver/drba_solver.hpp>
 #include <ba/problem/map_problem.hpp>
 
 #include <iostream>
-#include <random>
 #include <filesystem>
-#include <opencv2/opencv.hpp>
-#include <lgmath/se3/Transformation.hpp>
-#include <lgmath/se2/Transformation.hpp>
-#include <lgmath/so3/Operations.hpp>
-#include <opencv2/core/eigen.hpp>
-#include <Eigen/Sparse>
 
 namespace fs = std::filesystem;
 
@@ -56,7 +45,6 @@ int main() {
     opts.output_path = output_run_dir;
 
     ba::MapProblem problem(opts);
-    auto &voxel_map = problem.voxel_map();
     problem.initialize();
     
     std::cout << "Solving for map..." << std::endl;

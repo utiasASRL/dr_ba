@@ -1,27 +1,20 @@
 #include <ba/map/voxel_map.hpp>
 #include <ba/scans/manager.hpp>
-#include <ba/scans/local_map_scan.hpp>
 #include "ba/utils/ba_config.hpp"
-#include "ba/utils/io_utils.hpp"
-#include "ba/solver/solver.hpp"
-#include "ba/solver/drba_solver.hpp"
 #include "ba/solver/result.hpp"
-
 #include <ba/problem/ba_problem.hpp>
+#include <ba/solver/drba_solver.hpp>
+#include <ba/solver/loc_solver.hpp>
 
 #include <iostream>
-#include <random>
 #include <filesystem>
-#include <opencv2/opencv.hpp>
-#include <lgmath/se3/Transformation.hpp>
-#include <lgmath/se2/Transformation.hpp>
-#include <lgmath/so3/Operations.hpp>
-#include <opencv2/core/eigen.hpp>
-#include <Eigen/Sparse>
+#include <omp.h>
 
 namespace fs = std::filesystem;
 
 int main() {
+    omp_set_num_threads(14);
+    Eigen::setNbThreads(1);
     // Load in config from ba/config/dr_ba_config.yaml
     fs::path config_path = fs::path(__FILE__).parent_path().parent_path() / "config" / "dr_ba_config.yaml";
     YAML::Node config = YAML::LoadFile(config_path.string());
