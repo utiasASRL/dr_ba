@@ -2,6 +2,7 @@
 #include <iostream>
 #include <chrono>
 #include <algorithm>
+#include <omp.h>
 
 namespace ba {
 
@@ -85,8 +86,6 @@ void DrBASolver::construct_problem(double downsample_factor) {
     auto start_time = std::chrono::high_resolution_clock::now();
     double rel_pose_prior_time = 0.0;
     double avg_per_voxel_time = 0.0;
-    double avg_per_scan_time = 0.0;
-    int timed_scan_count = 0;
 
     // Check that tiling has been done
     if (tiles_.empty()) {
@@ -173,15 +172,21 @@ void DrBASolver::construct_problem(double downsample_factor) {
                 rhs_.segment<3>(state_idx_b) += d_e_d_Tb.transpose() * err_vec_weighted;
             }
 
-            cost_ += 0.5 * err_vec.transpose() * err_vec;
+            cost_ += 0.5 * err_vec.norm();
         }
     }
     rel_pose_prior_time = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - rel_pose_start_time).count();
 
+    // Local contributions for memory safety with multithreading
+    Eigen::MatrixXd lhs_tile = Eigen::MatrixXd::Zero(lhs_.rows(), lhs_.cols());
+    Eigen::VectorXd rhs_tile = Eigen::VectorXd::Zero(rhs_.size());
+    double cost_tile = 0.0;
+
     // Loop through each tile
     for (const auto& tile : tiles_) {
         // Load in data for scans in this tile
-        // scan_manager_.load_data(tile.scan_ids);
+        // Note this will fail if max_loaded_scans is too small
+        scan_manager_.load_data(tile.scan_ids);
 
         // Pre-compute active state indices for this tile (excluding fixed first pose)
         std::vector<int> active_state_indices;
@@ -193,6 +198,13 @@ void DrBASolver::construct_problem(double downsample_factor) {
         }
         int num_active_states = active_state_indices.size() * 3;  // Each pose has 3 DOF
 
+        std::unordered_map<int,int> global_to_local;
+        global_to_local.reserve(active_state_indices.size());
+
+        
+        for (size_t i = 0; i < active_state_indices.size(); ++i)
+            global_to_local[active_state_indices[i]] = i * 3;
+
         // Pre-filter voxels in this tile with downsampled keys (both are sorted)
         std::vector<decltype(tile.voxel_indices)::value_type> filtered_voxels;
         filtered_voxels.reserve(std::min(tile.voxel_indices.size(), voxel_keys_.size()));
@@ -201,10 +213,18 @@ void DrBASolver::construct_problem(double downsample_factor) {
             voxel_keys_.begin(), voxel_keys_.end(),
             std::back_inserter(filtered_voxels)
         );
+        const auto start_voxel_time = std::chrono::high_resolution_clock::now();
+
+#pragma omp parallel
+{
+        Eigen::MatrixXd lhs_local = Eigen::MatrixXd::Zero(lhs_.rows(), lhs_.cols());
+        Eigen::VectorXd rhs_local = Eigen::VectorXd::Zero(rhs_.size());
+        double cost_local = 0.0;
 
         // Loop through all voxels in this tile
-        for (const auto& voxel_idx : filtered_voxels) {
-            auto voxel_time_start = std::chrono::high_resolution_clock::now();
+        #pragma omp for schedule(dynamic)
+        for (size_t v = 0; v < filtered_voxels.size(); ++v) {
+            const auto& voxel_idx = filtered_voxels[v];
 
             double voxel_x = static_cast<double>(voxel_idx.first) * voxel_map_.res();
             double voxel_y = static_cast<double>(voxel_idx.second) * voxel_map_.res();
@@ -216,13 +236,7 @@ void DrBASolver::construct_problem(double downsample_factor) {
             int scan_count = 0;
 
             // Loop through all scans that cover this tile
-            for (const int scan_id : tile.scan_ids) {
-                // Load in scan, scans are managed in a queue to limit memory usage
-                // This will be extremely fast if scan is already loaded
-                // This will be quite slow if the max_loaded_scans value is reached within a given pixel
-                scan_manager_.load_data({scan_id});
-                auto start_scan_time = std::chrono::high_resolution_clock::now();
-                
+            for (const int scan_id : tile.scan_ids) {                
                 int scan_idx = scan_manager_.id_to_idx(scan_id);
                 auto scan = scan_manager_.get_scan(scan_id);
 
@@ -242,23 +256,12 @@ void DrBASolver::construct_problem(double downsample_factor) {
                 B(scan_count) = I_meas / std::sqrt(meas_cov);
                 if (scan_idx > 0) {
                     // Find position in local Jacobian
-                    int local_state_idx = -1;
-                    for (size_t j = 0; j < active_state_indices.size(); ++j) {
-                        if (active_state_indices[j] == (scan_idx - 1) * 3) {
-                            local_state_idx = j * 3;
-                            break;
-                        }
-                    }
-                    if (local_state_idx >= 0) {
-                        J_local.block<1, 3>(scan_count, local_state_idx) = d_beta_d_T;
-                    }
+                    auto it = global_to_local.find((scan_idx - 1) * 3);
+                    if (it != global_to_local.end())
+                        J_local.block<1,3>(scan_count, it->second) = d_beta_d_T;
                 }
 
                 scan_count++;
-
-                auto end_scan_time = std::chrono::high_resolution_clock::now();
-                avg_per_scan_time += std::chrono::duration<double>(end_scan_time - start_scan_time).count();
-                timed_scan_count++;
             }
             
             if (scan_count == 0) {
@@ -281,32 +284,50 @@ void DrBASolver::construct_problem(double downsample_factor) {
 
             // Scatter to global lhs_ and rhs_
             for (size_t i = 0; i < active_state_indices.size(); ++i) {
-                int global_i = active_state_indices[i];
-                for (size_t j = 0; j < active_state_indices.size(); ++j) {
-                    int global_j = active_state_indices[j];
-                    lhs_.block<3, 3>(global_i, global_j) += H_local.block<3, 3>(i * 3, j * 3);
+                int gi = active_state_indices[i];
+
+                // diagonal
+                lhs_local.block<3,3>(gi, gi) += H_local.block<3,3>(i*3, i*3);
+
+                for (size_t j = i + 1; j < active_state_indices.size(); ++j) {
+                    int gj = active_state_indices[j];
+                    auto Hij = H_local.block<3,3>(i*3, j*3);
+
+                    lhs_local.block<3,3>(gi, gj) += Hij;
+                    lhs_local.block<3,3>(gj, gi) += Hij.transpose();
                 }
-                rhs_.segment<3>(global_i) += g_local.segment<3>(i * 3);
+
+                rhs_local.segment<3>(gi) += g_local.segment<3>(i*3);
             }
 
             // Compute cost
             Eigen::VectorXd PB = P * B;
-            cost_ += 0.5 * PB.squaredNorm();
-
-            avg_per_voxel_time += std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - voxel_time_start).count();
+            cost_local += 0.5 * PB.squaredNorm();
         }
+        #pragma omp critical
+        {
+            lhs_tile += lhs_local;
+            rhs_tile += rhs_local;
+            cost_tile += cost_local;
+        }
+}
+        // Scatter local tile contributions to global matrices
+        lhs_ += lhs_tile;
+        rhs_ += rhs_tile;
+        cost_ += cost_tile;
+
+        const auto end_voxel_time = std::chrono::high_resolution_clock::now();
+        avg_per_voxel_time += std::chrono::duration<double>(end_voxel_time - start_voxel_time).count();
     }
 
     // Finalize timing
     auto end_time = std::chrono::high_resolution_clock::now();
     avg_per_voxel_time = avg_per_voxel_time / static_cast<double>(voxels_size);
-    avg_per_scan_time = avg_per_scan_time / static_cast<double>(timed_scan_count);
 
     std::cout << "Construct Problem Timing: " << std::endl;
     std::cout << "  Total time: " << std::chrono::duration<double>(end_time - start_time).count() << " s" << std::endl;
     std::cout << "  Relative Pose Prior time: " << rel_pose_prior_time << " s" << std::endl;
     std::cout << "  Avg time per voxel: " << avg_per_voxel_time << " s" << std::endl;
-    std::cout << "  Avg time per scan (interpolation): " << avg_per_scan_time << " s" << std::endl;
 }
 
 bool DrBASolver::solve() {
@@ -387,7 +408,6 @@ void DrBASolver::update_map() {
                 active_state_indices.push_back((scan_idx - 1) * 3);
             }
         }
-        int num_active_states = active_state_indices.size() * 3;  // Each pose has 3 DOF
 
         // Loop through all voxels in this tile
         for (const auto& voxel_idx : tile.voxel_indices) {
@@ -397,6 +417,7 @@ void DrBASolver::update_map() {
             // Use local Jacobian with only active states
             int max_scans = tile.scan_ids.size();
             Eigen::VectorXd B = Eigen::VectorXd::Zero(max_scans);
+            Eigen::VectorXd weighted_ones = Eigen::VectorXd::Zero(max_scans);
             int scan_count = 0;
 
             // Loop through all scans that cover this tile
@@ -413,8 +434,10 @@ void DrBASolver::update_map() {
                 if (!interp_meas.has_value()) {
                     continue;
                 }
+                double meas_cov = interp_meas->covariance;
                 // Assemble into local Jacobian
-                B(scan_count) = interp_meas->intensity;
+                B(scan_count) = interp_meas->intensity / std::sqrt(meas_cov);
+                weighted_ones(scan_count) = 1.0 / std::sqrt(meas_cov);
                 scan_count++;
             }
             
@@ -425,12 +448,10 @@ void DrBASolver::update_map() {
             
             // Trim to actual scan count
             B.conservativeResize(scan_count);
-
-            // Compute projection matrix
-            Eigen::VectorXd ones_vec = Eigen::VectorXd::Ones(scan_count);
+            weighted_ones.conservativeResize(scan_count);
 
             // Update voxel intensity
-            double new_intensity = (ones_vec.transpose() * B)(0,0) / static_cast<double>(scan_count);
+            double new_intensity = (weighted_ones.transpose() * B)(0,0) / (weighted_ones.transpose() * weighted_ones)(0,0);
             voxel_map_.at(voxel_idx) = new_intensity;
         }
     }
@@ -443,7 +464,6 @@ void DrBASolver::optimize() {
     }
 
     // Initialize timer stuff
-    double total_time = 0.0;
     double avg_construct_time = 0.0;
     double avg_solve_time = 0.0;
     double avg_update_time = 0.0;
@@ -451,7 +471,6 @@ void DrBASolver::optimize() {
     auto end = start;
 
     // Tile the problem
-    std::cout << "Tiling problem..." << std::endl;
     tile_problem();
     end =  std::chrono::high_resolution_clock::now();
     std::cout << "Number of tiles: " << tiles_.size() << std::endl;
@@ -464,6 +483,9 @@ void DrBASolver::optimize() {
     std::cout << "Initial ATE (m): " << scan_manager_.compute_ate() << std::endl;
     double downsample_factor = 1.0;
     int num_cost_rises = 0;
+
+    std::vector<int> save_map_iter_idx = {0, 1, 2, 4, 10, 20, 50};
+
     for (int iter = 0; iter < opts_.max_iterations; iter++) {
         std::cout << "Iteration " << iter + 1 << " / " << opts_.max_iterations << std::endl;
         downsample_factor = (iter < opts_.num_coarse_iterations) ? opts_.coarse_downsample : opts_.refine_downsample;
@@ -478,6 +500,17 @@ void DrBASolver::optimize() {
             if (opts_.save_result)
                 result_.save_full_result();
 
+        }
+
+        if (std::find(save_map_iter_idx.begin(), save_map_iter_idx.end(), iter) != save_map_iter_idx.end()) {
+            // Update map
+            update_map();
+            // Save voxel map
+            if (opts_.save_result) {
+                // std::string voxel_path = result_.output_dir() + "voxel_map_" + std::to_string(iter) + ".bin";
+                fs::path voxel_path = result_.output_dir() + ("voxel_map_" + std::to_string(iter) + ".bin");
+                result_.save_voxel_map(voxel_path);
+            }
         }
 
         // Construct problem
