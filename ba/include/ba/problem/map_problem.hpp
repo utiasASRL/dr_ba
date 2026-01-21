@@ -3,7 +3,6 @@
 
 #include <ba/problem/problem.hpp>
 
-
 namespace ba {
 
 class MapProblem : public Problem {

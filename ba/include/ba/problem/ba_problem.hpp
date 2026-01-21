@@ -3,7 +3,6 @@
 
 #include <ba/problem/problem.hpp>
 
-
 namespace ba {
 
 class BAProblem : public Problem {
