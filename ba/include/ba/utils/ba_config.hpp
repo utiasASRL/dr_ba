@@ -40,6 +40,7 @@ struct Options {
     bool fix_first_scan = true;
 
     // Optimization parameters
+    int num_threads = 1;
     int max_iterations = 20;
     double convergence_tol = 1e-3;
     double alpha = 0.5;        // step size
@@ -50,7 +51,9 @@ struct Options {
     double rel_pose_prior_translation_std = 0.1; // meters
     double rel_pose_prior_rotation_std = 5.0;    // degrees
     double range_factor = 0.0;   // factor to scale range uncertainty to intensity uncertainty
+    bool use_cumul_thresh = true;
     double cumul_thresh = 1.0;   // threshold to ignore measurements with too high a cumulative return
+    double zero_thresh = 1.0;    // max cumul return threshold to consider a measurement as zero return
     int num_coarse_iterations = 5; // number of initial iterations with higher downsampling
     double coarse_downsample = 0.2; // downsampling factor for coarse iterations
     double refine_downsample = 1.0; // downsampling factor for refinement iterations
@@ -61,6 +64,12 @@ struct Options {
     std::string pose_source = "gt"; // 'estimate', 'gt', 'pogo', 'dro'
     fs::path estimate_location;
     std::vector<std::pair<int, int>> frame_ranges; // pairs of start and end frame indices
+
+    // Localization parameters
+    fs::path map_location;
+    int start_frame = 0;
+    int end_frame = -1; // -1 for last frame
+    std::string map_seq;
 };
 
 Options load_options(const YAML::Node& config);
