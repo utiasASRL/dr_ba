@@ -74,10 +74,21 @@ public:
                 continue; // already loaded
             }
             if (loaded_scan_queue_.size() >= max_loaded_scans_) {
-                // Unload oldest scan
-                int unload_scan_id = loaded_scan_queue_.front();
-                loaded_scan_queue_.pop();
-                scans_.at(unload_scan_id)->unload_data();
+                // Find scan thats not in the current load list
+                while (!loaded_scan_queue_.empty()) {
+                    int unload_scan_id = loaded_scan_queue_.front();
+                    // Check if this scan is in the current load list
+                    if (std::find(load_scan_ids.begin(), load_scan_ids.end(), unload_scan_id) == load_scan_ids.end()) {
+                        // Not in load list, unload it
+                        loaded_scan_queue_.pop();
+                        scans_.at(unload_scan_id)->unload_data();
+                        break;
+                    } else {
+                        // In load list, move to back of queue
+                        loaded_scan_queue_.pop();
+                        loaded_scan_queue_.push(unload_scan_id);
+                    }
+                }
             }
             scan->load_data();
             loaded_scan_queue_.push(scan_id);
