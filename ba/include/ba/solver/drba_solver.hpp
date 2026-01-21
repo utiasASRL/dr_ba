@@ -1,11 +1,7 @@
 #pragma once
 
-#include <ba/scans/manager.hpp>
-#include <ba/utils/ba_config.hpp>
 #include <ba/map/voxel_map.hpp>
 #include <Eigen/Dense>
-#include <ankerl/unordered_dense.h>
-#include <ba/solver/result.hpp>
 #include <ba/problem/problem.hpp>
 #include <ba/solver/solver.hpp>
 
