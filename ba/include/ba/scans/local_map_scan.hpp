@@ -7,6 +7,7 @@
 #include <opencv2/opencv.hpp>
 #include <ba/utils/io_utils.hpp>
 #include <opencv2/core/eigen.hpp>
+#include <iostream>
 
 namespace ba {
 
@@ -27,6 +28,7 @@ public:
         res_(opts.local_map_res),
         range_factor_(opts.range_factor),
         cumul_thresh_(opts.cumul_thresh),
+        zero_thresh_(opts.zero_thresh),
         img_width_(0),
         img_height_(0),
         img_path_(img_path),
@@ -39,10 +41,13 @@ public:
         }
 
         // Load image to get dimensions only
-        load_data();
-        img_width_ = local_map_.cols();
-        img_height_ = local_map_.rows();
-        unload_data();
+        // TODO: This is very slow so I am hardcoding it for now...
+        // load_data();
+        // img_width_ = local_map_.cols();
+        // img_height_ = local_map_.rows();
+        // unload_data();
+        img_width_= 2401; // hardcoded for boreas local maps
+        img_height_ = 2401;
     }
 
     // Add initializer that takes in Eigen matrix directly (mostly for testing)
@@ -57,6 +62,7 @@ public:
         res_(opts.local_map_res),
         range_factor_(opts.range_factor),
         cumul_thresh_(opts.cumul_thresh),
+        zero_thresh_(opts.zero_thresh),
         img_width_(local_map.cols()),
         img_height_(local_map.rows()),
         local_map_(local_map) {}
@@ -96,6 +102,7 @@ private:
     double res_;
     double range_factor_;
     double cumul_thresh_;
+    double zero_thresh_;
     int img_width_;
     int img_height_;
     Eigen::MatrixXf local_map_;

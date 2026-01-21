@@ -26,9 +26,13 @@ std::optional<Scan::Measurement> LocalMapScan::interpolate(double x, double y) c
 
     // Check value of cumulative image at this point
     if (cumul_img_.rows() != 0 && cumul_img_.cols() != 0) {
+        // Threshold
         double cumul_value = cumul_img_(b, a);
         double root_intensity = local_map_(b, a);
-        if (root_intensity < 0.1 && cumul_value > cumul_thresh_) {
+        if (cumul_value > cumul_thresh_) {
+            return std::nullopt;
+        }
+        if (root_intensity < 0.1 && cumul_value > zero_thresh_) {
             return std::nullopt;
         }
     }
