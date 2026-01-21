@@ -11,7 +11,7 @@ from map.voxel_map import Map
 if len(sys.argv) > 1:
     base_path = sys.argv[1]
 else:
-    base_path =  '/home/dl/Documents/phd/dev/dr_ba/output/ba_results/run_96'
+    base_path =  '/home/dl/Documents/phd/dev/dr_ba/output/ba_results/run_2'
 
 voxel_path = osp.join(base_path, 'voxel_map.bin')
 

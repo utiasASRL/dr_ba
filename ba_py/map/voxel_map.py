@@ -2,6 +2,7 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 import struct
+from pylgmath import se3op
 
 
 class Map:
@@ -21,6 +22,7 @@ class Map:
         self.res = res
         self.voxels = {} # key: (x_idx, y_idx), value: Voxel
         self.poses = []
+        self.pose_ids = []
 
     def index(self, x, y):
         x_idx = int(np.floor(x / self.res))
@@ -138,6 +140,7 @@ class Map:
             for _ in range(num_poses):
                 pose_id, x, y, yaw, ate = pose_struct.unpack(f.read(pose_struct.size))
                 ate = np.round(ate, 5)
+                self.pose_ids.append(pose_id)
                 self.poses.append((pose_id, x, y, yaw, ate))
 
             # Voxels: int32, int32, double = 16 bytes
@@ -152,6 +155,128 @@ class Map:
                 self.voxels[(x, y)] = self.Voxel(intensity)
                 voxels_read += 1
 
+    # loc_results is list containing map_id,scan_id,est_x,est_y,est_yaw,gt_x,gt_y,gt_yaw
+    def plot_loc_result(self, loc_results, show=False, title="Voxel Map with Localization Results"):
+        if not self.voxels:
+            return
+
+        # --- convert sparse dict to dense raster ---
+        keys = np.asarray(list(self.voxels.keys()), dtype=np.int32)
+        vals = np.asarray([v.intensity for v in self.voxels.values()], dtype=np.float32)
+
+        # --- warn on invalid intensity range ---
+        invalid_low = np.any(vals < 0.0)
+        invalid_high = np.any(vals > 1.0)
+        if invalid_low or invalid_high:
+            print(
+                "[WARN] Voxel intensity values outside [0, 1] detected "
+                f"(min={np.nanmin(vals):.3f}, max={np.nanmax(vals):.3f})"
+            )
+
+        ix = keys[:, 0]
+        iy = keys[:, 1]
+
+        ix_min, ix_max = ix.min(), ix.max()
+        iy_min, iy_max = iy.min(), iy.max()
+
+        H = ix_max - ix_min + 1
+        W = iy_max - iy_min + 1
+
+        img = np.full((H, W), np.nan, dtype=np.float32)
+        img[ix - ix_min, iy - iy_min] = vals
+
+        # --- plotting ---
+        fig, ax = plt.subplots(facecolor="black", figsize=(10, 8))
+        ax.set_facecolor("black")
+
+        im = ax.imshow(
+            img.T,
+            origin="lower",
+            cmap="viridis",
+            vmin=0.0,          # clamp colormap
+            vmax=1.0,          # clamp colormap
+            extent=[
+                ix_min * self.res,
+                (ix_max + 1) * self.res,
+                iy_min * self.res,
+                (iy_max + 1) * self.res,
+            ],
+            interpolation="nearest",
+        )
+
+        cbar = plt.colorbar(im, ax=ax)
+        cbar.set_label("Intensity", color="white")
+        cbar.ax.yaxis.set_tick_params(color="white")
+        plt.setp(cbar.ax.get_yticklabels(), color="white")
+
+        # Plot localization results
+
+        # Get corresponding map pose
+        est_xs = []
+        est_ys = []
+        translation_errs = []
+        for ii in range(len(loc_results)):
+            map_id = loc_results[ii][0]
+            pose_idx = self.pose_ids.index(map_id)
+            map_node_pose = self.poses[pose_idx]
+            assert map_node_pose[0] == map_id, "Map ID mismatch when plotting localization results."
+
+            # Transform estimated and ground truth positions to map frame
+            est_x_local = loc_results[ii][2]
+            est_y_local = loc_results[ii][3]
+            est_yaw_local = loc_results[ii][4] * (np.pi / 180.0)  # Convert to radians
+            gt_x_local = loc_results[ii][5]
+            gt_y_local = loc_results[ii][6]
+            gt_yaw_local = loc_results[ii][7] * (np.pi / 180.0)  # Convert to radians
+
+            # Create SE3 transforms
+            map_pose = se3op.vec2tran(np.array([0.0, 0.0, 0.0, 0.0, 0.0, map_node_pose[3]]).reshape(-1, 1))
+            map_pose[0, 3] = map_node_pose[1]
+            map_pose[1, 3] = map_node_pose[2]
+            est_pose = se3op.vec2tran(-np.array([0.0, 0.0, 0.0, 0.0, 0.0, -est_yaw_local]).reshape(-1, 1))
+            est_pose[0, 3] = est_x_local
+            est_pose[1, 3] = est_y_local
+            gt_pose = se3op.vec2tran(-np.array([0.0, 0.0, 0.0, 0.0, 0.0, -gt_yaw_local]).reshape(-1, 1))
+            gt_pose[0, 3] = gt_x_local
+            gt_pose[1, 3] = gt_y_local
+
+            # print("Map ID:", map_id)
+            # print("Estimated local pose:\n", est_pose)
+            # print("Nearest map estimated pose:\n", map_pose)
+
+            est_in_map = map_pose @ est_pose
+            gt_in_map = map_pose @ gt_pose
+
+            est_xs.append(est_in_map[0, 3])
+            est_ys.append(est_in_map[1, 3])
+            translation_error = np.sqrt((est_x_local - gt_x_local)**2 + (est_y_local - gt_y_local)**2)
+            translation_errs.append(translation_error)
+
+
+        # reference_map_ids = [res[0] for res in loc_results]
+
+        # est_xs = [res[2] for res in loc_results]
+        # est_ys = [res[3] for res in loc_results]
+        # gt_xs = [res[5] for res in loc_results]
+        # gt_ys = [res[6] for res in loc_results]
+        ax.scatter(est_xs, est_ys, c=translation_errs, cmap='hot', s=10, label='Estimated Positions')
+        cbar_err = plt.colorbar(ax.collections[-1], ax=ax)
+        cbar_err.set_label("Translation RMSE (m)", color="white")
+        cbar_err.ax.yaxis.set_tick_params(color="white")
+        plt.setp(cbar_err.ax.get_yticklabels(), color="white")
+        ax.legend()
+
+        ax.set_xlim(ix_min * self.res, (ix_max + 1) * self.res)
+        ax.set_ylim(iy_min * self.res, (iy_max + 1) * self.res)
+        ax.set_title(title, color="white")
+        ax.set_xlabel("X", color="white")
+        ax.set_ylabel("Y", color="white")
+        ax.tick_params(colors="white")
+        ax.set_aspect("equal")
+
+        if show:
+            plt.show()
+            plt.close(fig)
 
     def plot(self, save_path=None, iter=None, show=False):
         if not self.voxels:
