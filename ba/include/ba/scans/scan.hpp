@@ -44,10 +44,22 @@ public:
 		update_pose(delta_xi_se3);
 	}
 
+	void set_pose(const lgmath::se3::Transformation &new_pose) {
+		pose_ = new_pose;
+	}
+	void set_gt_pose(const lgmath::se3::Transformation &new_gt_pose) {
+		gt_pose_ = new_gt_pose;
+	}
+
 	// Compute pose error (SE3)
 	Eigen::Matrix<double, 6, 1> pose_error() const {
-		lgmath::se3::Transformation T_err = pose_.inverse() * gt_pose_;
-		return T_err.vec();
+		lgmath::se3::Transformation T_err = gt_pose_.inverse() * pose_;
+		// Pick off x, y, z, roll, pitch, yaw
+		Eigen::Matrix<double, 3, 1> trans_err = T_err.r_ab_inb();
+		Eigen::Matrix<double, 3, 1> rot_err = T_err.vec().tail<3>();
+		Eigen::Matrix<double, 6, 1> pose_err;
+		pose_err << trans_err, rot_err;
+		return pose_err;
 	}
 
 	void set_ate_error(double ate) { ate_error_ = ate; }
