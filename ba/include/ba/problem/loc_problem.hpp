@@ -10,6 +10,7 @@ public:
     LocProblem(Options& opts)
         : Problem(opts) {}
 
+    void get_scan_indeces() override;
     void init_scans_and_map() override;
     void finalize() override;
 

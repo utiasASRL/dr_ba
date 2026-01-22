@@ -10,6 +10,7 @@ public:
     MapProblem(Options& opts)
         : Problem(opts) {}
 
+    void get_scan_indeces() override;
     void init_scans_and_map() override;
     void init_scans_and_map_from_estimates();
     void init_scans_and_map_from_data();

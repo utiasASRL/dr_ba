@@ -6,11 +6,116 @@
 
 namespace ba {
 
-void BAProblem::init_scans() {
+void BAProblem::get_scan_indeces() {
     std::string seq_id = opts_.seq_ids[0];
-    // Set up temporary folder for Gaussian-blurred images to be stored
-    fs::path temp_dir = fs::temp_directory_path() / "dr_ba_temp_gauss_blur" / seq_id;
-    fs::create_directories(temp_dir);
+
+    // Load groundtruth poses
+    std::vector<lgmath::se3::Transformation> all_gt_poses;
+    std::vector<double> all_gt_times;
+    ba::load_groundtruth_poses_and_times(opts_.data_path / seq_id, all_gt_poses, all_gt_times);
+
+    // Load pogo poses
+    std::vector<lgmath::se3::Transformation> all_pogo_poses;
+    std::vector<double> all_pogo_times;
+    ba::load_pogo_poses_and_times(opts_.meas_path / seq_id, all_pogo_poses, all_pogo_times);
+
+    // Load DRO poses
+    std::vector<lgmath::se3::Transformation> all_dro_poses;
+    std::vector<double> all_dro_times;
+    ba::load_dro_poses_and_times(opts_.meas_path / seq_id, all_dro_poses, all_dro_times);
+
+    // Initialize looping through trajectory
+    lgmath::se3::Transformation T_gt_abs_0(Eigen::Matrix4d(Eigen::Matrix4d::Identity()));
+    lgmath::se3::Transformation T_est_abs_0(Eigen::Matrix4d(Eigen::Matrix4d::Identity()));
+    lgmath::se3::Transformation T_kf_prev(Eigen::Matrix4d(Eigen::Matrix4d::Identity()));  // Previous keyframe pose
+    int kf_prev_id = 0;
+
+    // Loop through all images
+    // TODO: This is already done in preload_images, refactor to avoid duplicate work
+    fs::path all_img_dir = opts_.meas_path / seq_id / opts_.input_type;
+    // Sort files in directory
+    std::vector<fs::path> files;
+    for (const auto& entry : fs::directory_iterator(all_img_dir)) {
+        if (entry.path().extension() != ".png") {
+            continue;
+        }
+        if (entry.is_regular_file()) {
+            files.push_back(entry.path());
+        }
+    }
+    std::sort(files.begin(), files.end());
+
+    int num_checked = -1;
+    int num_loaded = 0;
+    int max_number_frames = opts_.num_frames > 0 ? opts_.num_frames : files.size();
+    for (const auto& path : files) {
+        // Only consider files ending with .png
+        if (path.extension() != ".png") {
+            continue;
+        }
+        num_checked++;
+        if (num_loaded >= max_number_frames) break;
+
+        // Load in scan pose
+        int64_t timestamp = std::stoll(path.stem().string()); // in microseconds
+        double timestamp_seconds = timestamp / 1e6; // convert to seconds
+
+        // Load in gt pose
+        lgmath::se3::Transformation T_gt_abs = ba::get_interpolated_pose(all_gt_poses, all_gt_times, timestamp_seconds);
+
+        // Load in initial guess pose
+        lgmath::se3::Transformation T_est_abs;
+        if (opts_.init_poses == "pogo") {
+            T_est_abs = ba::get_interpolated_pose(all_pogo_poses, all_pogo_times, timestamp_seconds);
+        } else if (opts_.init_poses == "gt") {
+            T_est_abs = ba::get_interpolated_pose(all_gt_poses, all_gt_times, timestamp_seconds);
+        } else if (opts_.init_poses == "dro") {
+            T_est_abs = ba::get_interpolated_pose(all_dro_poses, all_dro_times, timestamp_seconds);
+        } else {
+            throw std::invalid_argument("Invalid init_poses option: " + opts_.init_poses);
+        }
+
+        if (num_loaded != 0) {
+            // Temp, only load scans close to frame 0 in translation
+            // double translation_from_0 = (T_est_abs.r_ab_inb() - T_est_abs_0.r_ab_inb()).norm();
+            // if (translation_from_0 > 5.0) {
+            //     continue;
+            // }
+        
+            // Check if this pose is a keyframe
+            lgmath::se3::Transformation T_kf_rel = T_est_abs.inverse() * T_kf_prev;
+            double del_x = T_kf_rel.r_ab_inb()(0);
+            double del_y = T_kf_rel.r_ab_inb()(1);
+            double del_theta = T_kf_rel.vec()(5); // Yaw angle
+            double translation_mag = std::sqrt(std::pow(del_x, 2) + std::pow(del_y, 2));
+            double rotation_mag = std::abs(del_theta) * 180.0 / M_PI; // convert to degrees
+            if (translation_mag < opts_.max_kf_dist && rotation_mag < opts_.max_kf_rot) {
+                // Not a keyframe, skip
+                continue;
+            }
+            // Set up prior from prev keyframe radar frame to this keyframe radar frame
+            pose_priors_[{kf_prev_id, num_checked}] = T_kf_rel;
+        }
+
+        // We've decided this is a keyframe!
+        kf_prev_id = num_checked;
+        T_kf_prev = T_est_abs;
+
+        // Add to list of scan indices to load
+        scan_indices_.push_back(num_checked);
+        T_est_abs_list_.push_back(T_est_abs);
+        T_gt_abs_list_.push_back(T_gt_abs);
+
+        num_loaded++;
+    }
+
+    // Sort scan indices
+    std::sort(scan_indices_.begin(), scan_indices_.end());
+}
+
+void BAProblem::init_scans() {
+    std::cout << "Loading scans..." << std::endl;
+    std::string seq_id = opts_.seq_ids[0];
 
     // Load groundtruth poses
     std::vector<lgmath::se3::Transformation> all_gt_poses;
@@ -33,164 +138,47 @@ void BAProblem::init_scans() {
     std::uniform_real_distribution<double> rotation_dist(-rotation_std_rad, rotation_std_rad);
     std::mt19937 rng(99); // Fixed seed for reproducibility
 
-    // Load in images
-    fs::path all_img_dir = opts_.meas_path / seq_id / opts_.input_type;
-    // Sort files in directory
-    std::vector<fs::path> files;
-    for (const auto& entry : fs::directory_iterator(all_img_dir)) {
-        if (entry.is_regular_file()) {
-            files.push_back(entry.path());
-        }
-    }
-    std::sort(files.begin(), files.end());
+    lgmath::se3::Transformation T_est_abs_0 = T_est_abs_list_[0];
+    lgmath::se3::Transformation T_gt_abs_0 = T_gt_abs_list_[0];
+    for (size_t i=0; i < scan_indices_.size(); i++) {
+        int idx = scan_indices_[i];
 
-    // Load in cumulative return images
-    fs::path cumul_img_dir = opts_.meas_path / seq_id / "cumulated_returns";
-    std::vector<fs::path> cumul_files;
-    for (const auto& entry : fs::directory_iterator(cumul_img_dir)) {
-        if (entry.is_regular_file()) {
-            cumul_files.push_back(entry.path());
-        }
-    }
-    std::sort(cumul_files.begin(), cumul_files.end());
-
-    // Initialize looping through trajectory
-    lgmath::se3::Transformation T_gt_abs_0(Eigen::Matrix4d(Eigen::Matrix4d::Identity()));
-    lgmath::se3::Transformation T_est_abs_0(Eigen::Matrix4d(Eigen::Matrix4d::Identity()));
-    lgmath::se3::Transformation T_kf_prev(Eigen::Matrix4d(Eigen::Matrix4d::Identity()));  // Previous keyframe pose
-    int kf_prev_id = 0;
-
-    // Loop through all images
-    std::cout << "Loading images from: " << all_img_dir << std::endl;
-    int num_scans = files.size();
-    int num_checked = -1;
-    int num_loaded = 0;
-    int max_number_frames = opts_.num_frames > 0 ? opts_.num_frames : files.size();
-    for (const auto& path : files) {
-        // Only consider files ending with .png
-        if (path.extension() != ".png") {
-            continue;
-        }
-        if (num_loaded >= max_number_frames) break;
-        num_checked++;
-
-        // Load in scan pose
-        int64_t timestamp = std::stoll(path.stem().string()); // in microseconds
-        double timestamp_seconds = timestamp / 1e6; // convert to seconds
+        // Load in estimated pose
+        lgmath::se3::Transformation T_est_rel = T_est_abs_0.inverse() * T_est_abs_list_[i];
+        T_est_rel = T_est_rel.toSE2().toSE3();
 
         // Load in gt pose
-        lgmath::se3::Transformation T_gt_abs = ba::get_interpolated_pose(all_gt_poses, all_gt_times, timestamp_seconds);
-
-        // Load in initial guess pose
-        lgmath::se3::Transformation T_est_rel(Eigen::Matrix4d(Eigen::Matrix4d::Identity()));
-        lgmath::se3::Transformation T_est_abs;
-        if (opts_.init_poses == "pogo") {
-            T_est_abs = ba::get_interpolated_pose(all_pogo_poses, all_pogo_times, timestamp_seconds);
-        } else if (opts_.init_poses == "gt") {
-            T_est_abs = ba::get_interpolated_pose(all_gt_poses, all_gt_times, timestamp_seconds);
-        } else if (opts_.init_poses == "dro") {
-            T_est_abs = ba::get_interpolated_pose(all_dro_poses, all_dro_times, timestamp_seconds);
-        } else {
-            throw std::invalid_argument("Invalid init_poses option: " + opts_.init_poses);
-        }
-        T_est_rel = T_est_abs_0.inverse() * T_est_abs;
-        // Add noise to gt pose sampled from uniform distribution
-        Eigen::Vector3d noise;
-        noise << translation_dist(rng), translation_dist(rng), rotation_dist(rng);
-        lgmath::se3::Transformation T_noise = lgmath::se2::Transformation(noise).toSE3();
-        T_est_rel = T_est_rel * T_noise;
-
-        if (num_loaded != 0) {
-            // Temp, only load scans close to frame 0 in translation
-            // double translation_from_0 = (T_est_abs.r_ab_inb() - T_est_abs_0.r_ab_inb()).norm();
-            // if (translation_from_0 > 5.0) {
-            //     continue;
-            // }
-        
-            // Check if this pose is a keyframe
-            lgmath::se3::Transformation T_kf_rel = T_est_abs.inverse() * T_kf_prev;
-            double del_x = T_kf_rel.r_ab_inb()(0);
-            double del_y = T_kf_rel.r_ab_inb()(1);
-            double del_theta = T_kf_rel.vec()(5); // Yaw angle
-            double translation_mag = std::sqrt(std::pow(del_x, 2) + std::pow(del_y, 2));
-            double rotation_mag = std::abs(del_theta) * 180.0 / M_PI; // convert to degrees
-            if (translation_mag < opts_.max_kf_dist && rotation_mag < opts_.max_kf_rot) {
-                // Not a keyframe, skip
-                continue;
-            }
-            // Set up prior from prev keyframe radar frame to this keyframe radar frame
-            pose_priors_[{kf_prev_id, num_checked}] = T_kf_rel;
-        } else {
-            T_gt_abs_0 = T_gt_abs;
-            T_est_abs_0 = T_est_abs;
-            T_kf_prev = T_est_abs;
-            T_est_rel = lgmath::se3::Transformation(Eigen::Matrix4d(Eigen::Matrix4d::Identity()));
-        }
-
-        // We've decided this is a keyframe!
-        // std::cout << "Processing frame " << num_checked << " / " << num_scans << std::endl;
-        kf_prev_id = num_checked;
-        T_kf_prev = T_est_abs;
-
-        // Get relative gt transform
-        lgmath::se3::Transformation T_gt_rel = T_gt_abs_0.inverse() * T_gt_abs;
-
-        // TODO: Add support for more than just local_maps
-        if (opts_.input_type != "scans" && opts_.input_type != "local_maps") {
-            throw std::invalid_argument("Input type " + opts_.input_type + " not supported yet.");
-        }
-
-
-        // Load in image as Eigen matrix
-        fs::path temp_img_path = temp_dir / (std::to_string(num_checked) + "_" + std::to_string(opts_.gauss_blur_sigma) + ".png");
-        if (!fs::exists(temp_img_path)) {
-            // Only process if the temp image does not already exist
-            cv::Mat img = cv::imread(path.string(), cv::IMREAD_GRAYSCALE);
-            // Apply Gaussian blur
-            if (opts_.gauss_blur_sigma > 0.0) {
-                int ksize = static_cast<int>(std::ceil(opts_.gauss_blur_sigma * 6)) | 1; // kernel size should be odd
-                cv::GaussianBlur(img, img, cv::Size(ksize, ksize), opts_.gauss_blur_sigma);
-            }
-            // Convert to CV_32F and normalize to [0, 1]
-            img.convertTo(img, CV_32F, 1.0 / 255.0);
-            // Save blurred image to temp directory for easy loading
-            ba::save_img_bin(temp_img_path, img);
-            cv::imwrite(temp_img_path, img_u8);
-        }
-
-        // Load in cumulative return image
-        std::optional<fs::path> temp_cumul_img_path = temp_dir / (std::to_string(num_checked) + "_" + std::to_string(opts_.gauss_blur_sigma) + "_cumul.png");
-        if (!fs::exists(temp_cumul_img_path.value())) {
-            fs::path cumul_path = cumul_files[num_checked];
-            cv::Mat cumul_img = cv::imread(cumul_path.string(), cv::IMREAD_GRAYSCALE);
-            // Convert to CV_32F and normalize to [0, 1]
-            cumul_img.convertTo(cumul_img, CV_32F, 1.0 / 255.0);
-            // Save cumulative image to temp directory for easy loading
-            ba::save_img_bin(temp_cumul_img_path.value(), cumul_img);
-        }
-
-        // Create scan object
-        if (!opts_.use_cumul_thresh) {
-            // We won't be using cumulative return, so don't provide a path
-            temp_cumul_img_path = std::nullopt;
-        }
-
-        // Project relative matrices to SE2
-        T_est_rel = T_est_rel.toSE2().toSE3();
+        lgmath::se3::Transformation T_gt_rel = T_gt_abs_0.inverse() * T_gt_abs_list_[i];
         T_gt_rel = T_gt_rel.toSE2().toSE3();
 
-        auto scan = std::make_shared<ba::LocalMapScan>(timestamp, num_checked, opts_, T_est_rel, T_gt_rel, temp_img_path, temp_cumul_img_path);
-        if (opts_.fix_first_scan && num_loaded == 0) {
+        // Load in image paths
+        const auto& img_path = img_paths_[i];
+        std::optional<fs::path> cumul_img_path = std::nullopt;
+        if (opts_.use_cumul_thresh) {
+            if (cumul_paths_.empty()) {
+                throw std::runtime_error("Cumulative image paths are empty but use_cumul_thresh is true.");
+            }
+            cumul_img_path = cumul_paths_[i];
+        }
+
+        // Add noise to initial pose estimate if specified
+        if (i != 0 && (opts_.init_translation_std > 0.0 || opts_.init_rotation_std > 0.0)) {
+            // Add noise to gt pose sampled from uniform distribution
+            Eigen::Vector3d noise;
+            noise << translation_dist(rng), translation_dist(rng), rotation_dist(rng);
+            lgmath::se3::Transformation T_noise = lgmath::se2::Transformation(noise).toSE3();
+            T_est_rel = T_est_rel * T_noise;
+        }
+
+        auto scan = std::make_shared<ba::LocalMapScan>(timestamps_[i], idx, opts_, T_est_rel, T_gt_rel, img_path, cumul_img_path);
+        if (opts_.fix_first_scan && i == 0) {
             scan->set_fixed(true); // Fix the first scan's pose
         }
         scan_manager_.add_scan(scan);
-        num_loaded++;
     }
 
-    std::cout << "Loaded " << scan_manager_.num_scans() << "/" << num_scans << " scans." << std::endl;
-    std::cout << "Scan manager has " << scan_manager_.num_scans() << " scans." << std::endl;
+    std::cout << "Loaded " << scan_manager_.num_scans() << " scans." << std::endl;
 }
-
 
 void BAProblem::init_map() {
     // Initialize voxel map around all scans

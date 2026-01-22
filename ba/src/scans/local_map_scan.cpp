@@ -111,11 +111,15 @@ LocalMapScan::Index LocalMapScan::get_root_pixel_coords(double x, double y) cons
 
 void LocalMapScan::load_data() {
     if (local_map_.size() == 0) {
-        cv::Mat img = load_img_bin(img_path_);
+        // cv::Mat img = load_img_bin(img_path_);
+        cv::Mat img = cv::imread(img_path_, cv::IMREAD_GRAYSCALE);
+        img.convertTo(img, CV_32F, 1.0 / 255.0);
         cv::cv2eigen(img, local_map_);
     }
     if (cumul_img_path_.has_value() && cumul_img_.size() == 0) {
-        cv::Mat img = load_img_bin(cumul_img_path_.value());
+        // cv::Mat img = load_img_bin(cumul_img_path_.value());
+        cv::Mat img = cv::imread(cumul_img_path_.value(), cv::IMREAD_GRAYSCALE);
+        img.convertTo(img, CV_32F, 1.0 / 255.0);
         cv::cv2eigen(img, cumul_img_);
     }
 }

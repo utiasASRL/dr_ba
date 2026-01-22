@@ -502,16 +502,16 @@ void DrBASolver::optimize() {
 
         }
 
-        if (std::find(save_map_iter_idx.begin(), save_map_iter_idx.end(), iter) != save_map_iter_idx.end()) {
-            // Update map
-            update_map();
-            // Save voxel map
-            if (opts_.save_result) {
-                // std::string voxel_path = result_.output_dir() + "voxel_map_" + std::to_string(iter) + ".bin";
-                fs::path voxel_path = result_.output_dir() + ("voxel_map_" + std::to_string(iter) + ".bin");
-                result_.save_voxel_map(voxel_path);
-            }
-        }
+        // if (std::find(save_map_iter_idx.begin(), save_map_iter_idx.end(), iter) != save_map_iter_idx.end()) {
+        //     // Update map
+        //     update_map();
+        //     // Save voxel map
+        //     if (opts_.save_result) {
+        //         // std::string voxel_path = result_.output_dir() + "voxel_map_" + std::to_string(iter) + ".bin";
+        //         fs::path voxel_path = result_.output_dir() + ("voxel_map_" + std::to_string(iter) + ".bin");
+        //         result_.save_voxel_map(voxel_path);
+        //     }
+        // }
 
         // Construct problem
         start = std::chrono::high_resolution_clock::now();

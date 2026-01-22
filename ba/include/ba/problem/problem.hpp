@@ -18,6 +18,8 @@ class Problem {
 public:
     using PriorMap = ankerl::unordered_dense::map<std::pair<int32_t, int32_t>, lgmath::se3::Transformation>;
     void initialize() {
+        get_scan_indeces();
+        preload_images();
         init_scans_and_map();
         initialized_ = true;
     }
@@ -37,6 +39,8 @@ public:
     PriorMap& pose_priors() { return pose_priors_; }
     bool is_initialized() const { return initialized_; }
 
+    // Shared functions
+    void preload_images();
 
 protected:
     Problem(Options& opts)
@@ -46,6 +50,7 @@ protected:
           result_(voxel_map_, scan_manager_, opts_.output_path),
           initialized_(false) {}
 
+    virtual void get_scan_indeces() = 0;
     virtual void init_scans_and_map() = 0;
 
     void cleanup_temp_dir() noexcept {
@@ -64,6 +69,13 @@ protected:
     PriorMap pose_priors_;
     bool initialized_;
     fs::path temp_dir_;
+
+    std::vector<int> scan_indices_;
+    std::vector<fs::path> img_paths_;
+    std::vector<fs::path> cumul_paths_;
+    std::vector<int64_t> timestamps_;
+    std::vector<lgmath::se3::Transformation> T_est_abs_list_;
+    std::vector<lgmath::se3::Transformation> T_gt_abs_list_;
 };
 
 

@@ -69,10 +69,6 @@ void LocSolver::optimize() {
     }
     fs::path output_file = opts_.output_path / "loc_results.csv";
 
-    // Initialize timer stuff
-    double avg_solve_time = 0.0;
-    auto start = std::chrono::high_resolution_clock::now();
-
     Eigen::Vector3d avg_pose_error(0.0, 0.0, 0.0);
     std::vector<int> scan_id_list = scan_manager_.get_all_scan_ids();
 
@@ -95,6 +91,7 @@ void LocSolver::optimize() {
         std::cout << "Optimizing scan ID: " << scan_id << "/" << scan_manager_.num_scans() - 1
                   << " with " << voxel_keys_.size() << " voxels in range." << std::endl;
 
+        scan->load_data();
         for (int iter = 0; iter < opts_.max_iterations; iter++) {
             // Reset cost
             cost_ = 0.0;

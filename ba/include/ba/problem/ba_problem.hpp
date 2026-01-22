@@ -10,6 +10,7 @@ public:
     BAProblem(Options& opts)
         : Problem(opts) {}
 
+    void get_scan_indeces() override;
     void init_scans();
     void init_map();
     void init_scans_and_map() override {
