@@ -17,11 +17,23 @@ else:
 
 data = np.loadtxt(csv_path, delimiter=",", skiprows=1)
 
-cost = data[:, 0]
-ate = data[:, 1]
-rmse_x = data[:, 2]
-rmse_y = data[:, 3]
-rmse_yaw = data[:, 4]
+# Check number of entries in each row
+if data.shape[1] == 5:
+    cost = data[:, 0]
+    ate = data[:, 1]
+    rmse_x = data[:, 2]
+    rmse_y = data[:, 3]
+    rmse_yaw = data[:, 4]
+elif data.shape[1] == 6:
+    cost = data[:, 0]
+    ate = data[:, 1]
+    epe = data[:, 2]
+    rmse_x = data[:, 3]
+    rmse_y = data[:, 4]
+    rmse_yaw = data[:, 5]
+else:
+    print("Unexpected number of columns in CSV file:", data.shape[1])
+    sys.exit(1)
 
 fig, ax1 = plt.subplots()
 
@@ -66,6 +78,18 @@ plt.title('ATE History')
 plt.grid()
 if save_result:
     plt.savefig(osp.join(output_path, 'ate.png'), dpi=300, bbox_inches="tight")
+
+# Plot EPE history if available
+if data.shape[1] == 6:
+    plt.figure()
+    plt.plot(epe, marker='o')
+    plt.xlabel('Iteration')
+    plt.ylabel('EPE (m)')
+    plt.title('EPE History')
+    plt.grid()
+    if save_result:
+        plt.savefig(osp.join(output_path, 'epe.png'), dpi=300, bbox_inches="tight")
+
 plt.show()
 
 plt.close()

@@ -13,9 +13,12 @@ void Result::save_rmse_cost_to_csv(const fs::path& optional_output_dir) const {
     fs::path dir = optional_output_dir.empty() ? csv_path_: optional_output_dir;
 
     std::ofstream file(dir);
-    file << "cost,ate,rmse_x,rmse_y,rmse_yaw\n";
+    file << "cost,ate,epe,rmse_x,rmse_y,rmse_yaw\n";
     for (std::size_t i = 0; i < rmse_history_.size(); ++i) {
-        file << cost_history_[i] << "," << ate_history_[i] << "," << rmse_history_[i](0) << "," << rmse_history_[i](1) << "," << rmse_history_[i](2) << "\n";
+        file << cost_history_[i] << "," << ate_history_[i] << ","
+                << epe_history_[i] << ","
+                << rmse_history_[i](0) << "," << rmse_history_[i](1)<< ","
+                << rmse_history_[i](2) << "\n";
     }
 }
 

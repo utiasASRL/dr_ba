@@ -475,8 +475,8 @@ void DrBASolver::optimize() {
     // Compute initial RMSE
     result_.add_rmse(scan_manager_.compute_pose_rmse());
     result_.add_ate(scan_manager_.compute_ate());
-    std::cout << "Initial Pose RMSE (x, y, yaw): " << scan_manager_.compute_pose_rmse().transpose() << std::endl;
-    std::cout << "Initial ATE (m): " << scan_manager_.compute_ate() << std::endl;
+    result_.add_epe(scan_manager_.compute_epe());
+    std::cout << "Initial Pose Errors (ATE, EPE, RMSE: x, y, yaw): " << scan_manager_.compute_ate() << " | " << scan_manager_.compute_epe() << " | " << scan_manager_.compute_pose_rmse().transpose() << std::endl;
     double downsample_factor = 1.0;
     int num_cost_rises = 0;
 
@@ -568,12 +568,13 @@ void DrBASolver::optimize() {
 
         // std::cout << "Cost: " << cost_ << std::endl;
         std::cout << "----------------------------------------" << std::endl;
-        std::cout << "Pose Errors (ATE, RMSE: x, y, yaw): " << scan_manager_.compute_ate() << " | " << scan_manager_.compute_pose_rmse().transpose() << std::endl;
+        std::cout << "Pose Errors (ATE, EPE, RMSE: x, y, yaw): " << scan_manager_.compute_ate() << " | " << scan_manager_.compute_epe() << " | " << scan_manager_.compute_pose_rmse().transpose() << std::endl;
         std::cout << "Average Times (s): Construct Problem: " << (avg_construct_time / static_cast<double>(iter + 1))
                   << " | Solve: " << (avg_solve_time / static_cast<double>(iter + 1))
                   << " | Update Poses: " << (avg_update_time / static_cast<double>(iter + 1)) << std::endl;
         result_.add_rmse(scan_manager_.compute_pose_rmse());
         result_.add_ate(scan_manager_.compute_ate());
+        result_.add_epe(scan_manager_.compute_epe());
         if (iter != 0 && iter > opts_.num_coarse_iterations && (del_x_.norm() < opts_.convergence_tol || std::abs(prev_cost_ - cost_) < opts_.convergence_tol)) {
             std::cout << "Converged from: " << ((del_x_.norm() < opts_.convergence_tol ) ? "small pose update." : "small cost change.") << std::endl;
             break;

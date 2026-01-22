@@ -19,6 +19,8 @@ public:
     // Immutable accessors
     const std::vector<double>& cost_history() const { return cost_history_; }
     const std::vector<Eigen::Vector3d>& rmse_history() const { return rmse_history_; }
+    const std::vector<double>& ate_history() const { return ate_history_; }
+    const std::vector<double>& epe_history() const { return epe_history_; }
     const std::string output_dir() const { return output_dir_.string(); }
 
     // Mutable accessors
@@ -34,6 +36,9 @@ public:
     }
     void add_ate(double ate) {
         ate_history_.push_back(ate);
+    }
+    void add_epe(double epe) {
+        epe_history_.push_back(epe);
     }
     
     // Result output
@@ -56,6 +61,7 @@ private:
     std::vector<double> cost_history_;
     std::vector<Eigen::Vector3d> rmse_history_;
     std::vector<double> ate_history_;
+    std::vector<double> epe_history_;
     const fs::path csv_path_ = output_dir_ / "rmse_cost_history.csv";
     const fs::path poses_path_ = output_dir_ / "ba_traj.csv";
     const fs::path voxel_path_ = output_dir_ / "voxel_map.bin";
