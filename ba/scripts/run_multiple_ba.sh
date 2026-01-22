@@ -1,7 +1,7 @@
 #!/bin/bash
 
 SCRIPT_PATH=$(dirname "$(realpath "$0")")
-CONFIG_FILE="$SCRIPT_PATH/../config/dr_ba_config.yaml"
+CONFIG_FILE="$SCRIPT_PATH/../config/ba_config.yaml"
 
 sequences=(
     'boreas-2024-12-03-12-54' # Glenshield
