@@ -4,14 +4,14 @@
 
 #include <ba/problem/loc_problem.hpp>
 #include <ba/solver/loc_solver.hpp>
-#include <ba/solver/drba_solver.hpp>
+#include <ba/solver/ba_solver.hpp>
 #include <iostream>
 #include <filesystem>
 
 namespace fs = std::filesystem;
 
 int main() {
-    // Load in config from ba/config/dr_ba_config.yaml
+    // Load in config from ba/config/loc_config.yaml
     fs::path config_path = fs::path(__FILE__).parent_path().parent_path() / "config" / "loc_config.yaml";
     YAML::Node config = YAML::LoadFile(config_path.string());
     ba::Options opts = ba::load_options(config);

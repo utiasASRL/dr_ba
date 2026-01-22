@@ -1,4 +1,4 @@
-#include <ba/solver/drba_solver.hpp>
+#include <ba/solver/ba_solver.hpp>
 #include <iostream>
 #include <chrono>
 #include <algorithm>
@@ -519,22 +519,50 @@ void DrBASolver::optimize() {
         end =  std::chrono::high_resolution_clock::now();
         avg_construct_time += std::chrono::duration<double>(end - start).count();
 
-        // Solve problem, skip updating if solve failed
-        start = std::chrono::high_resolution_clock::now();
-        bool success = solve();
-        end =  std::chrono::high_resolution_clock::now();
-        avg_solve_time += std::chrono::duration<double>(end - start).count();
-        if (!success) continue;
-
-        if (cost_ > prev_cost_) {
+        if (iter > 0 && iter > opts_.num_coarse_iterations && cost_ > prev_cost_) {
+            if (num_cost_rises >= 25) {
+                std::cout << "Stopping optimization due to repeated cost increases." << std::endl;
+                break;
+            }
             num_cost_rises++;
-            std::cout << "Cost increased! (" << num_cost_rises << " times)" << std::endl;
-        } else {
-            num_cost_rises = 0;
-        }
 
-        // Save cost
-        result_.add_cost(cost_);
+            // Undo previous update
+            del_x_ = -del_x_;
+            update_poses();
+
+            // Recompute full del_x
+            del_x_ /= -alpha_;
+
+            // Reduce alpha
+            alpha_ *= 0.5;
+
+            // Compute new step
+            del_x_ *= alpha_;
+
+            // Try a new update!
+            update_poses();
+
+            // Retry with new step
+            iter--;
+            std::cout << "Cost increased. Reducing step size to alpha: " << alpha_ << " and retrying..." << std::endl;
+            continue;
+        } else {
+            // Solve normally
+            num_cost_rises = 0;
+            // Solve problem, skip updating if solve failed
+            start = std::chrono::high_resolution_clock::now();
+            bool success = solve();
+            end =  std::chrono::high_resolution_clock::now();
+            avg_solve_time += std::chrono::duration<double>(end - start).count();
+            if (!success) continue;
+            // Save cost
+            result_.add_cost(cost_);
+
+            // Slightly increase alpha if adaptive
+            if (opts_.adaptive_alpha && iter > opts_.num_coarse_iterations) {
+                alpha_ = std::min(alpha_ * 1.1, 5.0);
+            }
+        }
 
         // Update poses
         start = std::chrono::high_resolution_clock::now();
@@ -554,30 +582,15 @@ void DrBASolver::optimize() {
             std::cout << "Converged from: " << ((del_x_.norm() < opts_.convergence_tol ) ? "small pose update." : "small cost change.") << std::endl;
             break;
         }
-
-        if (iter > opts_.num_coarse_iterations) {
-            if (opts_.adaptive_alpha && cost_ > prev_cost_ && iter > opts_.num_coarse_iterations && alpha_ > 1e-2) {
-                // Shrink alpha
-                alpha_ *= 0.8;
-                // continue;
-            }
-            // if (opts_.adaptive_alpha && cost_ < prev_cost_) {
-            //     // Increase alpha
-            //     alpha_ = std::min(alpha_ * 1.1, 5.0);
-            // }
-            if (num_cost_rises >= 5) {
-                std::cout << "Stopping optimization due to repeated cost increases." << std::endl;
-                break;
-            }
+        if (cost_ < prev_cost_) {
+            prev_cost_ = cost_;
         }
-
-        prev_cost_ = cost_;
     }
 
     // Construct problem for final cost
     construct_problem(downsample_factor);
-    result_.add_cost(cost_);
-    std::cout << "Final Cost: " << cost_ << std::endl;
+    result_.add_cost(prev_cost_);
+    std::cout << "Final Cost: " << prev_cost_ << std::endl;
 
     // Update map
     update_map();

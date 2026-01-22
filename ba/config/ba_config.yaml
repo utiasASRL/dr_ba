@@ -2,16 +2,16 @@ map:
   voxel_res: 1.0  # m
 output:
   output_path: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results'
-  visualize: false
-  save_result: true
+  visualize: true
+  save_result: false
 input:
   data_path: '/home/dl/Documents/phd/data/boreas'
   meas_path: '/home/dl/Documents/phd/dev/dr_ba/output'
   seq_ids:
-    - 'boreas-2024-12-05-14-12'
+    - 'boreas-2024-12-04-11-45'
   max_dist: 80.0  # m
   gauss_blur_sigma: 3.0  # pixels
-  init_poses: 'gt'  # 'pogo' or 'gt', 'dro'
+  init_poses: 'pogo'  # 'pogo' or 'gt', 'dro'
   init_translation_std: 1.2  # m
   init_rotation_std: 1.2  # degrees
   input_type: 'scans' # 'local_maps' or 'scans'
@@ -22,10 +22,10 @@ keyframing:
   max_kf_rot: 30.0  # degrees
   fix_first_scan: true
 optimization:
-  num_threads: 6
+  num_threads: 14
   max_iterations: 51
   convergence_tol: 1e-3
-  alpha: 1.0  # step size
+  alpha: 5.0  # step size
   adaptive_alpha: true # decrease alpha if cost does not decrease
   prior_map_std: 0.1 # intensity units
   meas_std: 0.1 # intensity units
@@ -43,6 +43,3 @@ optimization:
   refine_downsample: 1.0
   tile_size: 100.0  # m, size of tiles to process separately
   max_loaded_scans: 400  # max number of scans to keep loaded in memory at once (>0 all)
-mapping:
-  pose_source: 'estimate' # 'estimate, 'gt', 'pogo', 'dro'
-  estimate_location: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results/run_96'

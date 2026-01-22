@@ -2,7 +2,7 @@
 #include <ba/scans/manager.hpp>
 #include "ba/utils/ba_config.hpp"
 #include "ba/solver/result.hpp"
-#include <ba/solver/drba_solver.hpp>
+#include <ba/solver/ba_solver.hpp>
 #include <ba/problem/map_problem.hpp>
 
 #include <iostream>
@@ -11,7 +11,7 @@
 namespace fs = std::filesystem;
 
 int main() {
-    // Load in config from ba/config/dr_ba_config.yaml
+    // Load in config from ba/config/map_config.yaml
     fs::path config_path = fs::path(__FILE__).parent_path().parent_path() / "config" / "map_config.yaml";
     YAML::Node config = YAML::LoadFile(config_path.string());
     ba::Options opts = ba::load_options(config);

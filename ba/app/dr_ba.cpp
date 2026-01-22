@@ -3,7 +3,7 @@
 #include "ba/utils/ba_config.hpp"
 #include "ba/solver/result.hpp"
 #include <ba/problem/ba_problem.hpp>
-#include <ba/solver/drba_solver.hpp>
+#include <ba/solver/ba_solver.hpp>
 #include <ba/solver/loc_solver.hpp>
 
 #include <iostream>
@@ -13,8 +13,8 @@
 namespace fs = std::filesystem;
 
 int main() {
-    // Load in config from ba/config/dr_ba_config.yaml
-    fs::path config_path = fs::path(__FILE__).parent_path().parent_path() / "config" / "dr_ba_config.yaml";
+    // Load in config from ba/config/ba_config.yaml
+    fs::path config_path = fs::path(__FILE__).parent_path().parent_path() / "config" / "ba_config.yaml";
     YAML::Node config = YAML::LoadFile(config_path.string());
     ba::Options opts = ba::load_options(config);
 
@@ -42,7 +42,7 @@ int main() {
         std::cout << "Outputing results to: " << output_run_dir << std::endl;
 
         // Copy config to output folder
-        fs::path output_config_path = output_run_dir / "dr_ba_config.yaml";
+        fs::path output_config_path = output_run_dir / "ba_config.yaml";
         fs::copy_file(config_path, output_config_path);
     }
 
