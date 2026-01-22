@@ -81,6 +81,7 @@ void LocSolver::optimize() {
     // Get the initial pose within the map frame
     lgmath::se3::Transformation curr_pose = nearest_map_gt_pose.inverse() * loc_init_pose;
     std::cout << "scan id list size: " << scan_id_list.size() << std::endl;
+    auto start_time = std::chrono::high_resolution_clock::now();
     for (size_t i = 0; i < scan_id_list.size(); i++) {
         int scan_id = scan_id_list.at(i);
         auto scan = scan_manager_.get_scan(scan_id);
@@ -188,8 +189,6 @@ void LocSolver::optimize() {
         }
 
         Eigen::Matrix<double, 6, 1> pose_error = scan->pose_error();
-        // std::cout << "Final scan pose: \n" << scan->pose() << std::endl;
-        // std::cout << "GT scan pose: \n" << scan->gt_pose() << std::endl;
         std::cout << "Final pose error (m, m, deg): " << pose_error(0) << ", " << pose_error(1) << ", " << pose_error(5) * 180.0 / M_PI << std::endl;
         avg_pose_error(0) += pose_error(0) * pose_error(0);
         avg_pose_error(1) += pose_error(1) * pose_error(1);
@@ -204,9 +203,11 @@ void LocSolver::optimize() {
         lgmath::se3::Transformation next_dro_pose = loc_problem.dro_poses().at(i + 1);
         dro_rel_pose = curr_dro_pose.inverse() * next_dro_pose;
         curr_pose = curr_pose * dro_rel_pose;
-
-        // break;
     }
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    std::cout << "Localization of " << scan_id_list.size() << " scans took " << duration << " ms. Average time per scan: "
+              << static_cast<double>(duration) / static_cast<double>(scan_id_list.size()) << " ms." << std::endl;
 
     avg_pose_error /= static_cast<double>(scan_id_list.size());
     avg_pose_error = avg_pose_error.cwiseSqrt();
