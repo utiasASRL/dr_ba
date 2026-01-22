@@ -83,8 +83,9 @@ void LocSolver::optimize() {
     // Project to SE2 to get rid of any gt rounding in 3D dimensions
     curr_pose = curr_pose.toSE2().toSE3();
     std::cout << "scan id list size: " << scan_id_list.size() << std::endl;
-    auto start_time = std::chrono::high_resolution_clock::now();
+    double avg_runtime = 0.0;
     for (size_t i = 0; i < scan_id_list.size(); i++) {
+        auto start_time = std::chrono::high_resolution_clock::now();
         int scan_id = scan_id_list.at(i);
         auto scan = scan_manager_.get_scan(scan_id);
         scan->set_pose(curr_pose);
@@ -168,6 +169,8 @@ void LocSolver::optimize() {
 
         // Compute gt pose within local map
         lgmath::se3::Transformation loc_gt_pose = nearest_map_gt_pose.inverse() * loc_problem.gt_poses().at(i);
+        // Discard 3D info from the relative transform
+        loc_gt_pose = loc_gt_pose.toSE2().toSE3();
         scan->set_gt_pose(loc_gt_pose);
 
         if (opts_.save_result) {
@@ -205,11 +208,15 @@ void LocSolver::optimize() {
         lgmath::se3::Transformation next_dro_pose = loc_problem.dro_poses().at(i + 1);
         dro_rel_pose = curr_dro_pose.inverse() * next_dro_pose;
         curr_pose = curr_pose * dro_rel_pose;
+
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+        avg_runtime += static_cast<double>(duration);
+        std::cout << "Average scan runtime: " << avg_runtime / static_cast<double>(i + 1) << " ms." << std::endl;
     }
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-    std::cout << "Localization of " << scan_id_list.size() << " scans took " << duration << " ms. Average time per scan: "
-              << static_cast<double>(duration) / static_cast<double>(scan_id_list.size()) << " ms." << std::endl;
+    
+    
+    std::cout << "Localization of " << scan_id_list.size() << " scans took " << avg_runtime / static_cast<double>(scan_id_list.size()) << " ms on average." <<  std::endl;
 
     avg_pose_error /= static_cast<double>(scan_id_list.size());
     avg_pose_error = avg_pose_error.cwiseSqrt();
