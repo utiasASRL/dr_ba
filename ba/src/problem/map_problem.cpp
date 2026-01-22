@@ -142,14 +142,14 @@ void MapProblem::get_scan_indeces() {
 
         // Load in initial guess pose
         lgmath::se3::Transformation T_est_abs;
-        if (opts_.init_poses == "pogo") {
+        if (opts_.pose_source == "pogo") {
             T_est_abs = ba::get_interpolated_pose(all_pogo_poses, all_pogo_times, timestamp_seconds);
-        } else if (opts_.init_poses == "gt") {
+        } else if (opts_.pose_source == "gt") {
             T_est_abs = ba::get_interpolated_pose(all_gt_poses, all_gt_times, timestamp_seconds);
-        } else if (opts_.init_poses == "dro") {
+        } else if (opts_.pose_source == "dro") {
             T_est_abs = ba::get_interpolated_pose(all_dro_poses, all_dro_times, timestamp_seconds);
         } else {
-            throw std::invalid_argument("Invalid init_poses option: " + opts_.init_poses);
+            throw std::invalid_argument("Invalid pose_source option: " + opts_.pose_source);
         }
 
         if (num_loaded != 0) {
