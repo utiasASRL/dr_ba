@@ -80,6 +80,8 @@ void LocSolver::optimize() {
     lgmath::se3::Transformation loc_init_pose = loc_problem.gt_poses().at(0);
     // Get the initial pose within the map frame
     lgmath::se3::Transformation curr_pose = nearest_map_gt_pose.inverse() * loc_init_pose;
+    // Project to SE2 to get rid of any gt rounding in 3D dimensions
+    curr_pose = curr_pose.toSE2().toSE3();
     std::cout << "scan id list size: " << scan_id_list.size() << std::endl;
     auto start_time = std::chrono::high_resolution_clock::now();
     for (size_t i = 0; i < scan_id_list.size(); i++) {
