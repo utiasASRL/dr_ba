@@ -136,6 +136,26 @@ public:
         return rmse;
     }
 
+    double compute_epe() const {
+        if (scans_.empty()) {
+            return 0.0;
+        }
+        // Get first and last scan poses
+        auto first_scan = scans_.at(idx_to_id_.front());
+        auto last_scan = scans_.at(idx_to_id_.back());
+        auto T_0 = first_scan->pose2d();
+        auto T_N = last_scan->pose2d();
+        auto T_gt_0 = first_scan->gt_pose2d();
+        auto T_gt_N = last_scan->gt_pose2d();
+        
+        // Compute EPE
+        auto T_est_epe = T_gt_0.inverse() * T_gt_N;
+        auto T_gt_epe = T_0.inverse() * T_N;
+        auto T_epe_err = T_est_epe.inverse() * T_gt_epe;
+        double epe = T_epe_err.r_ab_inb().head<2>().norm();
+        return epe;
+    }
+
     double compute_ate() const {
         if (scans_.empty()) {
             return 0.0;
