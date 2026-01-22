@@ -311,7 +311,7 @@ void DrBASolver::construct_problem(double downsample_factor) {
             cost_tile += cost_local;
         }
 }
-        // Scatter local tile contributions to global matrices
+        // Add local tile contributions to global matrices
         lhs_ += lhs_tile;
         rhs_ += rhs_tile;
         cost_ += cost_tile;
@@ -328,6 +328,19 @@ void DrBASolver::construct_problem(double downsample_factor) {
     std::cout << "  Total time: " << std::chrono::duration<double>(end_time - start_time).count() << " s" << std::endl;
     std::cout << "  Relative Pose Prior time: " << rel_pose_prior_time << " s" << std::endl;
     std::cout << "  Avg time per voxel: " << avg_per_voxel_time << " s" << std::endl;
+
+    // Look into sparsity of lhs_
+    int non_zero_count = 0;
+    for (int r = 0; r < lhs_.rows(); ++r) {
+        for (int c = 0; c < lhs_.cols(); ++c) {
+            if (std::abs(lhs_(r,c)) > 1e-12) {
+                non_zero_count++;
+            }
+        }
+    }
+    std::cout << "LHS matrix sparsity: " 
+              << static_cast<double>(non_zero_count) / static_cast<double>(lhs_.rows() * lhs_.cols()) * 100.0 
+              << " %" << std::endl;
 }
 
 bool DrBASolver::solve() {
@@ -337,26 +350,9 @@ bool DrBASolver::solve() {
     // Solve
     del_x_ = - alpha_ * lhs_.selfadjointView<Eigen::Upper>().ldlt().solve(rhs_);
 
-    // // Recompute cost after applying del_x_ on a copy of the scan manager
-    // ScanManager scan_manager_copy = scan_manager_.deep_copy();
-    // update_poses(scan_manager_copy);
-    // construct_problem(scan_manager_copy, 1.0);
-    // update_map();
-
     std::cout << "alpha: " << alpha_
             << " |delta|: " << del_x_.norm()
             << " cost: " << cost_ << std::endl;
-
-    // // Update lambda_
-    // if (cost_ < prev_cost_ || del_x_.norm() < opts_.convergence_tol) {
-    //     // Decrease lambda
-    //     lambda_ = std::max(lambda_ * 0.8, 1e-8);
-    //     return true;
-    // } else {
-    //     // Increase lambda
-    //     lambda_ *= 2.0;
-    //     return false;
-    // }
 
     return true;
 }
@@ -520,7 +516,7 @@ void DrBASolver::optimize() {
         avg_construct_time += std::chrono::duration<double>(end - start).count();
 
         if (iter > 0 && iter > opts_.num_coarse_iterations && cost_ > prev_cost_) {
-            if (num_cost_rises >= 25) {
+            if (num_cost_rises >= 5 || alpha_ < 1e-2) {
                 std::cout << "Stopping optimization due to repeated cost increases." << std::endl;
                 break;
             }
@@ -534,7 +530,7 @@ void DrBASolver::optimize() {
             del_x_ /= -alpha_;
 
             // Reduce alpha
-            alpha_ *= 0.5;
+            alpha_ *= std::pow(0.5, num_cost_rises);
 
             // Compute new step
             del_x_ *= alpha_;
