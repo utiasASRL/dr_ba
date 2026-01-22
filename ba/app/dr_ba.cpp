@@ -13,12 +13,13 @@
 namespace fs = std::filesystem;
 
 int main() {
-    omp_set_num_threads(14);
-    Eigen::setNbThreads(1);
     // Load in config from ba/config/dr_ba_config.yaml
     fs::path config_path = fs::path(__FILE__).parent_path().parent_path() / "config" / "dr_ba_config.yaml";
     YAML::Node config = YAML::LoadFile(config_path.string());
     ba::Options opts = ba::load_options(config);
+
+    omp_set_num_threads(opts.num_threads);
+    Eigen::setNbThreads(1);
 
     // Set up timer
     auto start_time = std::chrono::high_resolution_clock::now();
