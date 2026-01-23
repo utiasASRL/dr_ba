@@ -93,7 +93,7 @@ void LocSolver::optimize() {
         // Get voxels in range of initial pose
         voxel_keys_ = voxel_map_.get_voxels_in_range(scan->pose2d(), opts_.max_dist);
         std::cout << "Optimizing scan ID: " << scan_id << "/" << scan_manager_.num_scans() - 1
-                  << " with " << voxel_keys_.size() << " voxels in range." << std::endl;
+                  << " (timestamp: " << scan->timestamp() << ")" << std::endl;
 
         scan->load_data();
         for (int iter = 0; iter < opts_.max_iterations; iter++) {
