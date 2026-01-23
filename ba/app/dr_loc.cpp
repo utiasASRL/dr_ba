@@ -39,6 +39,11 @@ int main() {
         // Copy config to output folder
         fs::path output_config_path = output_run_dir / "loc_config.yaml";
         fs::copy_file(config_path, output_config_path);
+
+        // Copy voxel map to output folder
+        fs::path voxel_map_src = opts.map_location.string() + "/voxel_map.bin";
+        fs::path voxel_map_dst = output_run_dir / "voxel_map.bin";
+        fs::copy_file(voxel_map_src, voxel_map_dst);
     }
 
     // Overwrite opts output path to run-specific folder

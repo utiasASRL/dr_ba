@@ -8,19 +8,17 @@ from map.voxel_map import Map
 
 # Check if any argument is provided for base path
 
-if len(sys.argv) < 3:
-    print("Usage: python visualize_loc_result.py <base_path> <loc_path>")
+if len(sys.argv) < 2:
+    print("Usage: python visualize_loc_result.py <loc_path>")
     sys.exit(1)
 
-map_path = sys.argv[1]
-loc_path = sys.argv[2]
+loc_path = sys.argv[1]
 if len(sys.argv) > 3:
-    title_name = sys.argv[3]
+    title_name = sys.argv[2]
 else:
     title_name = "Localization Results"
 
-voxel_path = osp.join(map_path, 'voxel_map.bin')
-
+voxel_path = osp.join(loc_path, 'voxel_map.bin')
 # map_id,scan_id,est_x,est_y,est_yaw,gt_x,gt_y,gt_yaw
 loc_result_path = osp.join(loc_path, 'loc_results.csv')
 
