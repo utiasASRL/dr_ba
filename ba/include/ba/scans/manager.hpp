@@ -143,10 +143,10 @@ public:
         // Get first and last scan poses
         auto first_scan = scans_.at(idx_to_id_.front());
         auto last_scan = scans_.at(idx_to_id_.back());
-        auto T_0 = first_scan->pose2d();
-        auto T_N = last_scan->pose2d();
-        auto T_gt_0 = first_scan->gt_pose2d();
-        auto T_gt_N = last_scan->gt_pose2d();
+        auto T_0 = first_scan->pose();
+        auto T_N = last_scan->pose();
+        auto T_gt_0 = first_scan->gt_pose();
+        auto T_gt_N = last_scan->gt_pose();
         
         // Compute EPE
         auto T_est_epe = T_gt_0.inverse() * T_gt_N;
