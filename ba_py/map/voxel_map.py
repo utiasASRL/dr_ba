@@ -3,7 +3,7 @@ import random
 import matplotlib.pyplot as plt
 import struct
 from pylgmath import se3op
-
+import os.path as osp
 
 class Map:
     class Voxel:
@@ -156,7 +156,7 @@ class Map:
                 voxels_read += 1
 
     # loc_results is list containing map_id,scan_id,est_x,est_y,est_yaw,gt_x,gt_y,gt_yaw
-    def plot_loc_result(self, loc_results, show=False, title="Voxel Map with Localization Results"):
+    def plot_loc_result(self, loc_results, save_path=None, show=False, title="Voxel Map with Localization Results"):
         if not self.voxels:
             return
 
@@ -273,6 +273,10 @@ class Map:
         ax.set_ylabel("Y", color="white")
         ax.tick_params(colors="white")
         ax.set_aspect("equal")
+
+        if save_path is not None:
+            fig_path = osp.join(save_path, 'voxel_map_loc_results.png')
+            plt.savefig(fig_path, dpi=300, bbox_inches="tight", facecolor="black")
 
         if show:
             plt.show()

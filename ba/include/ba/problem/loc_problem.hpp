@@ -7,6 +7,17 @@ namespace ba {
 
 class LocProblem : public Problem {
 public:
+    struct LocResultEntry {
+        int map_id;
+        int scan_id;
+        double est_x;
+        double est_y;
+        double est_yaw;
+        double gt_x;
+        double gt_y;
+        double gt_yaw;
+    };
+
     LocProblem(Options& opts)
         : Problem(opts) {}
 
@@ -16,6 +27,13 @@ public:
 
     void load_map_from_estimate();
     void load_scans();
+    void add_loc_result(const LocResultEntry& entry) {
+        loc_results_.push_back(entry);
+    }
+
+    // Output
+    void save_loc_results(const fs::path &output_path);
+    void visualize_loc_results();
 
     std::vector<lgmath::se3::Transformation> gt_map_poses() const { return gt_map_poses_; }
     std::vector<lgmath::se3::Transformation> gt_poses() const { return gt_poses_; }
@@ -25,6 +43,7 @@ private:
     std::vector<lgmath::se3::Transformation> gt_map_poses_;
     std::vector<lgmath::se3::Transformation> gt_poses_;
     std::vector<lgmath::se3::Transformation> dro_poses_;
+    std::vector<LocProblem::LocResultEntry> loc_results_;
 };
 
 }   // namespace ba

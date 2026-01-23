@@ -4,19 +4,35 @@ import numpy as np
 import os.path as osp
 import sys
 from map.voxel_map import Map
+import argparse
 
 
-# Check if any argument is provided for base path
+parser = argparse.ArgumentParser(description="Visualize localization results")
+parser.add_argument(
+    "--loc_path",
+    type=str,
+    required=True,
+    help="Path to localization results"
+)
 
-if len(sys.argv) < 2:
-    print("Usage: python visualize_loc_result.py <loc_path>")
-    sys.exit(1)
+parser.add_argument(
+    "--title",
+    type=str,
+    default="Localization Results",
+    help="Plot title (optional)"
+)
 
-loc_path = sys.argv[1]
-if len(sys.argv) > 3:
-    title_name = sys.argv[2]
-else:
-    title_name = "Localization Results"
+parser.add_argument(
+    "--show",
+    action="store_true",
+    help="Show the plot (flag)"
+)
+
+args = parser.parse_args()
+
+loc_path = args.loc_path
+title_name = args.title
+show = args.show
 
 voxel_path = osp.join(loc_path, 'voxel_map.bin')
 # map_id,scan_id,est_x,est_y,est_yaw,gt_x,gt_y,gt_yaw
@@ -51,7 +67,7 @@ print("Number of localization results loaded:", len(loc_results))
 vox_map = Map(res=1.0)  # Resolution will get overwritten when loading
 vox_map.load_from_binary(voxel_path)
 print("Voxel map size:", vox_map.size())
-vox_map.plot_loc_result(loc_results, show=True, title=title_name)
+vox_map.plot_loc_result(loc_results, show=show, save_path=loc_path, title=title_name)
 
 print("RMSE (m), (m), (deg):")
 errs = np.array(errs)
@@ -79,4 +95,7 @@ axs[2].set_title('Histogram of Yaw Errors (deg)')
 axs[2].set_xlabel('Error (deg)')
 axs[2].set_ylabel('Frequency')
 plt.tight_layout()
+print("Saving error histograms to:", loc_path)
+plt.savefig(osp.join(loc_path, 'loc_error_histograms.png'), dpi=300, bbox_inches="tight")
 plt.show()
+plt.close('all')

@@ -67,7 +67,6 @@ void LocSolver::optimize() {
     if (!problem_.is_initialized()) {
         problem_.initialize();
     }
-    fs::path output_file = opts_.output_path / "loc_results.csv";
 
     Eigen::Vector3d avg_pose_error(0.0, 0.0, 0.0);
     int max_id = scan_manager_.get_all_scan_ids().back();
@@ -176,24 +175,25 @@ void LocSolver::optimize() {
         loc_gt_pose = loc_gt_pose.toSE2().toSE3();
         scan->set_gt_pose(loc_gt_pose);
 
-        if (opts_.save_result) {
-            // Save results to CSV
-            std::ofstream ofs;
-            if (i == 0) {
-                ofs.open(output_file, std::ios::out);
-                ofs << "map_id,scan_id,est_x,est_y,est_yaw,gt_x,gt_y,gt_yaw\n";
-            } else {
-                ofs.open(output_file, std::ios::out | std::ios::app);
-            }
-            Eigen::Matrix<double, 2, 1> loc_est_pose_xy = scan->pose2d().r_ab_inb();
-            Eigen::Matrix<double, 2, 1> loc_gt_pose_xy = scan->gt_pose2d().r_ab_inb();
-            double loc_est_yaw = scan->pose2d().vec()(2);
-            double loc_gt_yaw = scan->gt_pose2d().vec()(2);
-            ofs << loc_problem.voxel_map().pose_ids().at(best_map_idx) << ","
-                << scan->id() << ","
-                << loc_est_pose_xy(0) << "," << loc_est_pose_xy(1) << "," << loc_est_yaw << ","
-                << loc_gt_pose_xy(0) << "," << loc_gt_pose_xy(1) << "," << loc_gt_yaw << "\n";
-            ofs.close();
+        // Store result
+        Eigen::Matrix<double, 3, 1> loc_est_pose_xy = scan->pose().r_ab_inb();
+        Eigen::Matrix<double, 3, 1> loc_gt_pose_xy = scan->gt_pose().r_ab_inb();
+        double loc_est_yaw = scan->pose().vec()(2);
+        double loc_gt_yaw = scan->gt_pose().vec()(2);
+        LocProblem::LocResultEntry result_entry;
+        result_entry.map_id = loc_problem.voxel_map().pose_ids().at(best_map_idx);
+        result_entry.scan_id = scan->id();
+        result_entry.est_x = loc_est_pose_xy(0);
+        result_entry.est_y = loc_est_pose_xy(1);
+        result_entry.est_yaw = loc_est_yaw;
+        result_entry.gt_x = loc_gt_pose_xy(0);
+        result_entry.gt_y = loc_gt_pose_xy(1);
+        result_entry.gt_yaw = loc_gt_yaw;
+        loc_problem.add_loc_result(result_entry);
+
+        // Periodically save results to memory
+        if (opts_.save_result && (i % 10 == 0 || i == scan_id_list.size() - 1)) {
+            loc_problem.save_loc_results(opts_.output_path);
         }
 
         Eigen::Matrix<double, 6, 1> pose_error = scan->pose_error();

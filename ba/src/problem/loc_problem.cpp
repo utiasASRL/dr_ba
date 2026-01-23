@@ -44,7 +44,6 @@ void LocProblem::load_map_from_estimate() {
     std::string map_seq_id = opts_.map_seq;
     // Load in voxel map from estimates
     std::string map_location = opts_.map_location.string() + "/voxel_map.bin";
-    std::cout << "Loading voxel map from estimates: " << map_location << std::endl;
     voxel_map_.load_from_file(map_location);
 
     // Load groundtruth map poses
@@ -125,10 +124,61 @@ void LocProblem::load_scans() {
     std::cout << "Scan manager has " << scan_manager_.num_scans() << " scans." << std::endl;
 }
 
-void LocProblem::finalize() {
-    // Implementation for finalizing the localization problem
-    // This could involve saving results or cleaning up resources
+void LocProblem::save_loc_results(const fs::path &output_path) {
+    fs::path loc_results_path = output_path / "loc_results.csv";
+    // Remove existing file if it exists
+    if (fs::exists(loc_results_path)) {
+        fs::remove(loc_results_path);
+    }
+    // Save all data
+    std::ofstream ofs(loc_results_path, std::ios::out);
+    ofs << "map_id,scan_id,est_x,est_y,est_yaw,gt_x,gt_y,gt_yaw\n";
+    for (const auto& entry : loc_results_) {
+        ofs << entry.map_id << "," << entry.scan_id << ","
+            << entry.est_x << "," << entry.est_y << "," << entry.est_yaw << ","
+            << entry.gt_x << "," << entry.gt_y << "," << entry.gt_yaw << "\n";
+    }
+    ofs.close();
+}
 
+void LocProblem::visualize_loc_results() {
+    std::string cmd;
+    fs::path temp_dir;
+    bool use_temp_dir = !opts_.save_result;
+    if (use_temp_dir) {
+        temp_dir = fs::temp_directory_path() / "dr_ba_temp_visualization";
+        fs::create_directories(temp_dir);
+        std::cout << "Output directory not set. Using temporary directory: " << temp_dir.string() << std::endl;
+
+        // Save all map results to temporary directory
+        save_loc_results(temp_dir);
+        // Also copy over voxel_map.bin to temp directory
+        fs::path voxel_map_src = opts_.map_location / "voxel_map.bin";
+        fs::path voxel_map_dst = temp_dir / "voxel_map.bin";
+        fs::copy_file(voxel_map_src, voxel_map_dst);
+        cmd = "python3 /home/dl/Documents/phd/dev/dr_ba/ba_py/visualize_loc_result.py " + temp_dir.string();
+    } else {
+        cmd = "python3 /home/dl/Documents/phd/dev/dr_ba/ba_py/visualize_loc_result.py " + opts_.output_path.string();
+    }
+
+    int ret = std::system(cmd.c_str());
+    if (ret != 0)
+        throw std::runtime_error("Error executing command: " + cmd);
+
+    // Clean up temporary directory
+    if (use_temp_dir) {
+        std::cout << "Removing temporary directory: " << temp_dir.string() << std::endl;
+        fs::remove_all(temp_dir);
+    }
+}
+
+void LocProblem::finalize() {
+    if (opts_.save_result) {
+        save_loc_results(opts_.output_path);
+    }
+    if (opts_.visualize_result) {
+        visualize_loc_results();
+    }
 }
 
 
