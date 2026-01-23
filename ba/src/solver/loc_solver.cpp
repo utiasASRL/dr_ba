@@ -178,8 +178,8 @@ void LocSolver::optimize() {
         // Store result
         Eigen::Matrix<double, 3, 1> loc_est_pose_xy = scan->pose().r_ab_inb();
         Eigen::Matrix<double, 3, 1> loc_gt_pose_xy = scan->gt_pose().r_ab_inb();
-        double loc_est_yaw = scan->pose().vec()(2);
-        double loc_gt_yaw = scan->gt_pose().vec()(2);
+        double loc_est_yaw = scan->pose().vec()(5);
+        double loc_gt_yaw = scan->gt_pose().vec()(5);
         LocProblem::LocResultEntry result_entry;
         result_entry.map_id = loc_problem.voxel_map().pose_ids().at(best_map_idx);
         result_entry.scan_id = scan->id();
