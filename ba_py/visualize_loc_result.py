@@ -67,7 +67,7 @@ print("Number of localization results loaded:", len(loc_results))
 vox_map = Map(res=1.0)  # Resolution will get overwritten when loading
 vox_map.load_from_binary(voxel_path)
 print("Voxel map size:", vox_map.size())
-vox_map.plot_loc_result(loc_results, show=show, save_path=loc_path, title=title_name)
+vox_map.plot_loc_result(loc_results, show=False, save_path=loc_path, title=title_name)
 
 print("RMSE (m), (m), (deg):")
 errs = np.array(errs)
@@ -97,5 +97,8 @@ axs[2].set_ylabel('Frequency')
 plt.tight_layout()
 print("Saving error histograms to:", loc_path)
 plt.savefig(osp.join(loc_path, 'loc_error_histograms.png'), dpi=300, bbox_inches="tight")
-plt.show()
+
+if show:
+    plt.show()
+
 plt.close('all')

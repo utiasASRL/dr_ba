@@ -147,6 +147,7 @@ void LocProblem::visualize_loc_results() {
     bool use_temp_dir = !opts_.save_result;
     if (use_temp_dir) {
         temp_dir = fs::temp_directory_path() / "dr_ba_temp_visualization";
+        fs::remove_all(temp_dir);
         fs::create_directories(temp_dir);
         std::cout << "Output directory not set. Using temporary directory: " << temp_dir.string() << std::endl;
 
@@ -156,9 +157,13 @@ void LocProblem::visualize_loc_results() {
         fs::path voxel_map_src = opts_.map_location / "voxel_map.bin";
         fs::path voxel_map_dst = temp_dir / "voxel_map.bin";
         fs::copy_file(voxel_map_src, voxel_map_dst);
-        cmd = "python3 /home/dl/Documents/phd/dev/dr_ba/ba_py/visualize_loc_result.py " + temp_dir.string();
+        cmd = "python3 /home/dl/Documents/phd/dev/dr_ba/ba_py/visualize_loc_result.py --loc_path " + temp_dir.string();
     } else {
-        cmd = "python3 /home/dl/Documents/phd/dev/dr_ba/ba_py/visualize_loc_result.py " + opts_.output_path.string();
+        cmd = "python3 /home/dl/Documents/phd/dev/dr_ba/ba_py/visualize_loc_result.py --loc_path " + opts_.output_path.string();
+    }
+
+    if (opts_.visualize_result) {
+        cmd += " --show";
     }
 
     int ret = std::system(cmd.c_str());
@@ -176,7 +181,7 @@ void LocProblem::finalize() {
     if (opts_.save_result) {
         save_loc_results(opts_.output_path);
     }
-    if (opts_.visualize_result) {
+    if (opts_.visualize_result || opts_.save_result) {
         visualize_loc_results();
     }
 }
