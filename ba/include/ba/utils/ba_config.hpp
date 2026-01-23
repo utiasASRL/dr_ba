@@ -45,7 +45,6 @@ struct Options {
     double convergence_tol = 1e-3;
     double alpha = 0.5;        // step size
     bool adaptive_alpha = true; // decrease alpha if cost does not decrease
-    double prior_map_std = 1e-3; // intensity units
     double meas_std = 1.0;       // intensity units
     bool use_rel_pose_prior = true;
     double rel_pose_prior_translation_std = 0.1; // meters
