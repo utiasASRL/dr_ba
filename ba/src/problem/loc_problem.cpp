@@ -12,18 +12,21 @@ void LocProblem::get_scan_indeces() {
     // For localization load all scans
     std::string seq_id = opts_.seq_ids[0];
     fs::path all_img_dir = opts_.meas_path / seq_id / opts_.input_type;
-    int count = 0;
+    int count = -1;
     for (const auto& entry : fs::directory_iterator(all_img_dir)) {
         // Only consider files ending with .png
         if (entry.path().extension() != ".png") {
             continue;
         }
         if (entry.is_regular_file()) {
-            scan_indices_.push_back(count);
             count++;
-        }
-        if (opts_.end_frame > 0 && count > opts_.end_frame) {
-            break;
+            if (count < opts_.start_frame) {
+                continue;
+            }
+            scan_indices_.push_back(count);
+            if (opts_.end_frame >= 0 && count >= opts_.end_frame) {
+                break;
+            }
         }
     }
     // Sort scan indices
@@ -104,7 +107,7 @@ void LocProblem::load_scans() {
         dro_poses_.push_back(T_dro_abs);
 
         // Load in image paths
-        fs::path img_path = img_paths_[idx];
+        fs::path img_path = img_paths_[i];
         std::optional<fs::path> cumul_img_path = std::nullopt;
         if (opts_.use_cumul_thresh) {
             if (cumul_paths_.empty()) {
@@ -115,7 +118,7 @@ void LocProblem::load_scans() {
 
         // Just initialize all poses with identity matrix. We'll handle initialization later.
         lgmath::se3::Transformation T_init;
-        auto scan = std::make_shared<ba::LocalMapScan>(timestamps_[i], i, opts_, T_init, T_init, img_path, cumul_img_path);
+        auto scan = std::make_shared<ba::LocalMapScan>(timestamps_[i], idx, opts_, T_init, T_init, img_path, cumul_img_path);
         scan_manager_.add_scan(scan);
     }
 

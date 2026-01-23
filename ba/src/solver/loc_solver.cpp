@@ -70,11 +70,14 @@ void LocSolver::optimize() {
     fs::path output_file = opts_.output_path / "loc_results.csv";
 
     Eigen::Vector3d avg_pose_error(0.0, 0.0, 0.0);
+    int max_id = scan_manager_.get_all_scan_ids().back();
     std::vector<int> scan_id_list = scan_manager_.get_all_scan_ids();
 
     // Initialize pose using gt
     // Cast to LocProblem to access derived class methods
     auto& loc_problem = static_cast<LocProblem&>(problem_);
+    // These are re-used, hence the names. They may not be the actual nearest node if we start
+    // not at the start of the loop. loc_init_pose should still position us correctly.
     lgmath::se3::Transformation nearest_map_gt_pose = loc_problem.gt_map_poses().at(0);
     lgmath::se3::Transformation nearest_map_est_pose = loc_problem.voxel_map().poses().at(0).toSE3();
     lgmath::se3::Transformation loc_init_pose = loc_problem.gt_poses().at(0);
@@ -92,7 +95,7 @@ void LocSolver::optimize() {
         std::cout << "----------------------------------------" << std::endl;
         // Get voxels in range of initial pose
         voxel_keys_ = voxel_map_.get_voxels_in_range(scan->pose2d(), opts_.max_dist);
-        std::cout << "Optimizing scan ID: " << scan_id << "/" << scan_manager_.num_scans() - 1
+        std::cout << "Optimizing scan ID: " << scan_id << "/" << max_id
                   << " (timestamp: " << scan->timestamp() << ")" << std::endl;
 
         scan->load_data();
