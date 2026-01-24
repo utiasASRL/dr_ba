@@ -185,13 +185,13 @@ def getGTRadarPosesAndTimes(seq_id):
     gt_poses = np.array(poses)
     return gt_poses, gt_times
 
-def getPogoPosesAndTimes(seq_id, ouput_path='output'):
+def getPogoPosesAndTimes(seq_id, ouput_path='output', file_name="pose_graph_traj.txt", delimiter=' '):
     # Get the results path
-    data_path = os.path.join(ouput_path, seq_id, "pose_graph_traj.txt")
+    data_path = os.path.join(ouput_path, seq_id, file_name)
     if not os.path.exists(data_path):
         print(f"Skipping sequence {seq_id} due to missing results.")
         return None, None
-    data_raw = pd.read_csv(data_path, delimiter=' ')
+    data_raw = pd.read_csv(data_path, delimiter=delimiter)
     times = data_raw.iloc[:, 0].to_numpy()
     poses = []
     for i in range(len(times)):
@@ -448,6 +448,10 @@ def nameToTime(name):
     # Extract the timestamp from the filename
     time_str = name.split('.')[0]
     return float(time_str)*1e-6
+def timeToName(time):
+    # Convert the timestamp to the filename
+    time_int = int(time)
+    return str(time_int).zfill(16) + '.png'
 
 def align2DTrajectories(gt_poses, gt_times, est_poses, est_times):
     gt_interp_poses = getInterpolatedTrajectory(gt_poses, gt_times, est_times)
