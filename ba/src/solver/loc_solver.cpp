@@ -80,22 +80,26 @@ void LocSolver::optimize() {
     lgmath::se3::Transformation nearest_map_gt_pose = loc_problem.gt_map_poses().at(0);
     lgmath::se3::Transformation nearest_map_est_pose = loc_problem.voxel_map().poses().at(0).toSE3();
     lgmath::se3::Transformation loc_init_pose = loc_problem.gt_poses().at(0);
+
     // Get the initial pose within the map frame
-    lgmath::se3::Transformation curr_pose = nearest_map_gt_pose.inverse() * loc_init_pose;
+    lgmath::se3::Transformation curr_pose = nearest_map_est_pose * nearest_map_gt_pose.inverse() * loc_init_pose;
+
     // Project to SE2 to get rid of any gt rounding in 3D dimensions
     curr_pose = curr_pose.toSE2().toSE3();
-    std::cout << "scan id list size: " << scan_id_list.size() << std::endl;
     double avg_runtime = 0.0;
+    int64_t start_timestamp = scan_manager_.ref_timestamp();
     for (size_t i = 0; i < scan_id_list.size(); i++) {
         auto start_time = std::chrono::high_resolution_clock::now();
         int scan_id = scan_id_list.at(i);
         auto scan = scan_manager_.get_scan(scan_id);
         scan->set_pose(curr_pose);
         std::cout << "----------------------------------------" << std::endl;
+        int64_t scan_timestamp = scan->timestamp();
+        double time_from_start = static_cast<double>(scan_timestamp - start_timestamp) / 1e6;
         // Get voxels in range of initial pose
         voxel_keys_ = voxel_map_.get_voxels_in_range(scan->pose2d(), opts_.max_dist);
         std::cout << "Optimizing scan ID: " << scan_id << "/" << max_id
-                  << " (timestamp: " << scan->timestamp() << ")" << std::endl;
+                  << " (timestamp: " << scan->timestamp() << ", " << time_from_start << " s from start)" << std::endl;
 
         scan->load_data();
         for (int iter = 0; iter < opts_.max_iterations; iter++) {
@@ -108,6 +112,7 @@ void LocSolver::optimize() {
             rhs_.setZero(3);
 
             // Loop through all voxels in the scan's coverage
+            int num_voxels_used = 0;
             for (const auto& voxel_idx : voxel_keys_) {
                 double voxel_x = static_cast<double>(voxel_idx.first) * voxel_map_.res();
                 double voxel_y = static_cast<double>(voxel_idx.second) * voxel_map_.res();
@@ -132,6 +137,11 @@ void LocSolver::optimize() {
 
                 // Compute cost
                 cost_ += 0.5 * std::pow(err, 2) ;
+                num_voxels_used++;
+            }
+            
+            if (num_voxels_used == 0) {
+                throw std::runtime_error("Error: No voxels used in localization optimization! Check if your map and loc entries overlap?");
             }
 
             // Solve problem
@@ -152,11 +162,18 @@ void LocSolver::optimize() {
 
         // Compute errors
         // First, find nearest map pose to the scan's estimated pose
+        std::cout << "Finding nearest map pose to scan..." << std::endl;
         double min_dist = std::numeric_limits<double>::max();
         int best_map_idx = -1;
         for (size_t j = 0; j < loc_problem.gt_map_poses().size(); j++) {
             lgmath::se3::Transformation map_est_pose = loc_problem.voxel_map().poses().at(j).toSE3();
-            double dist = (map_est_pose.r_ab_inb().head<2>() - scan->pose().r_ab_inb().head<2>()).norm();
+            double dist = (map_est_pose.inverse() * scan->pose()).r_ab_inb().norm();
+
+            // Prefer selecting nodes with similar orientation
+            if (std::abs((map_est_pose.vec()(5) - scan->pose().vec()(5))) > M_PI / 2.0) {
+                dist += 1000.0;
+            }
+
             if (dist < min_dist) {
                 min_dist = dist;
                 nearest_map_gt_pose = loc_problem.gt_map_poses().at(j);
@@ -165,6 +182,16 @@ void LocSolver::optimize() {
                 best_map_idx = static_cast<int>(j);
             }
         }
+        if (best_map_idx == -1) {
+            throw std::runtime_error("Error: Could not find nearest map pose! Check if your map and loc entries overlap?");
+        }
+        std::cout << "Nearest map pose index: " << best_map_idx << ", distance: " << min_dist << " m." << std::endl;
+
+
+        std::cout << "scan->pose():\n" << scan->pose().matrix() << std::endl;
+        std::cout << "loc_problem.gt_poses().at(i):\n" << loc_problem.gt_poses().at(i).matrix() << std::endl;
+
+
         // Compute estimated pose within local map
         lgmath::se3::Transformation loc_est_pose = nearest_map_est_pose.inverse() * scan->pose();
         scan->set_pose(loc_est_pose);
@@ -206,6 +233,8 @@ void LocSolver::optimize() {
         if (i == scan_id_list.size() - 1) {
             break;
         }
+
+        // Set curr_pose for next iteration
         lgmath::se3::Transformation dro_rel_pose;
         lgmath::se3::Transformation curr_dro_pose = loc_problem.dro_poses().at(i);
         lgmath::se3::Transformation next_dro_pose = loc_problem.dro_poses().at(i + 1);

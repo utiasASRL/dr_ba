@@ -17,7 +17,8 @@ public:
     void finalize() override;
 
 private:
-
+    lgmath::se3::Transformation T_est_0_abs_;
+    lgmath::se3::Transformation T_gt_0_abs_;
 
 };
 

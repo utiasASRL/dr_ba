@@ -120,9 +120,6 @@ void MapProblem::get_scan_indeces() {
             continue;
         }
         num_checked++;
-        if (num_checked > max_frame) {
-            break;
-        }
 
         // Check if frame in desired ranges
         bool in_range = false;
@@ -166,6 +163,11 @@ void MapProblem::get_scan_indeces() {
             }
             // Set up prior from prev keyframe radar frame to this keyframe radar frame
             pose_priors_[{kf_prev_id, num_checked}] = T_kf_rel;
+        }
+        // Always want to root map in first pose, whether we use it or not
+        if (num_checked == 0) {
+            T_est_0_abs_ = T_est_abs;
+            T_gt_0_abs_ = T_gt_abs;
         }
 
         // We've decided this is a keyframe!
@@ -260,13 +262,12 @@ void MapProblem::init_scans_and_map_from_data() {
     lgmath::se3::Transformation T_gt_abs_0 = T_gt_abs_list_[0];
     for (size_t i=0; i < scan_indices_.size(); i++) {
         int idx = scan_indices_[i];
-
         // Load in estimated pose
-        lgmath::se3::Transformation T_est_rel = T_est_abs_0.inverse() * T_est_abs_list_[i];
+        lgmath::se3::Transformation T_est_rel = T_est_0_abs_.inverse() * T_est_abs_list_[i];
         T_est_rel = T_est_rel.toSE2().toSE3();
 
         // Load in gt pose
-        lgmath::se3::Transformation T_gt_rel = T_gt_abs_0.inverse() * T_gt_abs_list_[i];
+        lgmath::se3::Transformation T_gt_rel = T_gt_0_abs_.inverse() * T_gt_abs_list_[i];
         T_gt_rel = T_gt_rel.toSE2().toSE3();
 
         // Load in image paths

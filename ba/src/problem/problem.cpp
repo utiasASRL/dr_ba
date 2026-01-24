@@ -46,6 +46,11 @@ void Problem::preload_images() {
         std::sort(cumul_files.begin(), cumul_files.end());
     }
 
+    // Set reference timestamp based on first scan time
+    int64_t ref_timestamp = std::stoll(files[0].stem().string());
+    std::cout << "Reference timestamp set to: " << ref_timestamp << std::endl;
+    scan_manager_.set_ref_timestamp(ref_timestamp);
+
     // Loop through all images
     int num_scans = img_paths_.size();
     opts_.end_frame = (opts_.end_frame == -1) ? (num_scans - 1) : opts_.end_frame;

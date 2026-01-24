@@ -44,6 +44,14 @@ public:
         return static_cast<int>(loaded_scan_queue_.size());
     }
 
+    void set_ref_timestamp(int64_t timestamp) {
+        ref_timestamp_ = timestamp;
+    }
+
+    int64_t ref_timestamp() const {
+        return ref_timestamp_;
+    }
+
     int num_active_scans() const {
         int count = 0;
         for (const auto& kv : scans_) {
@@ -231,6 +239,7 @@ private:
     std::unordered_map<int, std::size_t> id_to_idx_; // scan_id -> scan_idx
     std::queue<int> loaded_scan_queue_;
     size_t max_loaded_scans_ = 0; // 0 means no limit
+    int64_t ref_timestamp_ = 0; // The timestamp of the first scan in the sequence, even if its not added
 };
 
 
