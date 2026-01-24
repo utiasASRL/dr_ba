@@ -39,11 +39,61 @@ def main():
     #crossCorrelationExample()
     #plotPublicBoreas()
 
-    baOverlayFigure()
+    #baOverlayFigure()
+    #baOverlayFigure(seq_id='boreas-2024-12-04-11-45', tbv_path='/home/ced/Documents/data/boreas/for_tbv/TBV_Eval/boreas_tbv_model_8_2026-01-20_21-18/job_0')
+    testOverlap(seq_id='boreas-2025-08-06-07-05', scan_ref = 1700, method='ba')
+    testOverlap(seq_id='boreas-2025-08-06-07-05', scan_ref = 1700, method='gt')
+    testOverlap(seq_id='boreas-2025-08-06-07-05', scan_ref = 1700, method='pogo')
 
     #plottrajectories()
 
     #timing()
+
+def testOverlap(seq_id='boreas-2024-12-03-12-54', scan_ref = 1000, method='gt'):
+    # Load the Dr-PoGO trajectory
+
+    ref = scan_ref
+    if method == 'gt':
+        pogo_traj, times = utils.getPogoPosesAndTimes(seq_id, ouput_path='output')
+        gt_traj, gt_times = utils.getGTRadarPosesAndTimes(seq_id)
+        gt_times = gt_times*1e6
+        traj = utils.getInterpolatedTrajectory(gt_traj, gt_times, times)
+    elif method == 'pogo':
+        traj, times = utils.getPogoPosesAndTimes(seq_id, ouput_path='output')
+    elif method == 'ba':
+        pogo_traj, times = utils.getPogoPosesAndTimes(seq_id, ouput_path='output')
+        time_ref = times[scan_ref]
+        traj, times = utils.getPogoPosesAndTimes(seq_id, ouput_path='output', file_name='ba_traj.csv', delimiter=',')
+        # Find the closest time to time_ref
+        ref = np.argmin(np.abs(times - time_ref))
+
+    distances = [0]
+    for i in range(1, traj.shape[0]):
+        delta = traj[i, 0:3, 3] - traj[i-1, 0:3, 3]
+        dist = np.linalg.norm(delta)
+        distances.append(distances[-1] + dist)
+
+    distances = np.array(distances)
+
+    # Get the closest scan to scan_ref that is at least 300m apart in terms of travelled distance
+    min_dist_gap = 300.0  # meters
+    last_selected_range = 10000.0
+    for i in range(traj.shape[0]):
+        if np.abs(distances[i] - distances[ref]) < min_dist_gap:
+            continue
+        dist = np.linalg.norm(traj[i, 0:3, 3] - traj[ref, 0:3, 3])
+        if dist < last_selected_range:
+            last_selected_range = dist
+            min_j = i
+    print(f"Selected scan {min_j} at distance {last_selected_range} m from scan {ref}")
+    os.makedirs('figures/overlays', exist_ok=True)
+
+    score = overlapScans(traj[ref], times[ref], traj[min_j], times[min_j], scan_path=os.path.join('output', seq_id, 'local_maps'), labels=[f'Scan {ref}', f'Scan {min_j}'], visualize=True, output_path='figures/overlays/' + f'{method}_overlay_{seq_id}_scan_{ref}_{min_j}.pdf')
+        
+
+
+
+
 
 
 def baOverlayFigure(seq_id='boreas-2024-12-03-12-54', tbv_path='/home/ced/Documents/data/boreas/for_tbv/TBV_Eval/boreas_tbv_model_8_2026-01-20_08-06/job_0'):
@@ -137,31 +187,31 @@ def baOverlayFigure(seq_id='boreas-2024-12-03-12-54', tbv_path='/home/ced/Docume
 
 
 
-    ## Plot the scores a link colormap on the trajectory
-    #fig, ax = plt.subplots(1, 1, figsize=(6, 6))
-    #ax.plot(pogo_traj[:, 0, 3], -pogo_traj[:, 1, 3], 'blue', label='PoGO', linewidth=1)
-    #norm = matplotlib.colors.Normalize(vmin=min(scores), vmax=max(scores))
-    #cmap = plt.get_cmap('hot')
-    #for idx, (i, j) in enumerate(scan_pairs):
-    #    color = cmap(norm(scores[idx]))
-    #    ax.plot([pogo_traj[i, 0, 3], pogo_traj[j, 0, 3]], [-pogo_traj[i, 1, 3], -pogo_traj[j, 1, 3]], color=color, linewidth=1.5)
-    #sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    #sm.set_array([])
-    #cbar = plt.colorbar(sm, ax=ax)
-    #cbar.set_label('Registration Score', rotation=270, labelpad=15)
-    #ax.set_title('Dr-PoGO Loop Closure Candidates with Registration Scores', {'fontweight': 'bold'})
-    #ax.set_xlabel('X [m]')
-    #ax.set_ylabel('Y [m]')
-    #ax.axis('equal')
-    #ax.legend(loc='upper right')
-    #plt.tight_layout()
-    #plt.show()
+    # Plot the scores a link colormap on the trajectory
+    fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+    ax.plot(pogo_traj[:, 0, 3], -pogo_traj[:, 1, 3], 'blue', label='PoGO', linewidth=1)
+    norm = matplotlib.colors.Normalize(vmin=min(scores), vmax=max(scores))
+    cmap = plt.get_cmap('hot')
+    for idx, (i, j) in enumerate(scan_pairs):
+        color = cmap(norm(scores[idx]))
+        ax.plot([pogo_traj[i, 0, 3], pogo_traj[j, 0, 3]], [-pogo_traj[i, 1, 3], -pogo_traj[j, 1, 3]], color=color, linewidth=1.5)
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm, ax=ax)
+    cbar.set_label('Registration Score', rotation=270, labelpad=15)
+    ax.set_title('Dr-PoGO Loop Closure Candidates with Registration Scores', {'fontweight': 'bold'})
+    ax.set_xlabel('X [m]')
+    ax.set_ylabel('Y [m]')
+    ax.axis('equal')
+    ax.legend(loc='upper right')
+    plt.tight_layout()
+    plt.show()
 
 
 
 
 
-def overlapScans(pose1, time1, pose2, time2, scan_path, output_path = None, labels = None):
+def overlapScans(pose1, time1, pose2, time2, scan_path, output_path = None, labels = None, visualize=False):
     res = utils.getPixelResolution()
     scan1 = cv2.imread(os.path.join(scan_path, utils.timeToName(time1)), cv2.IMREAD_GRAYSCALE)
     scan2 = cv2.imread(os.path.join(scan_path, utils.timeToName(time2)), cv2.IMREAD_GRAYSCALE)
@@ -178,7 +228,7 @@ def overlapScans(pose1, time1, pose2, time2, scan_path, output_path = None, labe
     print(f"Registration score: {score}")
 
 
-    if output_path is not None:
+    if output_path is not None or visualize:
         print(f"Saving overlay to {output_path}...")
         print("Relative pose:", xy, np.rad2deg(theta))
         plt.figure(figsize=(12,12))
@@ -188,7 +238,10 @@ def overlapScans(pose1, time1, pose2, time2, scan_path, output_path = None, labe
             plt.title(f"{labels[0]} & {labels[1]}\nScore: {score:.2f}", {'fontweight': 'bold'})
         plt.axis('off')
         plt.tight_layout()
-        plt.savefig(output_path)
+        if output_path is not None:
+            plt.savefig(output_path)
+        if visualize:
+            plt.show()
         plt.close()
 
     return score

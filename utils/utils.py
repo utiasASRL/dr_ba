@@ -16,6 +16,7 @@ kDataPaths = [
     "/media/ced/Extreme Pro/data/boreas/rss/ba",
     "/media/ced/Extreme Pro/data/boreas/rss/test",
     "/media/ced/Extreme Pro/data/boreas/original_train",
+    "/media/ced/Extreme Pro/data/boreas/rt_radar",
     "/home/ced/Documents/data/boreas/rss/test",
     "/home/ced/Documents/data/boreas/original_train",
     "/home/ced/Documents/data/boreas/for_tbv/rss/boreas",
