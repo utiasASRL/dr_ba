@@ -8,7 +8,7 @@ namespace ba {
 
 void MapProblem::get_scan_indeces() {
     std::cout << "Selecting scan indices based on frame ranges..." << std::endl;
-    std::string seq_id = opts_.seq_id;
+    std::string seq_id = opts_.map_seq;
 
     // Load groundtruth poses
     std::vector<lgmath::se3::Transformation> all_gt_poses;
@@ -200,7 +200,7 @@ void MapProblem::init_scans_and_map() {
 }
 
 void MapProblem::init_scans_and_map_from_estimates() {
-    std::string seq_id = opts_.seq_id;
+    std::string seq_id = opts_.map_seq;
 
     // Load in voxel map from estimates
     std::string estimate_location = opts_.estimate_location.string() + "/voxel_map.bin";
@@ -242,12 +242,12 @@ void MapProblem::init_scans_and_map_from_estimates() {
             img_path,
             cumul_img_path);
         scan_manager_.add_scan(scan);
-        voxel_map_.init_map(T_est_se2, opts_.max_dist, idx);
+        voxel_map_.init_map(T_est_se2, opts_.map_max_dist, idx);
     }
 }
 
 void MapProblem::init_scans_and_map_from_data() {
-    std::string seq_id = opts_.seq_id;
+    std::string seq_id = opts_.map_seq;
     std::cout << "Initializing scans and map from data for sequence: " << seq_id << std::endl;
 
     // Initialize uniform distribution for noise
@@ -296,7 +296,7 @@ void MapProblem::init_scans_and_map_from_data() {
     std::cout << "Initializing voxel map..." << std::endl;
     for (int scan_id : scan_manager_.get_all_scan_ids()) {
         auto scan = scan_manager_.get_scan(scan_id);
-        voxel_map_.init_map(scan->pose(), opts_.max_dist, scan_id);
+        voxel_map_.init_map(scan->pose(), opts_.map_max_dist, scan_id);
     }
 
     std::pair<double, double> x_bounds = voxel_map_.x_bounds();
@@ -313,11 +313,11 @@ void MapProblem::finalize() {
     if (opts_.save_result) {
         result_.save_full_result();
     }
-        
 
     // Visualize results
-    if (opts_.visualize_result)
+    if (opts_.visualize_result) {
         result_.visualize_map();
+    }
 }
 
 }   // namespace ba

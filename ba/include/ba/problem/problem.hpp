@@ -43,8 +43,9 @@ public:
     void preload_images();
 
 protected:
-    Problem(Options& opts)
+    Problem(Options& opts, std::string seq_id)
         : opts_(opts),
+          seq_id_(seq_id),
           voxel_map_(opts_.voxel_res),
           scan_manager_(opts_.max_loaded_scans),
           result_(voxel_map_, scan_manager_, opts_.output_path),
@@ -62,6 +63,7 @@ protected:
     }
 
     Options& opts_;
+    std::string seq_id_;
     VoxelMap voxel_map_;
     ScanManager scan_manager_;
     Result result_;

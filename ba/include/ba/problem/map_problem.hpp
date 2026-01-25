@@ -8,7 +8,12 @@ namespace ba {
 class MapProblem : public Problem {
 public:
     MapProblem(Options& opts)
-        : Problem(opts) {}
+        : Problem(opts, opts.map_seq) {
+            // Overwrite options for mapping
+            opts_.max_dist = opts.map_max_dist;
+            opts_.dist_field_preproc = opts.map_dist_field_preproc;
+            opts_.gauss_blur_sigma = opts.map_gauss_blur_sigma;
+        }
 
     void get_scan_indeces() override;
     void init_scans_and_map() override;

@@ -8,11 +8,10 @@ void Problem::preload_images() {
     if (scan_indices_.empty()) {
         throw std::runtime_error("Scan indices are empty. Cannot preload images.");
     }
-    std::string seq_id = opts_.seq_id;
-    std::cout << "Preloading images for sequence: " << seq_id << std::endl;
+    std::cout << "Preloading images for sequence: " << seq_id_ << std::endl;
 
     // Set up temporary folder for Gaussian-blurred images to be stored
-    fs::path temp_dir = opts_.meas_path / "dr_ba_temp" / seq_id;
+    fs::path temp_dir = opts_.meas_path / "dr_ba_temp" / seq_id_;
     fs::create_directories(temp_dir);
 
     // TODO: Add support for more than just local_maps
@@ -21,7 +20,7 @@ void Problem::preload_images() {
     }
 
     // Load in images
-    fs::path all_img_dir = opts_.meas_path / seq_id / opts_.input_type;
+    fs::path all_img_dir = opts_.meas_path / seq_id_ / opts_.input_type;
     // Sort files in directory
     std::vector<fs::path> files;
     for (const auto& entry : fs::directory_iterator(all_img_dir)) {
@@ -37,7 +36,7 @@ void Problem::preload_images() {
     // Load in cumulative return images
     std::vector<fs::path> cumul_files;
     if (opts_.use_cumul_thresh) {
-        fs::path cumul_img_dir = opts_.meas_path / seq_id / "cumulated_returns";
+        fs::path cumul_img_dir = opts_.meas_path / seq_id_ / "cumulated_returns";
         for (const auto& entry : fs::directory_iterator(cumul_img_dir)) {
             if (entry.is_regular_file()) {
                 cumul_files.push_back(entry.path());

@@ -19,7 +19,7 @@ public:
     };
 
     LocProblem(Options& opts)
-        : Problem(opts) {}
+        : Problem(opts, opts.seq_id) {}
 
     void get_scan_indeces() override;
     void init_scans_and_map() override;
