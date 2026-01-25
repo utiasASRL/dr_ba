@@ -8,3 +8,4 @@ venv
 
 # Project-specific stuff
 pogo/config_temp.yaml
+*temp_*_config*
