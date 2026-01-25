@@ -76,6 +76,9 @@ protected:
     std::vector<int64_t> timestamps_;
     std::vector<lgmath::se3::Transformation> T_est_abs_list_;
     std::vector<lgmath::se3::Transformation> T_gt_abs_list_;
+
+    lgmath::se3::Transformation T_est_0_abs_;
+    lgmath::se3::Transformation T_gt_0_abs_;
 };
 
 

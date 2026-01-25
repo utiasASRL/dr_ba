@@ -7,6 +7,7 @@
 namespace ba {
 
 void BAProblem::get_scan_indeces() {
+    std::cout << "Selecting scan indices based on frame ranges..." << std::endl;
     std::string seq_id = opts_.seq_ids[0];
 
     // Load groundtruth poses
@@ -45,16 +46,39 @@ void BAProblem::get_scan_indeces() {
     }
     std::sort(files.begin(), files.end());
 
+    // Check validity of frame ranges
+    int num_scans = files.size();
+    int max_frame = 0;
+    for (auto& range : opts_.frame_ranges) {
+        if (range.second == -1) {
+            range.second = num_scans - 1;
+        }
+        if (range.second < range.first) {
+            throw std::invalid_argument("Invalid frame range: [" + std::to_string(range.first) + ", " + std::to_string(range.second) + "]");
+        }
+        if (range.first < 0 || range.second >= num_scans) {
+            throw std::out_of_range("Frame range out of bounds: [" + std::to_string(range.first) + ", " + std::to_string(range.second) + "]");
+        }
+        max_frame = std::max(max_frame, range.second);
+    }
+
     int num_checked = -1;
     int num_loaded = 0;
-    int max_number_frames = opts_.num_frames > 0 ? opts_.num_frames : files.size();
     for (const auto& path : files) {
         // Only consider files ending with .png
         if (path.extension() != ".png") {
             continue;
         }
         num_checked++;
-        if (num_loaded >= max_number_frames) break;
+
+        // Check if frame in desired ranges
+        bool in_range = false;
+        for (const auto& range : opts_.frame_ranges) {
+            if (num_checked >= range.first && num_checked <= range.second) {
+                in_range = true;
+                break;
+            }
+        }
 
         // Load in scan pose
         int64_t timestamp = std::stoll(path.stem().string()); // in microseconds
@@ -96,10 +120,21 @@ void BAProblem::get_scan_indeces() {
             // Set up prior from prev keyframe radar frame to this keyframe radar frame
             pose_priors_[{kf_prev_id, num_checked}] = T_kf_rel;
         }
+        // Always want to root map in first pose, whether we use it or not
+        if (num_checked == 0) {
+            T_est_0_abs_ = T_est_abs;
+            T_gt_0_abs_ = T_gt_abs;
+        }
 
         // We've decided this is a keyframe!
         kf_prev_id = num_checked;
         T_kf_prev = T_est_abs;
+
+        if (!in_range) {
+            // We want to do keyframing in the same way for all frames, but dont
+            // want to load out of range
+            continue;
+        }
 
         // Add to list of scan indices to load
         scan_indices_.push_back(num_checked);
@@ -138,17 +173,15 @@ void BAProblem::init_scans() {
     std::uniform_real_distribution<double> rotation_dist(-rotation_std_rad, rotation_std_rad);
     std::mt19937 rng(99); // Fixed seed for reproducibility
 
-    lgmath::se3::Transformation T_est_abs_0 = T_est_abs_list_[0];
-    lgmath::se3::Transformation T_gt_abs_0 = T_gt_abs_list_[0];
     for (size_t i=0; i < scan_indices_.size(); i++) {
         int idx = scan_indices_[i];
 
         // Load in estimated pose
-        lgmath::se3::Transformation T_est_rel = T_est_abs_0.inverse() * T_est_abs_list_[i];
+        lgmath::se3::Transformation T_est_rel = T_est_0_abs_.inverse() * T_est_abs_list_[i];
         T_est_rel = T_est_rel.toSE2().toSE3();
 
         // Load in gt pose
-        lgmath::se3::Transformation T_gt_rel = T_gt_abs_0.inverse() * T_gt_abs_list_[i];
+        lgmath::se3::Transformation T_gt_rel = T_gt_0_abs_.inverse() * T_gt_abs_list_[i];
         T_gt_rel = T_gt_rel.toSE2().toSE3();
 
         // Load in image paths

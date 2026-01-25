@@ -113,6 +113,13 @@ void DrBASolver::construct_problem(double downsample_factor) {
         for (const auto& prior : pose_priors_) {
             int scan_id_a = prior.first.first;
             int scan_id_b = prior.first.second;
+
+            // Make sure both scans are in the current problem
+            if (scan_manager_.has_scan(scan_id_a) == false ||
+                scan_manager_.has_scan(scan_id_b) == false) {
+                continue;
+            }
+
             lgmath::se2::Transformation T_prior = prior.second.toSE2();
             // T_prior is the transform from scan A to scan B
             // Load in poses
@@ -284,14 +291,14 @@ void DrBASolver::construct_problem(double downsample_factor) {
             Eigen::VectorXd err = P * B_raw;
 
             // Apply robust cost (Huber)
-            double huber_delta = 0.3;
-            for (int k = 0; k < err.size(); ++k) {
-                double abs_val = std::abs(err(k));
-                if (abs_val > huber_delta) {
-                    // Downweight P values
-                    P(k) *= huber_delta / abs_val;
-                }
-            }
+            // double huber_delta = 0.3;
+            // for (int k = 0; k < err.size(); ++k) {
+            //     double abs_val = std::abs(err(k));
+            //     if (abs_val > huber_delta) {
+            //         // Downweight P values
+            //         P(k) *= huber_delta / abs_val;
+            //     }
+            // }
 
             Eigen::MatrixXd PtP = P.transpose() * P;
 
