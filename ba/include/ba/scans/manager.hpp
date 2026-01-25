@@ -36,6 +36,10 @@ public:
         return scans_.at(scan_id);
     }
 
+    bool has_scan(int scan_id) const {
+        return scans_.find(scan_id) != scans_.end();
+    }
+
     int num_scans() const {
         return static_cast<int>(scans_.size());
     }
