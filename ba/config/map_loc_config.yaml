@@ -1,72 +1,57 @@
 map:
-  voxel_res: 0.5  # m
+  voxel_res: 1.0
 output:
-  output_path: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results'
+  output_path: /home/dl/Documents/phd/dev/dr_ba/output/map_loc_ablation/set_06
   visualize: true
   save_result: true
 input:
-  data_path: '/home/dl/Documents/phd/data/boreas'
-  meas_path: '/home/dl/Documents/phd/dev/dr_ba/output'
-  seq_ids: 'boreas-2024-12-04-11-45' # skyway
-    # - 'boreas-2024-12-03-12-54' # glen
-    # - 'boreas-2024-12-05-14-12' # industrial
-    # - 'boreas-2024-12-23-16-27' # industrial
-    # - 'boreas-2024-12-04-11-45' # skyway
-    # - 'boreas-2025-07-18-10-33' # forest
-    # - 'boreas-2025-07-18-14-55' # Farm
-    # - 'boreas-2025-08-06-06-33' # urban
-    # - 'boreas-2025-08-06-07-05' # urban
-  max_dist: 100.0  # m
-  dist_field_preproc: true
-  gauss_blur_sigma: 21.0  # pixels
-  init_poses: 'gt'  # 'pogo' or 'gt', 'dro'
-  init_translation_std: 0.0  # m
-  init_rotation_std: 0.0  # degrees
-  input_type: 'local_maps' # 'scans' or 'local_maps' with both being images (for now)
-  local_map_res: 0.1  # m/pixel (only relevant if input_type is 'local_map')
+  data_path: /home/dl/Documents/phd/data/boreas
+  meas_path: /home/dl/Documents/phd/dev/dr_ba/output
+  seq_id: boreas-2024-12-04-11-56
+  max_dist: 100.0
+  dist_field_preproc: false
+  gauss_blur_sigma: 3.0
+  init_poses: gt
+  init_translation_std: 0.0
+  init_rotation_std: 0.0
+  input_type: local_maps
+  local_map_res: 0.1
+  map_id: boreas-2024-12-04-11-45
 keyframing:
-  max_kf_dist: 5.0  # m
-  max_kf_rot: 30.0  # degrees
+  max_kf_dist: 5.0
+  max_kf_rot: 30.0
   fix_first_scan: true
 optimization:
-  num_threads: 14
+  num_threads: 16
   max_iterations: 20
   convergence_tol: 1e-3
-  alpha: 1.0  # step size
-  adaptive_alpha: true # decrease alpha if cost does not decrease
-  meas_std: 0.1 # intensity units
-  range_factor: 0.0005  # factor to scale range uncertainty to intensity uncertainty
+  alpha: 1.0
+  adaptive_alpha: true
+  meas_std: 0.1
+  range_factor: 0.0005
   use_cumul_thresh: true
-  zero_thresh: 0.1 # max cumul return threshold to consider a measurement as zero return
-  cumul_thresh: 0.9  # threshold to ignore measurements with too high a cumulative return
+  zero_thresh: 0.1
+  cumul_thresh: 0.9
   rel_pose_prior:
     use_pose_prior: false
-    translation_std: 100.0  # m
-    rotation_std: 0.1  # degrees
-  # Downsample control
+    translation_std: 100.0
+    rotation_std: 0.1
   num_coarse_iterations: 0
   coarse_downsample: 0.2
   refine_downsample: 1.0
-  tile_size: 100.0  # m, size of tiles to process separately
-  max_loaded_scans: 300  # max number of scans to keep loaded in memory at once (>0 all)
+  tile_size: 100.0
+  max_loaded_scans: 300
 mapping:
-  pose_source: 'pogo' # 'estimate, 'gt', 'pogo', 'dro'
-  estimate_location: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results/run_52'
+  map_seq: boreas-2024-12-04-11-45
+  pose_source: gt
+  estimate_location: /home/dl/Documents/phd/dev/dr_ba/output/ba_results/run_52
+  max_dist: 80.0
+  dist_field_preproc: false
+  gauss_blur_sigma: 3.0
   frame_ranges:
-    # - [490, 510]
-    # - [1690, 1710]
-    # - [7500, -1]
-    - [390, 420]
-    # - [1500, 1900]  # start segment
-    # - [4500, 4700] # crossing segment
-    # - [5900, 6400]  # end segment
-
-    # - [1550, 1850]  # small start segment
-    # - [6150, 6200]  # small end segment
+  - - 0
+    - -1
 localization:
-  map_seq: 'boreas-2024-12-04-11-45'
-  map_location: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results/map_29'
-  # start_frame: 490
-  # end_frame: 500  # -1 for last frame
-  start_frame: 400
-  end_frame: 410  # -1 for last frame
+  map_location: /home/dl/Documents/phd/dev/dr_ba/output/ba_results/map_29
+  start_frame: 0
+  end_frame: -1
