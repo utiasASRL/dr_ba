@@ -62,6 +62,11 @@ void BAProblem::get_scan_indeces() {
         max_frame = std::max(max_frame, range.second);
     }
 
+    std::cout << "Ranges are:" << std::endl;
+    for (const auto& range : opts_.frame_ranges) {
+        std::cout << "[" << range.first << ", " << range.second << "]" << std::endl;
+    }
+
     int num_checked = -1;
     int num_loaded = 0;
     for (const auto& path : files) {
