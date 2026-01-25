@@ -7,11 +7,6 @@ import yaml
 
 # RSS data
 sequences = [
-    'boreas-2025-08-06-06-33', # Urban
-    'boreas-2025-08-06-07-05', # Urban
-    'boreas-2025-08-06-07-41', # Urban
-    'boreas-2025-08-06-08-35', # Urban
-
     'boreas-2024-12-03-12-54', # Glenshield
     'boreas-2025-01-08-10-59', # Glenshield
     'boreas-2025-01-08-11-22', # Glenshield
