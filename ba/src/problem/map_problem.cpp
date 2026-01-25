@@ -26,7 +26,6 @@ void MapProblem::get_scan_indeces() {
     ba::load_dro_poses_and_times(opts_.meas_path / seq_id, all_dro_poses, all_dro_times);
 
     // Initialize looping through trajectory
-    lgmath::se3::Transformation T_gt_abs_0(Eigen::Matrix4d(Eigen::Matrix4d::Identity()));
     lgmath::se3::Transformation T_est_abs_0(Eigen::Matrix4d(Eigen::Matrix4d::Identity()));
     lgmath::se3::Transformation T_kf_prev(Eigen::Matrix4d(Eigen::Matrix4d::Identity()));  // Previous keyframe pose
     int kf_prev_id = 0;
@@ -92,7 +91,7 @@ void MapProblem::get_scan_indeces() {
             }
 
             if (i == 0) {
-                T_gt_abs_0 = ba::get_interpolated_pose(all_gt_poses, all_gt_times, std::stod(files[0].stem().string()) / 1e6);
+                T_gt_0_abs_ = ba::get_interpolated_pose(all_gt_poses, all_gt_times, std::stod(files[0].stem().string()) / 1e6);
             }
             // Check if current index is in pose_ids
             if (std::find(pose_ids.begin(), pose_ids.end(), i) == pose_ids.end()) {
@@ -212,12 +211,11 @@ void MapProblem::init_scans_and_map_from_estimates() {
     // Re-initialize a new voxel_map
     voxel_map_ = VoxelMap(opts_.voxel_res);
 
-    lgmath::se3::Transformation T_gt_abs_0 = T_gt_abs_list_[0];
     for (size_t i=0; i < scan_indices_.size(); i++) {
         int idx = scan_indices_[i];
 
         // Load in gt pose
-        lgmath::se3::Transformation T_gt_rel = T_gt_abs_0.inverse() * T_gt_abs_list_[i];
+        lgmath::se3::Transformation T_gt_rel = T_gt_0_abs_.inverse() * T_gt_abs_list_[i];
         T_gt_rel = T_gt_rel.toSE2().toSE3();
 
         // Get SE2 pose from voxel map
@@ -259,7 +257,6 @@ void MapProblem::init_scans_and_map_from_data() {
     std::mt19937 rng(99); // Fixed seed for reproducibility
 
     lgmath::se3::Transformation T_est_abs_0 = T_est_abs_list_[0];
-    lgmath::se3::Transformation T_gt_abs_0 = T_gt_abs_list_[0];
     for (size_t i=0; i < scan_indices_.size(); i++) {
         int idx = scan_indices_[i];
         // Load in estimated pose
