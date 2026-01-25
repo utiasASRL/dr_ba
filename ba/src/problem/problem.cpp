@@ -12,7 +12,7 @@ void Problem::preload_images() {
     std::cout << "Preloading images for sequence: " << seq_id << std::endl;
 
     // Set up temporary folder for Gaussian-blurred images to be stored
-    fs::path temp_dir = fs::temp_directory_path() / "dr_ba_temp" / seq_id;
+    fs::path temp_dir = opts_.meas_path / "dr_ba_temp" / seq_id;
     fs::create_directories(temp_dir);
 
     // TODO: Add support for more than just local_maps
