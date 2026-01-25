@@ -1,0 +1,48 @@
+map:
+  voxel_res: 1.0
+output:
+  output_path: /home/dl/Documents/phd/dev/dr_ba/output/ba_ablation/set_00
+  visualize: false
+  save_result: true
+input:
+  data_path: /home/dl/Documents/phd/data/boreas
+  meas_path: /home/dl/Documents/phd/dev/dr_ba/output
+  seq_id: boreas-2024-12-04-11-45
+  max_dist: 80.0
+  dist_field_preproc: false
+  gauss_blur_sigma: 25.0
+  init_poses: pogo
+  init_translation_std: 0.0
+  init_rotation_std: 0.0
+  input_type: local_maps
+  local_map_res: 0.1
+keyframing:
+  max_kf_dist: 5.0
+  max_kf_rot: 30.0
+  fix_first_scan: true
+optimization:
+  num_threads: 14
+  max_iterations: 30
+  convergence_tol: 1e-3
+  alpha: 1.0
+  adaptive_alpha: false
+  meas_std: 0.1
+  range_factor: 0.0005
+  use_cumul_thresh: true
+  zero_thresh: 0.2
+  cumul_thresh: 0.9
+  rel_pose_prior:
+    use_pose_prior: false
+    translation_std: 0.1
+    rotation_std: 0.1
+  num_coarse_iterations: 0
+  coarse_downsample: 1.0
+  refine_downsample: 1.0
+  tile_size: 100.0
+  max_loaded_scans: 360
+mapping:
+  frame_ranges:
+  - - 0
+    - 550
+  - - 1710
+    - -1
