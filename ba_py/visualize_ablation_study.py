@@ -80,8 +80,8 @@ def visualize_ablation(
 ):
     ablation_root = Path(ablation_root)
     run_dirs = sorted(
-        d for d in ablation_root.iterdir()
-        if d.is_dir() and d.name.startswith("run_")
+        (d for d in ablation_root.iterdir() if d.is_dir() and d.name.startswith("run_")),
+        key=lambda d: int(d.name.split("_")[1])
     )
 
     fig_epe, ax_epe = plt.subplots()
@@ -139,7 +139,7 @@ def visualize_ablation(
 
 if __name__ == "__main__":
     visualize_ablation(
-        ablation_root="/home/dl/Documents/phd/dev/dr_ba/output/ba_ablation/set_00",
+        ablation_root="/home/dl/Documents/phd/dev/dr_ba/output/ba_ablation/set_01",
         label_fields={
             "input.gauss_blur_sigma": "σ",
             "input.dist_field_preproc": "DF",

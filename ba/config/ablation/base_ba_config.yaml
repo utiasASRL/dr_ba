@@ -42,5 +42,6 @@ optimization:
   tile_size: 100.0  # m, size of tiles to process separately
   max_loaded_scans: 360  # max number of scans to keep loaded in memory at once (>0 all)
 mapping:
+  map_seq: 'boreas-2024-12-04-11-45'
   frame_ranges:
   - [0, -1]

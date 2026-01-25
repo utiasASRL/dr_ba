@@ -18,36 +18,36 @@ def set_by_path(cfg, key_path, value):
 
 if __name__ == "__main__":
     param_sets = [
-        {
-            "input.seq_id": "boreas-2024-12-04-11-45",
-            "input.dist_field_preproc": False,
-            "input.gauss_blur_sigma": 3.0,
-            "mapping.frame_ranges": [[0, 550], [1710, -1]],
-        },
-        {
-            "input.seq_id": "boreas-2024-12-04-11-45",
-            "input.dist_field_preproc": False,
-            "input.gauss_blur_sigma": 25.0,
-            "mapping.frame_ranges": [[0, 550], [1710, -1]],
-        },
-        {
-            "input.seq_id": "boreas-2024-12-04-11-45",
-            "input.dist_field_preproc": True,
-            "input.gauss_blur_sigma": 3.0,
-            "mapping.frame_ranges": [[0, 550], [1710, -1]],
-        },
-        {
-            "input.seq_id": "boreas-2024-12-04-11-45",
-            "input.dist_field_preproc": True,
-            "input.gauss_blur_sigma": 9.0,
-            "mapping.frame_ranges": [[0, 550], [1710, -1]],
-        },
-        {
-            "input.seq_id": "boreas-2024-12-04-11-45",
-            "input.dist_field_preproc": True,
-            "input.gauss_blur_sigma": 15.0,
-            "mapping.frame_ranges": [[0, 550], [1710, -1]],
-        },
+        # {
+        #     "input.seq_id": "boreas-2024-12-04-11-45",
+        #     "input.dist_field_preproc": False,
+        #     "input.gauss_blur_sigma": 3.0,
+        #     "mapping.frame_ranges": [[0, 550], [1710, -1]],
+        # },
+        # {
+        #     "input.seq_id": "boreas-2024-12-04-11-45",
+        #     "input.dist_field_preproc": False,
+        #     "input.gauss_blur_sigma": 25.0,
+        #     "mapping.frame_ranges": [[0, 550], [1710, -1]],
+        # },
+        # {
+        #     "input.seq_id": "boreas-2024-12-04-11-45",
+        #     "input.dist_field_preproc": True,
+        #     "input.gauss_blur_sigma": 3.0,
+        #     "mapping.frame_ranges": [[0, 550], [1710, -1]],
+        # },
+        # {
+        #     "input.seq_id": "boreas-2024-12-04-11-45",
+        #     "input.dist_field_preproc": True,
+        #     "input.gauss_blur_sigma": 9.0,
+        #     "mapping.frame_ranges": [[0, 550], [1710, -1]],
+        # },
+        # {
+        #     "input.seq_id": "boreas-2024-12-04-11-45",
+        #     "input.dist_field_preproc": True,
+        #     "input.gauss_blur_sigma": 15.0,
+        #     "mapping.frame_ranges": [[0, 550], [1710, -1]],
+        # },
         {
             "input.seq_id": "boreas-2024-12-04-11-45",
             "input.dist_field_preproc": True,
@@ -82,7 +82,7 @@ if __name__ == "__main__":
         for key_path, value in overrides.items():
             set_by_path(cfg, key_path, value)
 
-        out_path = base_config_path / f"config_run_{i:02d}.yaml"
+        out_path = base_config_path / f"temp_ba_config.yaml"
         with open(out_path, "w") as f:
             yaml.safe_dump(cfg, f, sort_keys=False)
 
