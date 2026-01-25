@@ -187,11 +187,6 @@ void LocSolver::optimize() {
         }
         std::cout << "Nearest map pose index: " << best_map_idx << ", distance: " << min_dist << " m." << std::endl;
 
-
-        std::cout << "scan->pose():\n" << scan->pose().matrix() << std::endl;
-        std::cout << "loc_problem.gt_poses().at(i):\n" << loc_problem.gt_poses().at(i).matrix() << std::endl;
-
-
         // Compute estimated pose within local map
         lgmath::se3::Transformation loc_est_pose = nearest_map_est_pose.inverse() * scan->pose();
         scan->set_pose(loc_est_pose);
@@ -229,6 +224,11 @@ void LocSolver::optimize() {
         avg_pose_error(1) += pose_error(1) * pose_error(1);
         avg_pose_error(2) += pose_error(5) * pose_error(5);
 
+        // If pose error is larger than max_dist, localization has failed and will not recover
+        if (std::sqrt(pose_error(0) * pose_error(0) + pose_error(1) * pose_error(1)) > opts_.max_dist) {
+            throw std::runtime_error("Error: Localization has diverged! Pose error exceeded maximum map range.");
+        }
+
         // Propagate curr_pose using DRO estimates
         if (i == scan_id_list.size() - 1) {
             break;
@@ -240,6 +240,9 @@ void LocSolver::optimize() {
         lgmath::se3::Transformation next_dro_pose = loc_problem.dro_poses().at(i + 1);
         dro_rel_pose = curr_dro_pose.inverse() * next_dro_pose;
         curr_pose = curr_pose * dro_rel_pose;
+        // For debug, set current pose to groundtruth
+        // curr_pose = nearest_map_est_pose * nearest_map_gt_pose.inverse() * loc_problem.gt_poses().at(i + 1);
+        // curr_pose = curr_pose.toSE2().toSE3();
 
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
