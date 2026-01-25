@@ -169,6 +169,16 @@ Options load_options(const YAML::Node& config) {
             opts.pose_source = config["mapping"]["pose_source"].as<std::string>();
         if (config["mapping"]["estimate_location"])
             opts.estimate_location = std::filesystem::path(config["mapping"]["estimate_location"].as<std::string>());
+        if (config["mapping"]["map_seq"])
+            opts.map_seq = config["mapping"]["map_seq"].as<std::string>();
+        else
+            throw std::runtime_error("Mapping sequence ID not found in config file.");
+        if (config["mapping"]["map_max_dist"])
+            opts.map_max_dist = config["mapping"]["map_max_dist"].as<double>();
+        if (config["mapping"]["map_dist_field_preproc"])
+            opts.map_dist_field_preproc = config["mapping"]["map_dist_field_preproc"].as<bool>();
+        if (config["mapping"]["map_gauss_blur_sigma"])
+            opts.map_gauss_blur_sigma = config["mapping"]["map_gauss_blur_sigma"].as<double>();
         if (config["mapping"]["frame_ranges"]) {
             opts.frame_ranges.clear();
             for (const auto& range_node : config["mapping"]["frame_ranges"]) {
@@ -193,10 +203,6 @@ Options load_options(const YAML::Node& config) {
             opts.start_frame = config["localization"]["start_frame"].as<int>();
         if (config["localization"]["end_frame"])
             opts.end_frame = config["localization"]["end_frame"].as<int>();
-        if (config["localization"]["map_seq"])
-            opts.map_seq = config["localization"]["map_seq"].as<std::string>();
-        else
-            throw std::runtime_error("Map sequence ID not found in config file.");
     }
 
     return opts;

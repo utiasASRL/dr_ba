@@ -62,13 +62,16 @@ struct Options {
     // Mapping parameters
     std::string pose_source = "gt"; // 'estimate', 'gt', 'pogo', 'dro'
     fs::path estimate_location;
+    std::string map_seq;
+    double map_max_dist = 80.0; // meters
+    bool map_dist_field_preproc = true;
+    double map_gauss_blur_sigma = 3.0; // pixels
     std::vector<std::pair<int, int>> frame_ranges; // pairs of start and end frame indices
 
     // Localization parameters
     fs::path map_location;
     int start_frame = 0;
     int end_frame = -1; // -1 for last frame
-    std::string map_seq;
 };
 
 Options load_options(const YAML::Node& config);
