@@ -99,6 +99,10 @@ def visualize_ablation(
         label = format_label(cfg, label_fields)
 
         csv_path = run_dir / 'rmse_cost_history.csv'
+        if not csv_path.exists():
+            print(f"Skipping {run_dir} (no CSV data)")
+            continue
+
         data = np.loadtxt(csv_path, delimiter=",", skiprows=1)
 
         # Check number of entries in each row
