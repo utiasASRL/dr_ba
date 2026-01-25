@@ -479,6 +479,9 @@ void DrBASolver::update_map() {
             voxel_map_.at(voxel_idx) = new_intensity;
         }
     }
+
+    // Unload all scans
+    scan_manager_.unload_all_data();
 }
 
 void DrBASolver::optimize() {
@@ -511,7 +514,7 @@ void DrBASolver::optimize() {
     std::vector<int> save_map_iter_idx = {0, 1, 2, 4, 10, 20, 50};
 
     for (int iter = 0; iter < opts_.max_iterations; iter++) {
-        std::cout << "Iteration " << iter + 1 << " / " << opts_.max_iterations << std::endl;
+        std::cout << "Iteration " << iter << " / " << opts_.max_iterations << std::endl;
         downsample_factor = (iter < opts_.num_coarse_iterations) ? opts_.coarse_downsample : opts_.refine_downsample;
 
         // Occasionally re-tile problem in case poses have changed significantly
@@ -520,10 +523,6 @@ void DrBASolver::optimize() {
             tile_problem();
             // Update map
             update_map();
-            // Save result
-            if (opts_.save_result)
-                result_.save_full_result();
-
         }
 
         // if (std::find(save_map_iter_idx.begin(), save_map_iter_idx.end(), iter) != save_map_iter_idx.end()) {
@@ -544,7 +543,7 @@ void DrBASolver::optimize() {
         avg_construct_time += std::chrono::duration<double>(end - start).count();
 
         if (iter > 0 && iter > opts_.num_coarse_iterations && cost_ > prev_cost_) {
-            if (num_cost_rises >= 5 || alpha_ < 1e-2) {
+            if (num_cost_rises >= 3 || alpha_ < 1e-2) {
                 std::cout << "Stopping optimization due to repeated cost increases." << std::endl;
                 break;
             }
@@ -603,6 +602,9 @@ void DrBASolver::optimize() {
         result_.add_rmse(scan_manager_.compute_pose_rmse());
         result_.add_ate(scan_manager_.compute_ate());
         result_.add_epe(scan_manager_.compute_epe());
+        if (opts_.save_result)
+            result_.save_full_result();
+
         if (iter != 0 && iter > opts_.num_coarse_iterations && (del_x_.norm() < opts_.convergence_tol || std::abs(prev_cost_ - cost_) < opts_.convergence_tol)) {
             std::cout << "Converged from: " << ((del_x_.norm() < opts_.convergence_tol ) ? "small pose update." : "small cost change.") << std::endl;
             break;
