@@ -10,7 +10,7 @@ namespace ba {
 
 void LocProblem::get_scan_indeces() {
     // For localization load all scans
-    std::string seq_id = opts_.seq_ids[0];
+    std::string seq_id = opts_.seq_id;
     fs::path all_img_dir = opts_.meas_path / seq_id / opts_.input_type;
     int count = -1;
     for (const auto& entry : fs::directory_iterator(all_img_dir)) {
@@ -83,7 +83,7 @@ void LocProblem::load_map_from_estimate() {
 
 void LocProblem::load_scans() {
     std::cout << "Loading scans for localization..." << std::endl;
-    std::string seq_id = opts_.seq_ids[0];
+    std::string seq_id = opts_.seq_id;
 
     // Load groundtruth poses
     std::vector<lgmath::se3::Transformation> all_gt_poses;

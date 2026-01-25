@@ -7,39 +7,57 @@ output:
 input:
   data_path: '/home/dl/Documents/phd/data/boreas'
   meas_path: '/home/dl/Documents/phd/dev/dr_ba/output'
-  seq_ids:
-    - 'boreas-2024-12-04-11-45'
+  seq_id: 'boreas-2024-12-04-11-45'
   max_dist: 80.0  # m
-  gauss_blur_sigma: 3.0  # pixels
+  dist_field_preproc: true
+  gauss_blur_sigma: 21.0  # pixels
   init_poses: 'pogo'  # 'pogo' or 'gt', 'dro'
-  init_translation_std: 1.2  # m
-  init_rotation_std: 1.2  # degrees
-  input_type: 'scans' # 'local_maps' or 'scans'
+  init_translation_std: 0.0  # m
+  init_rotation_std: 0.0  # degrees
+  input_type: 'local_maps' # 'local_maps' or 'scans'
   local_map_res: 0.1  # m/pixel (only relevant if input_type is 'local_map')
 keyframing:
-  num_frames: 200
   max_kf_dist: 5.0  # m
   max_kf_rot: 30.0  # degrees
   fix_first_scan: true
 optimization:
   num_threads: 14
-  max_iterations: 51
+  max_iterations: 5
   convergence_tol: 1e-3
   alpha: 5.0  # step size
-  adaptive_alpha: true # decrease alpha if cost does not decrease
-  prior_map_std: 0.1 # intensity units
+  adaptive_alpha: false # decrease alpha if cost does not decrease
   meas_std: 0.1 # intensity units
   range_factor: 0.0005  # factor to scale range uncertainty to intensity uncertainty
   use_cumul_thresh: true
   zero_thresh: 0.2 # max cumul return threshold to consider a measurement as zero return
-  cumul_thresh: 0.99  # threshold to ignore measurements with too high a cumulative return
+  cumul_thresh: 0.9  # threshold to ignore measurements with too high a cumulative return
   rel_pose_prior:
     use_pose_prior: false
-    translation_std: 100.0  # m
+    translation_std: 0.1  # m
     rotation_std: 0.1  # degrees
   # Downsample control
   num_coarse_iterations: 0
   coarse_downsample: 1.0
   refine_downsample: 1.0
   tile_size: 100.0  # m, size of tiles to process separately
-  max_loaded_scans: 400  # max number of scans to keep loaded in memory at once (>0 all)
+  max_loaded_scans: 360  # max number of scans to keep loaded in memory at once (>0 all)
+mapping:
+  frame_ranges:
+  - [0, -1]
+  # - [300, 320]
+    # - [400, 600]
+    # - [1600, 1780]
+    # - [400, 600]
+    # - [1600, 1770]
+
+    # - [490, 510]
+    # - [1690, 1710]
+
+
+# - 'boreas-2024-12-03-12-54' # glen
+# - 'boreas-2024-12-05-14-12' # industrial
+# - 'boreas-2024-12-04-11-45' # skyway
+# - 'boreas-2025-07-18-10-33' # forest
+# - 'boreas-2025-07-18-14-55' # Farm
+# - 'boreas-2025-08-06-06-33' # urban
+# - 'boreas-2025-08-06-07-05' # urban

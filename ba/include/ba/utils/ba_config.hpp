@@ -14,7 +14,7 @@ struct Options {
     fs::path data_path;
     fs::path meas_path;
     fs::path input_path;
-    std::vector<std::string> seq_ids;
+    std::string seq_id;
 
     // Map parameters
     double voxel_res = 0.2;        // meters

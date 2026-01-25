@@ -43,13 +43,10 @@ Options load_options(const YAML::Node& config) {
             opts.meas_path = std::filesystem::path(config["input"]["meas_path"].as<std::string>());
         else
             throw std::runtime_error("Measurement path not found in config file.");
-        if (config["input"]["seq_ids"]) {
-            opts.seq_ids.clear();
-            for (const auto& id_node : config["input"]["seq_ids"]) {
-                opts.seq_ids.push_back(id_node.as<std::string>());
-            }
+        if (config["input"]["seq_id"]) {
+            opts.seq_id = config["input"]["seq_id"].as<std::string>();
         } else
-            throw std::runtime_error("Sequence IDs not found in config file.");
+            throw std::runtime_error("Sequence ID not found in config file.");
         if (config["input"]["max_dist"])
             opts.max_dist = config["input"]["max_dist"].as<double>();
         else

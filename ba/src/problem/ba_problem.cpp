@@ -8,7 +8,7 @@ namespace ba {
 
 void BAProblem::get_scan_indeces() {
     std::cout << "Selecting scan indices based on frame ranges..." << std::endl;
-    std::string seq_id = opts_.seq_ids[0];
+    std::string seq_id = opts_.seq_id;
 
     // Load groundtruth poses
     std::vector<lgmath::se3::Transformation> all_gt_poses;
@@ -150,7 +150,7 @@ void BAProblem::get_scan_indeces() {
 
 void BAProblem::init_scans() {
     std::cout << "Loading scans..." << std::endl;
-    std::string seq_id = opts_.seq_ids[0];
+    std::string seq_id = opts_.seq_id;
 
     // Load groundtruth poses
     std::vector<lgmath::se3::Transformation> all_gt_poses;

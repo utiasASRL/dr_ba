@@ -8,7 +8,7 @@ namespace ba {
 
 void MapProblem::get_scan_indeces() {
     std::cout << "Selecting scan indices based on frame ranges..." << std::endl;
-    std::string seq_id = opts_.seq_ids[0];
+    std::string seq_id = opts_.seq_id;
 
     // Load groundtruth poses
     std::vector<lgmath::se3::Transformation> all_gt_poses;
@@ -200,7 +200,7 @@ void MapProblem::init_scans_and_map() {
 }
 
 void MapProblem::init_scans_and_map_from_estimates() {
-    std::string seq_id = opts_.seq_ids[0];
+    std::string seq_id = opts_.seq_id;
 
     // Load in voxel map from estimates
     std::string estimate_location = opts_.estimate_location.string() + "/voxel_map.bin";
@@ -247,7 +247,7 @@ void MapProblem::init_scans_and_map_from_estimates() {
 }
 
 void MapProblem::init_scans_and_map_from_data() {
-    std::string seq_id = opts_.seq_ids[0];
+    std::string seq_id = opts_.seq_id;
     std::cout << "Initializing scans and map from data for sequence: " << seq_id << std::endl;
 
     // Initialize uniform distribution for noise

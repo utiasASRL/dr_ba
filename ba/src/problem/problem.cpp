@@ -8,7 +8,7 @@ void Problem::preload_images() {
     if (scan_indices_.empty()) {
         throw std::runtime_error("Scan indices are empty. Cannot preload images.");
     }
-    std::string seq_id = opts_.seq_ids[0];
+    std::string seq_id = opts_.seq_id;
     std::cout << "Preloading images for sequence: " << seq_id << std::endl;
 
     // Set up temporary folder for Gaussian-blurred images to be stored
