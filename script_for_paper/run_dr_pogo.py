@@ -5,9 +5,13 @@ from utils import utils
 import subprocess
 import yaml
 
-
 # RSS data
 sequences = [
+    'boreas-2025-08-06-06-33', # Urban
+    'boreas-2025-08-06-07-05', # Urban
+    'boreas-2025-08-06-07-41', # Urban
+    'boreas-2025-08-06-08-35', # Urban
+
     'boreas-2024-12-03-12-54', # Glenshield
     'boreas-2025-01-08-10-59', # Glenshield
     'boreas-2025-01-08-11-22', # Glenshield
@@ -32,11 +36,6 @@ sequences = [
     'boreas-2025-07-18-15-12', # Farm
     'boreas-2025-07-18-15-30', # Farm
     'boreas-2025-07-18-15-48', # Farm
-
-    'boreas-2025-08-06-06-33', # Urban
-    'boreas-2025-08-06-07-05', # Urban
-    'boreas-2025-08-06-07-41', # Urban
-    'boreas-2025-08-06-08-35', # Urban
 ]
 
 data_path = utils.getDataDir()
@@ -54,7 +53,7 @@ for seq in sequences:
         subprocess.call(["python3","raplace/raplace.py"])
         subprocess.call(["python3","coarse_registration/coarse_registrations.py"])
         subprocess.call(["python3","dro/fine_registration.py"])
-        subprocess.call(["pogo/build/pogo"])
+        subprocess.call(["python3","pogo/pogo.py"])
     except:
         print(f"An error occurred while processing sequence {seq}.")
         continue
