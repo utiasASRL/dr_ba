@@ -35,42 +35,6 @@ def format_label(cfg, label_fields):
 
 
 # ----------------------------
-# Data loading (placeholder)
-# ----------------------------
-
-def load_run_data(run_dir):
-    """
-    Load whatever data you want to visualize for a single run.
-
-    Replace this with:
-      - reading numpy arrays
-      - parsing CSVs
-      - loading trajectory errors
-      - etc.
-    """
-    csv_path = run_dir / 'rmse_cost_history.csv'
-    data = np.loadtxt(csv_path, delimiter=",", skiprows=1)
-
-    # Check number of entries in each row
-    if data.shape[1] == 5:
-        cost = data[:, 0]
-        ate = data[:, 1]
-        rmse_x = data[:, 2]
-        rmse_y = data[:, 3]
-        rmse_yaw = data[:, 4]
-    elif data.shape[1] == 6:
-        cost = data[:, 0]
-        ate = data[:, 1]
-        epe = data[:, 2]
-        rmse_x = data[:, 3]
-        rmse_y = data[:, 4]
-        rmse_yaw = data[:, 5]
-    else:
-        print("Unexpected number of columns in CSV file:", data.shape[1])
-        sys.exit(1)
-
-
-# ----------------------------
 # Main visualization
 # ----------------------------
 
