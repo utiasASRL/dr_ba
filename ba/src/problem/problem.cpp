@@ -64,17 +64,55 @@ void Problem::preload_images() {
 
         // Create temporary scan path
         std::string int_gauss_blur = std::to_string(static_cast<int>(opts_.gauss_blur_sigma));
-        fs::path temp_img_path = temp_dir / (img_stem + "_" + int_gauss_blur + ".png");
+        fs::path temp_img_path;
+        if (opts_.dist_field_preproc)
+            temp_img_path = temp_dir / (img_stem + "_distfield_" + int_gauss_blur + ".png");
+        else
+            temp_img_path = temp_dir / (img_stem + "_" + int_gauss_blur + ".png");
 
         // Load in image as Eigen matrix
         if (!fs::exists(temp_img_path)) {
             // Only process if the temp image does not already exist
             cv::Mat img = cv::imread(img_path.string(), cv::IMREAD_GRAYSCALE);
 
+            if (img.empty()) {
+                throw std::runtime_error("Failed to load image: " + img_path.string());
+            }
+
+            if (opts_.dist_field_preproc) {
+                // Convert to float
+                img.convertTo(img, CV_32F, 1.0 / 255.0);
+
+                // Min–max normalization
+                double min_val, max_val;
+                cv::minMaxLoc(img, &min_val, &max_val);
+                img = (img - min_val) / (max_val - min_val);
+
+                // Invert: 1 - normalized
+                img = 1.0 - img;
+
+                // Exponential transform
+                cv::exp(-2.0 * img, img);
+            }
+
             // Apply Gaussian blur
             if (opts_.gauss_blur_sigma > 0.0) {
                 int ksize = static_cast<int>(std::ceil(opts_.gauss_blur_sigma * 6)) | 1; // kernel size should be odd
                 cv::GaussianBlur(img, img, cv::Size(ksize, ksize), opts_.gauss_blur_sigma);
+            }
+
+            if (opts_.dist_field_preproc) {
+                // Re-normalize after blur
+                double min_val, max_val;
+                cv::minMaxLoc(img, &min_val, &max_val);
+                img = (img - min_val) / (max_val - min_val);
+
+                // Clip to [0, 1] (should already be in this range, but just to be safe)
+                cv::threshold(img, img, 0.0, 0.0, cv::THRESH_TOZERO);
+                cv::threshold(img, img, 1.0, 1.0, cv::THRESH_TRUNC);
+
+                // Convert back to 8-bit for saving
+                img.convertTo(img, CV_8U, 255.0);
             }
 
             // Save blurred image to temp directory for easy loading

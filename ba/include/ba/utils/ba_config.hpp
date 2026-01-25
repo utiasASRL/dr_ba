@@ -26,6 +26,7 @@ struct Options {
 
     // Input parameters
     double max_dist = 80.0;       // meters
+    bool dist_field_preproc = true;
     double gauss_blur_sigma = 2.0; // pixels
     std::string init_poses = "gt";    // 'gt' or 'pogo'
     double init_translation_std = 0.5; // meters
@@ -34,7 +35,6 @@ struct Options {
     double local_map_res = 0.1; // meters/pixel
 
     // Keyframing parameters
-    int num_frames = 5;
     double max_kf_dist = 2.0;    // meters
     double max_kf_rot = 10.0;    // degrees
     bool fix_first_scan = true;

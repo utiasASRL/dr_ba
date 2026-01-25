@@ -54,6 +54,8 @@ Options load_options(const YAML::Node& config) {
             opts.max_dist = config["input"]["max_dist"].as<double>();
         else
             throw std::runtime_error("Max distance not found in config file.");
+        if (config["input"]["dist_field_preproc"])
+            opts.dist_field_preproc = config["input"]["dist_field_preproc"].as<bool>();
         if (config["input"]["gauss_blur_sigma"])
             opts.gauss_blur_sigma = config["input"]["gauss_blur_sigma"].as<double>();
         else
@@ -83,10 +85,6 @@ Options load_options(const YAML::Node& config) {
     }
 
     if (config["keyframing"]) {
-        if (config["keyframing"]["num_frames"])
-            opts.num_frames = config["keyframing"]["num_frames"].as<int>();
-        else
-            throw std::runtime_error("Number of frames not found in config file.");
         if (config["keyframing"]["max_kf_dist"])
             opts.max_kf_dist = config["keyframing"]["max_kf_dist"].as<double>();
         else
