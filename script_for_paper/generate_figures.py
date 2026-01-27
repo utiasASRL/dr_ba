@@ -41,15 +41,19 @@ def main():
 
     #baOverlayFigure()
     #baOverlayFigure(seq_id='boreas-2024-12-04-11-45', tbv_path='/home/ced/Documents/data/boreas/for_tbv/TBV_Eval/boreas_tbv_model_8_2026-01-20_21-18/job_0')
-    testOverlap(seq_id='boreas-2025-08-06-07-05', scan_ref = 1700, method='ba')
-    testOverlap(seq_id='boreas-2025-08-06-07-05', scan_ref = 1700, method='gt')
-    testOverlap(seq_id='boreas-2025-08-06-07-05', scan_ref = 1700, method='pogo')
+    testOverlap(seq_id='boreas-2024-12-04-11-45', scan_ref = 1700, method='ba', black_background=True)
+    testOverlap(seq_id='boreas-2024-12-04-11-45', scan_ref = 1700, method='ba')
+    #testOverlap(seq_id='boreas-2024-12-04-11-45', scan_ref = 1700, method='gt')
+    #testOverlap(seq_id='boreas-2024-12-04-11-45', scan_ref = 1700, method='pogo')
+    #testOverlap(seq_id='boreas-2024-12-03-12-54', scan_ref = 1700, method='ba')
+    #testOverlap(seq_id='boreas-2024-12-03-12-54', scan_ref = 1700, method='gt')
+    #testOverlap(seq_id='boreas-2024-12-03-12-54', scan_ref = 1700, method='pogo')
 
     #plottrajectories()
 
     #timing()
 
-def testOverlap(seq_id='boreas-2024-12-03-12-54', scan_ref = 1000, method='gt'):
+def testOverlap(seq_id='boreas-2024-12-03-12-54', scan_ref = 1000, method='gt', black_background=False):
     # Load the Dr-PoGO trajectory
 
     ref = scan_ref
@@ -88,7 +92,7 @@ def testOverlap(seq_id='boreas-2024-12-03-12-54', scan_ref = 1000, method='gt'):
     print(f"Selected scan {min_j} at distance {last_selected_range} m from scan {ref}")
     os.makedirs('figures/overlays', exist_ok=True)
 
-    score = overlapScans(traj[ref], times[ref], traj[min_j], times[min_j], scan_path=os.path.join('output', seq_id, 'local_maps'), labels=[f'Scan {ref}', f'Scan {min_j}'], visualize=True, output_path='figures/overlays/' + f'{method}_overlay_{seq_id}_scan_{ref}_{min_j}.pdf')
+    score = overlapScans(traj[ref], times[ref], traj[min_j], times[min_j], scan_path=os.path.join('output', seq_id, 'local_maps'), labels=[f'Scan {ref}', f'Scan {min_j}'], visualize=True, output_path='figures/overlays/' + f'{method}_overlay_{seq_id}_scan_{ref}_{min_j}.pdf', black_background=black_background)
         
 
 
@@ -96,7 +100,7 @@ def testOverlap(seq_id='boreas-2024-12-03-12-54', scan_ref = 1000, method='gt'):
 
 
 
-def baOverlayFigure(seq_id='boreas-2024-12-03-12-54', tbv_path='/home/ced/Documents/data/boreas/for_tbv/TBV_Eval/boreas_tbv_model_8_2026-01-20_08-06/job_0'):
+def baOverlayFigure(seq_id='boreas-2024-12-03-12-54', tbv_path='/home/ced/Documents/data/boreas/for_tbv/TBV_Eval/boreas_tbv_model_8_2026-01-20_08-06/job_0', black_background=False):
 
     # Load the Dr-PoGO trajectory
     # Get the BA trajectory
@@ -105,6 +109,8 @@ def baOverlayFigure(seq_id='boreas-2024-12-03-12-54', tbv_path='/home/ced/Docume
 
     pogo_traj = utils.getInterpolatedTrajectory(pogo_traj, pogo_times, ba_times)
     pogo_times = ba_times
+
+    dro_traj, dro_times = utils.getDroPosesAndTimes(seq_id, ouput_path='output')
 
     # Get the TBV trajectory
     tbv_traj, tbv_times, _ = utils.readTBV2DTraj(tbv_path)
@@ -142,7 +148,7 @@ def baOverlayFigure(seq_id='boreas-2024-12-03-12-54', tbv_path='/home/ced/Docume
     # Scores for each pair
     scores = []
     for (i, j) in scan_pairs:
-        scores.append(overlapScans(pogo_traj[i], pogo_times[i], pogo_traj[j], pogo_times[j], scan_path=os.path.join('output', seq_id, 'local_maps'), labels=[f'Scan {i}', f'Scan {j}']))
+        scores.append(overlapScans(pogo_traj[i], pogo_times[i], pogo_traj[j], pogo_times[j], scan_path=os.path.join('output', seq_id, 'local_maps'), labels=[f'Scan {i}', f'Scan {j}'], black_background=black_background))
 
     # Get the n lowest scores that are at least 50m apart and display their overlays
     distance_threshold = 50.0  # meters
@@ -177,15 +183,16 @@ def baOverlayFigure(seq_id='boreas-2024-12-03-12-54', tbv_path='/home/ced/Docume
     for idx in selected_indices:
         i, j = scan_pairs[idx]
         output_path = os.path.join(overlay_path, f'pogo_overlay_scan_{i}_{j}.pdf')
-        overlapScans(pogo_traj[i], pogo_times[i], pogo_traj[j], pogo_times[j], scan_path=scan_path, output_path=output_path, labels=[f'Scan {i}', f'Scan {j}'])
+        overlapScans(pogo_traj[i], pogo_times[i], pogo_traj[j], pogo_times[j], scan_path=scan_path, output_path=output_path, labels=[f'Scan {i}', f'Scan {j}'], black_background=black_background)
 
         output_path = os.path.join(overlay_path, f'tbv_overlay_scan_{i}_{j}.pdf')
-        overlapScans(tbv_traj_interp[i], pogo_times[i], tbv_traj_interp[j], pogo_times[j], scan_path=scan_path, output_path=output_path, labels=[f'Scan {i}', f'Scan {j}'])
+        overlapScans(tbv_traj_interp[i], pogo_times[i], tbv_traj_interp[j], pogo_times[j], scan_path=scan_path, output_path=output_path, labels=[f'Scan {i}', f'Scan {j}'], black_background=black_background)
 
         output_path = os.path.join(overlay_path, f'ba_overlay_scan_{i}_{j}.pdf')
-        overlapScans(ba_traj[i], pogo_times[i], ba_traj[j], pogo_times[j], scan_path=scan_path, output_path=output_path, labels=[f'Scan {i}', f'Scan {j}'])
+        overlapScans(ba_traj[i], pogo_times[i], ba_traj[j], pogo_times[j], scan_path=scan_path, output_path=output_path, labels=[f'Scan {i}', f'Scan {j}'], black_background=black_background)
 
-
+        output_path = os.path.join(overlay_path, f'dro_overlay_scan_{i}_{j}.pdf')
+        overlapScans(dro_traj[i], pogo_times[i], dro_traj[j], pogo_times[j], scan_path=scan_path, output_path=output_path, labels=[f'Scan {i}', f'Scan {j}'], black_background=black_background)
 
     # Plot the scores a link colormap on the trajectory
     fig, ax = plt.subplots(1, 1, figsize=(6, 6))
@@ -211,7 +218,7 @@ def baOverlayFigure(seq_id='boreas-2024-12-03-12-54', tbv_path='/home/ced/Docume
 
 
 
-def overlapScans(pose1, time1, pose2, time2, scan_path, output_path = None, labels = None, visualize=False):
+def overlapScans(pose1, time1, pose2, time2, scan_path, output_path = None, labels = None, visualize=False, black_background=False):
     res = utils.getPixelResolution()
     scan1 = cv2.imread(os.path.join(scan_path, utils.timeToName(time1)), cv2.IMREAD_GRAYSCALE)
     scan2 = cv2.imread(os.path.join(scan_path, utils.timeToName(time2)), cv2.IMREAD_GRAYSCALE)
@@ -232,8 +239,23 @@ def overlapScans(pose1, time1, pose2, time2, scan_path, output_path = None, labe
         print(f"Saving overlay to {output_path}...")
         print("Relative pose:", xy, np.rad2deg(theta))
         plt.figure(figsize=(12,12))
-        plt.imshow(scan1, cmap='gray')
-        plt.imshow(overlay, cmap='hot', alpha=0.7)
+        if black_background:
+            plt.imshow(scan1, cmap='gray')
+            plt.imshow(overlay, cmap='hot', alpha=0.7)
+        else:
+            offset = 1.5
+            scan1 = (scan1.astype(np.float32) / np.max(scan1)) * offset
+            image_blend = np.zeros((scan1.shape[0], scan1.shape[1], 3), dtype=np.float32)
+            image_blend[:, :, 0] = np.clip(1-scan1, 0, 1)
+            if np.max(overlay) > 0:
+                overlay = (overlay.astype(np.float32) / np.max(overlay)) * offset
+                image_blend[:, :, 2] = np.clip(1-overlay, 0, 1)
+                image_blend[:, :, 1] = np.clip(1-(scan1 * 0.5 + overlay * 0.5), 0, 1)
+            else:
+                image_blend[:, :, 1] = 1 - scan1 * 0.5 
+                image_blend[:, :, 2] = 1
+            plt.imshow(image_blend)
+
         if labels is not None:
             plt.title(f"{labels[0]} & {labels[1]}\nScore: {score:.2f}", {'fontweight': 'bold'})
         plt.axis('off')
