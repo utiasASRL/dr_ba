@@ -56,7 +56,7 @@ void MapProblem::get_scan_indeces() {
             throw std::invalid_argument("Invalid frame range: [" + std::to_string(range.first) + ", " + std::to_string(range.second) + "]");
         }
         if (range.first < 0 || range.second >= num_scans) {
-            throw std::out_of_range("Frame range out of bounds: [" + std::to_string(range.first) + ", " + std::to_string(range.second) + "]");
+            throw std::out_of_range("Frame range out of bounds: [" + std::to_string(range.first) + ", " + std::to_string(range.second) + "] for sequence " + seq_id_);
         }
         max_frame = std::max(max_frame, range.second);
     }
