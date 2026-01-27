@@ -209,12 +209,12 @@ void LocSolver::optimize() {
         lgmath::se3::Transformation pose_diff = scan->pose().inverse() * curr_pose;
         double pos_diff = pose_diff.r_ab_inb().head<2>().norm();
         std::cout << "Position difference from prior: " << pos_diff << " m." << std::endl;
-        // if (pos_diff > 0.2) {
-        //     std::cout << "Pose change from prior: " << pos_diff << " m. Ignoring estimate and using prior." << std::endl;
-        // } else {
-        //     curr_pose = scan->pose();
-        // }
-        curr_pose = scan->pose();
+        if (pos_diff > 0.4 && i > 5) {
+            std::cout << "Pose change from prior: " << pos_diff << " m. Ignoring estimate and using prior." << std::endl;
+        } else {
+            curr_pose = scan->pose();
+        }
+        // curr_pose = scan->pose();
         
 
         // Compute errors
