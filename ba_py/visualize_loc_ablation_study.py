@@ -57,6 +57,8 @@ def plot_ablation_comparison(
 
     fig, axs = plt.subplots(3, 1, sharex=True, figsize=(10, 8))
 
+    # labels = ['glen', 'skyway', 'farm', 'forest']
+
     for run_dir in run_dirs:
         print(f"Processing {run_dir.name}...")
         cfg_path = run_dir / 'map_loc_config.yaml'
@@ -68,6 +70,7 @@ def plot_ablation_comparison(
             cfg = yaml.safe_load(f)
 
         label = format_label(cfg, label_fields)
+        # label = labels[int(run_dir.name.split("_")[2]) - 1]
 
         # map_id,scan_id,est_x,est_y,est_yaw,gt_x,gt_y,gt_yaw
         loc_result_path = osp.join(run_dir, "loc_results.csv")
@@ -79,13 +82,15 @@ def plot_ablation_comparison(
         x_errs = []
         y_errs = []
         yaw_errs = []
-
+        scan_id_0 = None
         with open(loc_result_path, "r") as f:
             next(f)  # skip header
             for line in f:
                 tokens = line.strip().split(",")
+                if scan_id_0 is None:
+                    scan_id_0 = int(tokens[1])
 
-                scan_id = int(tokens[1])
+                scan_id = int(tokens[1]) - scan_id_0
 
                 est_x = float(tokens[2])
                 est_y = float(tokens[3])
@@ -107,10 +112,22 @@ def plot_ablation_comparison(
                 y_errs.append(est_y - gt_y)
                 yaw_errs.append(yaw_err)
 
+        print("RMSE (m), (m), (deg):")
+        x_errs = np.array(x_errs)
+        y_errs = np.array(y_errs)
+        yaw_errs = np.array(yaw_errs)
+        rmse_x = np.sqrt(np.mean(x_errs**2))
+        rmse_y = np.sqrt(np.mean(y_errs**2))
+        rmse_yaw = np.sqrt(np.mean(yaw_errs**2))
+        print(f"{rmse_x:.3f}, {rmse_y:.3f}, {rmse_yaw:.3f}")
+        label += f" (RMSE: {rmse_x:.2f}m, {rmse_y:.2f}m, {rmse_yaw:.2f}°)"
+
         # ---- plotting ----
         axs[0].plot(frame_ids, x_errs, label=label)
         axs[1].plot(frame_ids, y_errs, label=label)
         axs[2].plot(frame_ids, yaw_errs, label=label)
+
+
 
     # ---- formatting ----
     axs[0].set_ylabel("x error [m]")
@@ -135,7 +152,7 @@ def plot_ablation_comparison(
 
 if __name__ == "__main__":
     plot_ablation_comparison(
-        ablation_root="/home/dl/Documents/phd/dev/dr_ba/output/ablation_map_loc/set_00",
+        ablation_root="/home/dl/Documents/phd/dev/dr_ba/output/ablation_map_loc/set_50",
         label_fields={
             "map.voxel_res": "vox",
             "input.dist_field_preproc": "DF-scan",
