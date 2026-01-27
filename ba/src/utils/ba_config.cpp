@@ -195,6 +195,14 @@ Options load_options(const YAML::Node& config) {
 
     // Localization parameters
     if (config["localization"]) {
+        if (config["localization"]["odometry_prior"]) {
+            if (config["localization"]["odometry_prior"]["use_odometry_prior"])
+                opts.use_odometry_prior = config["localization"]["odometry_prior"]["use_odometry_prior"].as<bool>();
+            if (config["localization"]["odometry_prior"]["translation_std"])
+                opts.odom_translation_std = config["localization"]["odometry_prior"]["translation_std"].as<double>();
+            if (config["localization"]["odometry_prior"]["rotation_std"])
+                opts.odom_rotation_std = config["localization"]["odometry_prior"]["rotation_std"].as<double>();
+        }
         if (config["localization"]["map_location"])
             opts.map_location = std::filesystem::path(config["localization"]["map_location"].as<std::string>());
         else

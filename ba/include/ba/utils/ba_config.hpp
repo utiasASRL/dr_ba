@@ -69,6 +69,9 @@ struct Options {
     std::vector<std::pair<int, int>> frame_ranges; // pairs of start and end frame indices
 
     // Localization parameters
+    bool use_odometry_prior = false;
+    double odom_translation_std = 0.2; // meters
+    double odom_rotation_std = 5.0;    // degrees
     fs::path map_location;
     int start_frame = 0;
     int end_frame = -1; // -1 for last frame
