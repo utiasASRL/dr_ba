@@ -16,6 +16,9 @@ public:
         double gt_x;
         double gt_y;
         double gt_yaw;
+        double std_x;
+        double std_y;
+        double std_yaw;
     };
 
     LocProblem(Options& opts)

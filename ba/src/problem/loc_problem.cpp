@@ -46,6 +46,8 @@ void LocProblem::load_map_from_estimate() {
     std::string map_location = opts_.map_location.string() + "/voxel_map.bin";
     voxel_map_.load_from_file(map_location);
 
+    std::cout << "Voxel map loaded from: " << map_location << std::endl;
+
     // Load groundtruth map poses
     std::vector<lgmath::se3::Transformation> all_gt_poses;
     std::vector<double> all_gt_times;
@@ -67,6 +69,11 @@ void LocProblem::load_map_from_estimate() {
 
     const std::vector<int> pose_ids = voxel_map_.pose_ids();
     const std::vector<lgmath::se2::Transformation> map_poses = voxel_map_.poses();
+
+    if (files.size() < pose_ids.back()) {
+        throw std::runtime_error("Less image files than pose ids in voxel map. Are you sure the map was built from the same sequence? map_seq_id: " + map_seq_id);
+    }
+
     for (size_t i = 0; i < pose_ids.size(); i++) {
         int pose_id = pose_ids[i];
         // Get timestamp from pose_id by looking at the filename for boreas-2024-12-03-12-54
@@ -94,6 +101,11 @@ void LocProblem::load_scans() {
     std::vector<lgmath::se3::Transformation> all_dro_poses;
     std::vector<double> all_dro_times;
     ba::load_dro_poses_and_times(opts_.meas_path / seq_id, all_dro_poses, all_dro_times);
+
+    // Load pogo poses
+    std::vector<lgmath::se3::Transformation> all_pogo_poses;
+    std::vector<double> all_pogo_times;
+    ba::load_pogo_poses_and_times(opts_.meas_path / seq_id, all_pogo_poses, all_pogo_times);
 
     // Loop through indeces
     for (size_t i=0; i < scan_indices_.size(); i++) {
@@ -132,11 +144,12 @@ void LocProblem::save_loc_results(const fs::path &output_path) {
     }
     // Save all data
     std::ofstream ofs(loc_results_path, std::ios::out);
-    ofs << "map_id,scan_id,est_x,est_y,est_yaw,gt_x,gt_y,gt_yaw\n";
+    ofs << "map_id,scan_id,est_x,est_y,est_yaw,gt_x,gt_y,gt_yaw,std_x,std_y,std_yaw\n";
     for (const auto& entry : loc_results_) {
         ofs << entry.map_id << "," << entry.scan_id << ","
             << entry.est_x << "," << entry.est_y << "," << entry.est_yaw << ","
-            << entry.gt_x << "," << entry.gt_y << "," << entry.gt_yaw << "\n";
+            << entry.gt_x << "," << entry.gt_y << "," << entry.gt_yaw << ","
+            << entry.std_x << "," << entry.std_y << "," << entry.std_yaw << "\n";
     }
     ofs.close();
 }
