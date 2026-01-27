@@ -161,6 +161,8 @@ Options load_options(const YAML::Node& config) {
             opts.tile_size = config["optimization"]["tile_size"].as<double>();
         if (config["optimization"]["max_loaded_scans"])
             opts.max_loaded_scans = config["optimization"]["max_loaded_scans"].as<int>();
+        if (config["optimization"]["coarse_to_fine"])
+            opts.coarse_to_fine = config["optimization"]["coarse_to_fine"].as<bool>();
     }
 
     // Mapping parameters

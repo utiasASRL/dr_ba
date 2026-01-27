@@ -58,6 +58,7 @@ struct Options {
     double refine_downsample = 1.0; // downsampling factor for refinement iterations
     double tile_size = 0.0;     // meters, size of tiles to process separately
     int max_loaded_scans = 0;   // max number of scans to keep loaded in memory at once (>0 all)
+    bool coarse_to_fine = false; // whether to switch from coarse to fine after num_coarse_iterations
 
     // Mapping parameters
     std::string pose_source = "gt"; // 'estimate', 'gt', 'pogo', 'dro'
