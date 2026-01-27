@@ -6,6 +6,7 @@
 #include <lgmath/se2/Transformation.hpp>
 #include <lgmath/se3/Operations.hpp>
 #include <ba/utils/ba_config.hpp>
+#include <random>
 
 namespace ba {
 
@@ -49,6 +50,22 @@ public:
 	}
 	void set_gt_pose(const lgmath::se3::Transformation &new_gt_pose) {
 		gt_pose_ = new_gt_pose;
+	}
+
+	void apply_noise_to_pose(double pos_stddev, double yaw_stddev) {
+		// Initialize uniform distribution for noise
+		std::uniform_real_distribution<double> translation_dist(-pos_stddev, pos_stddev);
+		double rotation_std_rad = yaw_stddev* M_PI / 180.0;
+		std::uniform_real_distribution<double> rotation_dist(-rotation_std_rad, rotation_std_rad);
+		std::mt19937 rng(99); // Fixed seed for reproducibility
+
+		// Create random noise
+		Eigen::Vector3d noise;
+		noise << translation_dist(rng), translation_dist(rng), rotation_dist(rng);
+		lgmath::se3::Transformation T_noise = lgmath::se2::Transformation(noise).toSE3();
+
+		// Apply noise
+		pose_ = pose_ * T_noise;
 	}
 
 	// Compute pose error (SE3)
