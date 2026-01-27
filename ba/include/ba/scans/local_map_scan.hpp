@@ -86,6 +86,10 @@ public:
         return std::make_shared<LocalMapScan>(*this);
     }
 
+    void set_fine_image_path(const fs::path& fine_img_path) {
+        fine_img_path_ = fine_img_path;
+    }
+
     // Load/unload heavy data
     void load_data() override;
     void unload_data() override {
@@ -98,6 +102,10 @@ public:
         return (local_map_.size() != 0);
     }
 
+    void switch_to_fine() {
+        img_path_ = fine_img_path_;
+    }
+
 private:
     double res_;
     double range_factor_;
@@ -108,6 +116,7 @@ private:
     Eigen::MatrixXf local_map_;
     Eigen::MatrixXf cumul_img_;
     fs::path img_path_;
+    fs::path fine_img_path_;
     std::optional<fs::path> cumul_img_path_;
 };
 

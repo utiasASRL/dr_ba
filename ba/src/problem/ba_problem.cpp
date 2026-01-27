@@ -212,6 +212,9 @@ void BAProblem::init_scans() {
         if (opts_.fix_first_scan && i == 0) {
             scan->set_fixed(true); // Fix the first scan's pose
         }
+        if (opts_.coarse_to_fine) {
+            scan->set_fine_image_path(fine_img_paths_[i]);
+        }
         scan_manager_.add_scan(scan);
     }
 

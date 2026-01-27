@@ -63,11 +63,13 @@ void Problem::preload_images() {
         // Create temporary scan path
         std::string int_gauss_blur = std::to_string(static_cast<int>(opts_.gauss_blur_sigma));
         fs::path temp_img_path;
+        std::string image_name = img_stem;
+        if (opts_.input_type == "local_maps")
+            image_name += "_localmap";
         if (opts_.dist_field_preproc)
-            temp_img_path = temp_dir / (img_stem + "_distfield_" + int_gauss_blur + ".png");
-        else
-            temp_img_path = temp_dir / (img_stem + "_" + int_gauss_blur + ".png");
-
+            image_name += "_distfield";
+        image_name += "_" + int_gauss_blur + ".png";
+        temp_img_path = temp_dir / image_name;
         // Load in image as Eigen matrix
         if (!fs::exists(temp_img_path)) {
             // Only process if the temp image does not already exist
@@ -115,6 +117,33 @@ void Problem::preload_images() {
 
             // Save blurred image to temp directory for easy loading
             cv::imwrite(temp_img_path, img);
+        }
+
+        // Also store fine image path if coarse-to-fine is enabled
+        if (opts_.coarse_to_fine) {
+            // The fine image is currently hard-coded to be Gaussian blur of 3.0
+            std::string fine_img_name = img_stem;
+            if (opts_.input_type == "local_maps")
+                fine_img_name += "_localmap";
+            fine_img_name += "_" + std::to_string(3) + ".png";
+            fs::path fine_img_path = temp_dir / fine_img_name;
+            if (!fs::exists(fine_img_path)) {
+                // Only process if the temp image does not already exist
+                cv::Mat img = cv::imread(img_path.string(), cv::IMREAD_GRAYSCALE);
+
+                if (img.empty()) {
+                    throw std::runtime_error("Failed to load image: " + img_path.string());
+                }
+
+                // Apply Gaussian blur
+                double fine_sigma = 3.0;
+                int ksize = static_cast<int>(std::ceil(fine_sigma * 6)) | 1; // kernel size should be odd
+                cv::GaussianBlur(img, img, cv::Size(ksize, ksize), fine_sigma);
+
+                // Save blurred image to temp directory for easy loading
+                cv::imwrite(fine_img_path, img);
+            }
+            fine_img_paths_.push_back(fine_img_path);
         }
 
         // Store path
