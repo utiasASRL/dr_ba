@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <ba/scans/scan.hpp>
+#include <ba/scans/local_map_scan.hpp>
 #include <ankerl/unordered_dense.h>
 #include <iostream>
 #include <queue>
@@ -66,6 +67,16 @@ public:
         return count;
     }
 
+    void switch_all_to_fine() {
+        for (const auto& kv : scans_) {
+            auto scan = kv.second;
+            auto local_map_scan = std::dynamic_pointer_cast<LocalMapScan>(scan);
+            if (local_map_scan) {
+                local_map_scan->switch_to_fine();
+            }
+        }
+    }
+
     void load_data(std::vector<int> scan_ids = {}) {
         std::vector<int> load_scan_ids;
         if (scan_ids.empty()) {
@@ -125,6 +136,12 @@ public:
 
     int id_to_idx(int scan_id) const {
         return id_to_idx_.at(scan_id);
+    }
+
+    void apply_noise_to_scans(double pos_stddev, double yaw_stddev) {
+        for (const auto& kv : scans_) {
+            kv.second->apply_noise_to_pose(pos_stddev, yaw_stddev);
+        }
     }
 
     // Compute RMSE of all scan poses compared to groundtruth (SE2: x, y, yaw)
