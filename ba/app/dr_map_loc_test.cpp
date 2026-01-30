@@ -97,5 +97,9 @@ int main(int argc, char** argv) {
     std::cout << "Total localization time: " << total_time << " s" << std::endl;
     loc_problem.finalize();
 
+    if (opts.save_result) {
+        std::cout << "Results saved to: " << output_run_dir << std::endl;
+    }
+
     return 0;
 }
