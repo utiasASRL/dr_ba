@@ -55,8 +55,12 @@ Options load_options(const YAML::Node& config) {
             opts.dist_field_preproc = config["input"]["dist_field_preproc"].as<bool>();
         if (config["input"]["gauss_blur_sigma"])
             opts.gauss_blur_sigma = config["input"]["gauss_blur_sigma"].as<double>();
-        else
-            throw std::runtime_error("Gaussian blur sigma not found in config file.");
+        if (config["input"]["adaptive_blur"])
+            opts.adaptive_blur = config["input"]["adaptive_blur"].as<bool>();
+        if (config["input"]["min_int_val_tol"])
+            opts.min_int_val_tol = config["input"]["min_int_val_tol"].as<double>();
+        if (config["input"]["min_percent_nonzero"])
+            opts.min_percent_nonzero = config["input"]["min_percent_nonzero"].as<double>();
         if (config["input"]["init_poses"])
             opts.init_poses = config["input"]["init_poses"].as<std::string>();
         else
@@ -161,8 +165,6 @@ Options load_options(const YAML::Node& config) {
             opts.tile_size = config["optimization"]["tile_size"].as<double>();
         if (config["optimization"]["max_loaded_scans"])
             opts.max_loaded_scans = config["optimization"]["max_loaded_scans"].as<int>();
-        if (config["optimization"]["coarse_to_fine"])
-            opts.coarse_to_fine = config["optimization"]["coarse_to_fine"].as<bool>();
     }
 
     // Mapping parameters
@@ -179,6 +181,14 @@ Options load_options(const YAML::Node& config) {
             opts.map_max_dist = config["mapping"]["map_max_dist"].as<double>();
         if (config["mapping"]["map_dist_field_preproc"])
             opts.map_dist_field_preproc = config["mapping"]["map_dist_field_preproc"].as<bool>();
+        if (config["mapping"]["map_gauss_blur_sigma"])
+            opts.map_gauss_blur_sigma = config["mapping"]["map_gauss_blur_sigma"].as<double>();
+        if (config["mapping"]["map_adaptive_blur"])
+            opts.map_adaptive_blur = config["mapping"]["map_adaptive_blur"].as<bool>();
+        if (config["mapping"]["map_min_int_val_tol"])
+            opts.map_min_int_val_tol = config["mapping"]["map_min_int_val_tol"].as<double>();
+        if (config["mapping"]["map_min_percent_nonzero"])
+            opts.map_min_percent_nonzero = config["mapping"]["map_min_percent_nonzero"].as<double>();
         if (config["mapping"]["map_gauss_blur_sigma"])
             opts.map_gauss_blur_sigma = config["mapping"]["map_gauss_blur_sigma"].as<double>();
         if (config["mapping"]["frame_ranges"]) {
