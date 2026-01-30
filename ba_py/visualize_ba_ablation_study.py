@@ -44,12 +44,17 @@ def visualize_ablation(
 ):
     ablation_root = Path(ablation_root)
     run_dirs = sorted(
-        (d for d in ablation_root.iterdir() if d.is_dir() and d.name.startswith("run_")),
-        key=lambda d: int(d.name.split("_")[1])
+        (d for d in ablation_root.iterdir() if d.is_dir()),
+        key=lambda d: d.name
     )
+    print(run_dirs)
 
     fig_epe, ax_epe = plt.subplots()
     fig_ate, ax_ate = plt.subplots()
+
+    avg_ate = 0.0
+    avg_epe = 0.0
+    count = 0
 
     for run_dir in run_dirs:
         cfg_path = run_dir / 'ba_config.yaml'
@@ -81,6 +86,15 @@ def visualize_ablation(
         ax_epe.plot(epe, marker='o', label=label)
         ax_ate.plot(ate, marker='o', label=label)
 
+        avg_ate += ate[-1]
+        avg_epe += epe[-1]
+        count += 1
+    if count > 0:
+        avg_ate /= count
+        avg_epe /= count
+        print(f"Average final ATE over {count} runs: {avg_ate:.4f} m")
+        print(f"Average final EPE over {count} runs: {avg_epe:.4f} m")
+
 
     for ax, fig, ylabel, title in [
         (ax_ate, fig_ate, "ATE (m)", "ATE over Iterations"),
@@ -103,7 +117,8 @@ def visualize_ablation(
 
 if __name__ == "__main__":
     visualize_ablation(
-        ablation_root="/home/dl/Documents/phd/dev/dr_ba/output/ba_ablation/set_01",
+        # ablation_root="/home/dl/Documents/phd/dev/dr_ba/output/aaa_paper_results/ba/skyway",
+        ablation_root="/home/dl/Documents/phd/dev/dr_ba/output/aa_paper_ablation/drba_skyway",
         label_fields={
             "input.gauss_blur_sigma": "σ",
             "input.dist_field_preproc": "DF",
