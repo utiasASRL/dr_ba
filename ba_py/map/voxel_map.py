@@ -5,6 +5,13 @@ import struct
 from pylgmath import se3op
 import os.path as osp
 
+
+plt.rcParams.update({
+    "text.usetex": True,          # Use LaTeX for all text
+    "font.family": "serif",       # Or any LaTeX-supported font
+    "legend.frameon": True
+})
+
 class Map:
     class Voxel:
         def __init__(self, intensity=0.0):
@@ -365,3 +372,269 @@ class Map:
             plt.show()
             plt.close(fig)
 
+    # loc_results is list containing map_id,scan_id,est_x,est_y,est_yaw,gt_x,gt_y,gt_yaw
+    def plot_loc_paper(self, loc_results, save_path=None, show=False, title="Voxel Map with Localization Results"):
+        if not self.voxels:
+            return
+
+        # --- convert sparse dict to dense raster ---
+        keys = np.asarray(list(self.voxels.keys()), dtype=np.int32)
+        vals = np.asarray([v.intensity for v in self.voxels.values()], dtype=np.float32)
+
+        # --- warn on invalid intensity range ---
+        invalid_low = np.any(vals < 0.0)
+        invalid_high = np.any(vals > 1.0)
+        if invalid_low or invalid_high:
+            print(
+                "[WARN] Voxel intensity values outside [0, 1] detected "
+                f"(min={np.nanmin(vals):.3f}, max={np.nanmax(vals):.3f})"
+            )
+
+
+        # Cap vals at 0.5 for better visualization
+        vals = np.clip(vals, 0.0, 0.6)
+        # Normalize to [0, 1]
+        vals = (vals - 0.0) / (0.3 - 0.0)
+        # vals = np.clip(vals, 0.1, 1.0)
+
+        ix = keys[:, 0]
+        iy = keys[:, 1]
+
+        ix_min, ix_max = ix.min(), ix.max()
+        iy_min, iy_max = iy.min(), iy.max()
+
+        H = ix_max - ix_min + 1
+        W = iy_max - iy_min + 1
+
+        img = np.full((H, W), np.nan, dtype=np.float32)
+        img[ix - ix_min, iy - iy_min] = vals
+
+        # --- plotting ---
+        fig, ax = plt.subplots(facecolor="white", figsize=(10, 8))
+        ax.set_facecolor("white")
+
+        im = ax.imshow(
+            img.T,
+            origin="lower",
+            cmap="magma_r",
+            vmin=0.0,          # clamp colormap
+            vmax=1.0,          # clamp colormap
+            extent=[
+                ix_min * self.res,
+                (ix_max + 1) * self.res,
+                iy_min * self.res,
+                (iy_max + 1) * self.res,
+            ],
+            interpolation="nearest",
+        )
+
+        # Plot localization results (estimated + ground truth trajectories)
+        est_xs, est_ys = [], []
+        gt_xs, gt_ys = [], []
+
+        for ii in range(len(loc_results)):
+            map_id = loc_results[ii][0]
+            pose_idx = self.pose_ids.index(map_id)
+            map_node_pose = self.poses[pose_idx]
+            assert map_node_pose[0] == map_id, "Map ID mismatch when plotting localization results."
+
+            # Local poses
+            est_x_local = loc_results[ii][2]
+            est_y_local = loc_results[ii][3]
+            est_yaw_local = np.deg2rad(loc_results[ii][4])
+
+            gt_x_local = loc_results[ii][5]
+            gt_y_local = loc_results[ii][6]
+            gt_yaw_local = np.deg2rad(loc_results[ii][7])
+
+            # Map pose
+            map_pose = se3op.vec2tran(
+                np.array([0.0, 0.0, 0.0, 0.0, 0.0, map_node_pose[3]]).reshape(-1, 1)
+            )
+            map_pose[0, 3] = map_node_pose[1]
+            map_pose[1, 3] = map_node_pose[2]
+
+            # Estimated pose in local frame
+            est_pose = se3op.vec2tran(
+                -np.array([0.0, 0.0, 0.0, 0.0, 0.0, -est_yaw_local]).reshape(-1, 1)
+            )
+            est_pose[0, 3] = est_x_local
+            est_pose[1, 3] = est_y_local
+
+            # Ground-truth pose in local frame
+            gt_pose = se3op.vec2tran(
+                -np.array([0.0, 0.0, 0.0, 0.0, 0.0, -gt_yaw_local]).reshape(-1, 1)
+            )
+            gt_pose[0, 3] = gt_x_local
+            gt_pose[1, 3] = gt_y_local
+
+            # Transform into map frame
+            est_in_map = map_pose @ est_pose
+            gt_in_map = map_pose @ gt_pose
+
+            est_xs.append(est_in_map[0, 3])
+            est_ys.append(est_in_map[1, 3])
+            gt_xs.append(gt_in_map[0, 3])
+            gt_ys.append(gt_in_map[1, 3])
+
+        # Plot trajectories
+        ax.plot(
+            gt_xs, gt_ys,
+            color="red",
+            linewidth=2,
+            linestyle="-",
+            label=r"ground truth"
+        )
+        ax.plot(
+            est_xs, est_ys,
+            color="black",
+            linewidth=2,
+            linestyle="--",
+            label=r"localized"
+        )
+
+        leg = ax.legend(facecolor="white", edgecolor="black", labelcolor="black", loc='lower right', fontsize=22)
+        for legline in leg.get_lines():
+            legline.set_linewidth(5)  # set the line thickness in the legend
+
+        ax.set_aspect("equal")
+        # ax.set_title(title, fontsize=14)
+        ax.axis("off")
+        ax.margins(0)
+        plt.tight_layout(pad=0)
+
+
+    def plot_paper(self, save_path=None, show=False, title="Map"):
+        if not self.voxels:
+            return
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        # --- convert sparse dict to dense raster ---
+        keys = np.asarray(list(self.voxels.keys()), dtype=np.int32)
+        vals = np.asarray([v.intensity for v in self.voxels.values()], dtype=np.float32)
+
+        ix = keys[:, 0]
+        iy = keys[:, 1]
+
+        # Rotate by 15 degrees for better visualization
+        theta = np.radians(85)
+        rotation_matrix = np.array([[np.cos(theta), -np.sin(theta)],
+                                    [np.sin(theta),  np.cos(theta)]])
+        rotated_coords = rotation_matrix @ np.vstack((ix, iy))
+        ix = np.round(rotated_coords[0, :]).astype(np.int32)
+        iy = np.round(rotated_coords[1, :]).astype(np.int32)
+
+        ix_min, ix_max = ix.min(), ix.max()
+        iy_min, iy_max = iy.min(), iy.max()
+
+        H = ix_max - ix_min + 1
+        W = iy_max - iy_min + 1
+
+        # Cap vals at 0.5 for better visualization
+        vals = np.clip(vals, 0.0, 0.6)
+        # Normalize to [0, 1]
+        vals = (vals - 0.0) / (0.3 - 0.0)
+
+        img = np.full((H, W), np.nan, dtype=np.float32)
+        img[ix - ix_min, iy - iy_min] = vals
+
+        # --- plotting (paper style) ---
+        fig, ax = plt.subplots(figsize=(6, 6), facecolor="white")
+        ax.set_facecolor("white")
+
+        ax.imshow(
+            img.T,
+            origin="lower",
+            cmap="magma_r",
+            vmin=0.0,
+            vmax=1.0,
+            extent=[
+                ix_min * self.res,
+                (ix_max + 1) * self.res,
+                iy_min * self.res,
+                (iy_max + 1) * self.res,
+            ],
+            interpolation="nearest",
+        )
+
+        # Overlay poses (subtle, publication-friendly)
+        if self.poses:
+            pose_xs = [p[1] for p in self.poses]
+            pose_ys = [p[2] for p in self.poses]
+            # ax.plot(
+            #     pose_xs,
+            #     pose_ys,
+            #     color="black",
+            #     linewidth=1.0,
+            #     alpha=0.8,
+            # )
+
+        ax.set_xlim(ix_min * self.res, (ix_max + 1) * self.res)
+        ax.set_ylim(iy_min * self.res, (iy_max + 1) * self.res)
+
+        ax.set_aspect("equal")
+        # ax.set_title(title, fontsize=14)
+        ax.axis("off")
+        ax.margins(0)
+        plt.tight_layout(pad=0)
+
+        add_scale_bar(ax, ix_min, ix_max, iy_min, iy_max, self.res)
+
+        # Clean, paper-style axes
+        ax.tick_params(labelsize=10)
+        for spine in ax.spines.values():
+            spine.set_linewidth(0.8)
+
+        plt.tight_layout()
+
+        if save_path is not None:
+            plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
+            plt.close(fig)
+        elif show:
+            plt.show()
+            plt.close(fig)
+
+def add_scale_bar(ax, ix_min, ix_max, iy_min, iy_max, res, fraction=0.15):
+    """
+    Add a scale bar to a map.
+    
+    fraction: fraction of map width to use for scale bar length
+    """
+    map_width_m = (ix_max - ix_min) * res
+    map_height_m = (iy_max - iy_min) * res
+
+    # Choose a nice round number for the scale bar
+    raw_length = map_width_m * fraction
+    # Round to 1,2,5,10,20... sequence
+    def round_to_nice(x):
+        exp = 10 ** (len(str(int(x))) - 1)
+        for n in [1, 2, 5, 10]:
+            if x <= n * exp:
+                return n * exp
+        return 10 * exp
+    length_m = round_to_nice(raw_length)
+
+    # Bar size & position
+    bar_height = 0.02 * map_height_m
+    bar_x = ix_max * res - 1.05 * length_m  # 5% padding from right
+    bar_y = iy_min * res + 0.05 * map_height_m  # 5% padding from bottom
+
+    ax.add_patch(plt.Rectangle(
+        (bar_x, bar_y),
+        length_m,
+        bar_height,
+        facecolor='white',
+        edgecolor='black',
+        linewidth=0.8
+    ))
+    ax.text(
+        bar_x + length_m / 2,
+        bar_y + 2 * bar_height,
+        f"{length_m} m",
+        ha='center',
+        va='bottom',
+        fontsize=8,
+        color='black'
+    )
