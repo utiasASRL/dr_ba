@@ -245,7 +245,7 @@ void DrBASolver::construct_problem(double downsample_factor) {
             int scan_count = 0;
 
             // Loop through all scans that cover this tile
-            for (const int scan_id : tile.scan_ids) {
+            for (const int scan_id : tile.scan_ids) {                
                 int scan_idx = scan_manager_.id_to_idx(scan_id);
                 auto scan = scan_manager_.get_scan(scan_id);
 
@@ -521,13 +521,18 @@ void DrBASolver::optimize() {
         std::cout << "Iteration " << iter << " / " << opts_.max_iterations << std::endl;
         downsample_factor = (iter < opts_.num_coarse_iterations) ? opts_.coarse_downsample : opts_.refine_downsample;
 
-        // Occasionally re-tile problem in case poses have changed significantly
-        if (iter != 0 && opts_.tile_size > 0.0 && (iter % 5 == 0) && num_cost_rises == 0) {
-            // std::cout << "Re-tiling problem..." << std::endl;
-            // tile_problem();
-            // Update map
-            update_map();
+        if (iter > 2) {
+            // Slowly decrease alpha
+            alpha_ *= 0.9;
         }
+
+        // Occasionally re-tile problem in case poses have changed significantly
+        // if (iter != 0 && opts_.tile_size > 0.0 && (iter % 5 == 0) && num_cost_rises == 0) {
+        //     // std::cout << "Re-tiling problem..." << std::endl;
+        //     // tile_problem();
+        //     // Update map
+        //     update_map();
+        // }
 
         // if (std::find(save_map_iter_idx.begin(), save_map_iter_idx.end(), iter) != save_map_iter_idx.end()) {
         //     // Update map
@@ -616,33 +621,33 @@ void DrBASolver::optimize() {
         if (cost_ < prev_cost_) {
             prev_cost_ = cost_;
         }
-        if (opts_.coarse_to_fine && !coarse_to_fine_switched) {
-            // Switch to fine images if ate has stagnated
-            const std::vector<double> ate_history = result_.ate_history();
-            double diff_ate = ate_history[ate_history.size() - 2] - ate_history[ate_history.size() - 1];
-            if (iter > 2 && std::abs(diff_ate) < 0.01) {
-                std::cout << "Switching all scans to fine images due to ATE stagnation." << std::endl;
-                scan_manager_.switch_all_to_fine();
+        // if (opts_.coarse_to_fine && !coarse_to_fine_switched) {
+        //     // Switch to fine images if ate has stagnated
+        //     const std::vector<double> ate_history = result_.ate_history();
+        //     double diff_ate = ate_history[ate_history.size() - 2] - ate_history[ate_history.size() - 1];
+        //     if (iter > 2 && std::abs(diff_ate) < 0.01) {
+        //         std::cout << "Switching all scans to fine images due to ATE stagnation." << std::endl;
+        //         scan_manager_.switch_all_to_fine();
 
-                // Rejig all state estimates to have a nice restart for the new optimization
-                // scan_manager_.apply_noise_to_scans(0.3, 0.1);
+        //         // Rejig all state estimates to have a nice restart for the new optimization
+        //         // scan_manager_.apply_noise_to_scans(0.3, 0.1);
 
-                // Reset problem
-                prev_cost_ = std::numeric_limits<double>::max();
-                alpha_ = opts_.alpha;
+        //         // Reset problem
+        //         prev_cost_ = std::numeric_limits<double>::max();
+        //         alpha_ = opts_.alpha;
 
-                coarse_to_fine_switched = true;
-            }
-        }
+        //         coarse_to_fine_switched = true;
+        //     }
+        // }
     }
 
     // Construct problem for final cost
-    construct_problem(downsample_factor);
-    result_.add_cost(prev_cost_);
-    std::cout << "Final Cost: " << prev_cost_ << std::endl;
+    // construct_problem(downsample_factor);
+    result_.add_cost(cost_);
+    std::cout << "Final Cost: " << cost_ << std::endl;
 
     // Update map
-    update_map();
+    update_map();   
 }
 
 

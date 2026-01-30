@@ -91,6 +91,7 @@ void LocSolver::optimize() {
     double avg_runtime = 0.0;
     int64_t start_timestamp = scan_manager_.ref_timestamp();
     Eigen::Matrix3d curr_cov = 0.001 * Eigen::Matrix3d::Identity();
+    int num_pose_rejections = 0;
     for (size_t i = 0; i < scan_id_list.size(); i++) {
         auto start_time = std::chrono::high_resolution_clock::now();
         int scan_id = scan_id_list.at(i);
@@ -208,18 +209,21 @@ void LocSolver::optimize() {
         // Compute difference between prior and estimate
         lgmath::se3::Transformation pose_diff = scan->pose().inverse() * curr_pose;
         double pos_diff = pose_diff.r_ab_inb().head<2>().norm();
+        double yaw_diff = std::abs(pose_diff.vec()(5)) * 180.0 / M_PI;
         std::cout << "Position difference from prior: " << pos_diff << " m." << std::endl;
-        if (pos_diff > 0.4 && i > 5) {
-            std::cout << "Pose change from prior: " << pos_diff << " m. Ignoring estimate and using prior." << std::endl;
-        } else {
-            curr_pose = scan->pose();
-        }
-        // curr_pose = scan->pose();
+        std::cout << "Yaw difference from prior: " << yaw_diff << " deg." <<  std::endl;
+        // if ((pos_diff > 0.2 || yaw_diff > 1.0) && i > 5 && num_pose_rejections < 5) {
+        //     num_pose_rejections++;
+        //     std::cout << "Pose change from prior: " << pos_diff << " m. Ignoring estimate and using prior." << std::endl;
+        // } else {
+        //     curr_pose = scan->pose();
+        //     num_pose_rejections = 0;
+        // }
+        curr_pose = scan->pose();
         
 
         // Compute errors
         // First, find nearest map pose to the scan's estimated pose
-        std::cout << "Finding nearest map pose to scan..." << std::endl;
         double min_dist = std::numeric_limits<double>::max();
         int best_map_idx = -1;
         for (size_t j = 0; j < loc_problem.gt_map_poses().size(); j++) {
@@ -243,7 +247,6 @@ void LocSolver::optimize() {
             throw std::runtime_error("Error: Could not find nearest map pose! Check if your map and loc entries overlap?");
         }
         std::cout << "Nearest map pose index: " << best_map_idx << ", distance: " << min_dist << " m." << std::endl;
-
         // Compute estimated pose within local map
         lgmath::se3::Transformation loc_est_pose = nearest_map_est_pose.inverse() * curr_pose;
         scan->set_pose(loc_est_pose);
@@ -287,7 +290,8 @@ void LocSolver::optimize() {
 
         // If pose error is larger than max_dist, localization has failed and will not recover
         if (std::sqrt(pose_error(0) * pose_error(0) + pose_error(1) * pose_error(1)) > 15.0) {
-            throw std::runtime_error("Error: Localization has diverged! Pose error exceeded maximum map range.");
+            std::cerr << "Error: Localization has diverged! Pose error exceeded maximum map range." << std::endl;
+            break;
         }
 
         // Propagate curr_pose using DRO estimates
