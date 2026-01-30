@@ -76,5 +76,9 @@ int main(int argc, char** argv) {
 
     problem.finalize();
 
+    if (opts.save_result) {
+        std::cout << "Results saved to: " << output_run_dir << std::endl;
+    }
+
     return 0;
 }
