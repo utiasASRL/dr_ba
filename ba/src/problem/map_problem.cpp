@@ -205,6 +205,7 @@ void MapProblem::init_scans_and_map_from_estimates() {
     // Load in voxel map from estimates
     std::string estimate_location = opts_.estimate_location.string() + "/voxel_map.bin";
     std::cout << "Loading voxel map from estimates: " << estimate_location << std::endl;
+    std::cout << "Map spanning from " << timestamps_.front() << " to " << timestamps_.back() << " microseconds." << std::endl;
     voxel_map_.load_poses_from_file(estimate_location);
     const std::vector<int> pose_ids = voxel_map_.pose_ids();
     const std::vector<lgmath::se2::Transformation> poses_se2 = voxel_map_.poses();
