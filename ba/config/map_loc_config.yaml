@@ -1,7 +1,7 @@
 map:
   voxel_res: 1.0
 output:
-  output_path: /home/dl/Documents/phd/dev/dr_ba/output/map_loc_ablation/set_06
+  output_path: /home/dl/Documents/phd/dev/dr_ba/output/ba_results
   visualize: true
   save_result: true
 input:
@@ -10,27 +10,29 @@ input:
   seq_id: boreas-2024-12-04-11-56
   max_dist: 100.0
   dist_field_preproc: false
-  gauss_blur_sigma: 3.0
+  adaptive_blur: false # adaptively choose Gaussian blur sigma based on scan content
+  gauss_blur_sigma: 3.0  # pixels
+  min_int_val_tol: 0.5 # min intensity value to consider a non-zero pixel
+  min_percent_nonzero: 0.3 # Minimum percent of scan pixels above min_int_val_tol to stop blurring scan
   init_poses: gt
   init_translation_std: 0.0
   init_rotation_std: 0.0
   input_type: local_maps
   local_map_res: 0.1
-  map_id: boreas-2024-12-04-11-45
 keyframing:
   max_kf_dist: 5.0
   max_kf_rot: 30.0
   fix_first_scan: true
 optimization:
   num_threads: 16
-  max_iterations: 20
+  max_iterations: 15
   convergence_tol: 1e-3
   alpha: 1.0
-  adaptive_alpha: true
+  adaptive_alpha: false
   meas_std: 0.1
   range_factor: 0.0005
   use_cumul_thresh: true
-  zero_thresh: 0.1
+  zero_thresh: 0.2
   cumul_thresh: 0.9
   rel_pose_prior:
     use_pose_prior: false
@@ -42,15 +44,23 @@ optimization:
   tile_size: 100.0
   max_loaded_scans: 300
 mapping:
+  odometry_prior:
+    use_odometry_prior: false
+    translation_std: 0.1
+    rotation_std: 0.1
   map_seq: boreas-2024-12-04-11-45
   pose_source: gt
-  estimate_location: /home/dl/Documents/phd/dev/dr_ba/output/ba_results/run_52
-  max_dist: 80.0
+  estimate_location: /home/dl/Documents/phd/dev/dr_ba/output/ba_ablation/set_19/run_1
+  max_dist: 100.0
   dist_field_preproc: false
-  gauss_blur_sigma: 3.0
+  adaptive_blur: true # adaptively choose Gaussian blur sigma based on scan content
+  gauss_blur_sigma: 3.0  # pixels
+  min_int_val_tol: 0.5 # min intensity value to consider a non-zero pixel
+  min_percent_nonzero: 0.3 # Minimum percent of scan pixels above min_int_val_tol to stop blurring scan
   frame_ranges:
-  - - 0
-    - -1
+  - [0, -1]
+  # - [200, 500]
+  # - [1700, 2100]
 localization:
   map_location: /home/dl/Documents/phd/dev/dr_ba/output/ba_results/map_29
   start_frame: 0

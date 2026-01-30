@@ -7,20 +7,26 @@ output:
 input:
   data_path: '/home/dl/Documents/phd/data/boreas'
   meas_path: '/home/dl/Documents/phd/dev/dr_ba/output'
-  seq_id: 'boreas-2024-12-04-11-56' #skyway
+  seq_id: boreas-2024-12-04-12-19
     # - 'boreas-2024-12-03-12-54' # glen
+    # - 'boreas-2025-01-08-10-59' # glen
     # - 'boreas-2024-12-05-14-12' # industrial
     # - 'boreas-2024-12-23-16-27' # industrial
     # - 'boreas-2024-12-04-11-45' # skyway
+    # - 'boreas-2024-12-04-11-56' # skyway
     # - 'boreas-2025-07-18-10-33' # forest
     # - 'boreas-2025-07-18-14-55' # Farm
     # - 'boreas-2025-07-18-15-12' # Farm
+    # - 'boreas-2025-07-18-15-30' # Farm
     # - 'boreas-2025-08-06-06-33' # urban
     # - 'boreas-2025-08-06-07-05' # urban
     # - 'boreas-2025-08-06-07-41' # urban
-  max_dist: 80.0  # m
-  dist_field_preproc: true
+  max_dist: 100.0  # m
+  dist_field_preproc: false
+  adaptive_blur: false # adaptively choose Gaussian blur sigma based on scan content
   gauss_blur_sigma: 3.0  # pixels
+  min_int_val_tol: 0.5 # min intensity value to consider a non-zero pixel
+  min_percent_nonzero: 0.3 # Minimum percent of scan pixels above min_int_val_tol to stop blurring scan
   init_poses: 'dro'  # 'pogo' or 'gt', 'dro'
   init_translation_std: 0.0  # m
   init_rotation_std: 0.0  # degrees
@@ -31,14 +37,14 @@ keyframing:
   max_kf_rot: 30.0  # degrees
   fix_first_scan: true
 optimization:
-  max_iterations: 20
+  max_iterations: 15
   convergence_tol: 1e-3
   alpha: 1.0  # step size
-  adaptive_alpha: true # decrease alpha if cost does not decrease
-  meas_std: 0.1 # intensity units   
-  range_factor: 0.0005  # factor to scale range uncertainty to intensity uncertainty
+  adaptive_alpha: false # decrease alpha if cost does not decrease
+  meas_std: 0.1 # intensity units
+  range_factor: 0.0005 # factor to scale range uncertainty to intensity uncertainty
   use_cumul_thresh: true
-  zero_thresh: 0.1 # max cumul return threshold to consider a measurement as zero return
+  zero_thresh: 0.2 # max cumul return threshold to consider a measurement as zero return
   cumul_thresh: 0.9  # threshold to ignore measurements with too high a cumulative return
   rel_pose_prior:
     use_pose_prior: false
@@ -50,12 +56,21 @@ optimization:
   refine_downsample: 1.0
   tile_size: 15.0  # m, size of tiles to process separately
   max_loaded_scans: 0  # max number of scans to keep loaded in memory at once (>0 all)
+mapping:
+  map_seq: boreas-2024-12-04-11-45
 localization:
-  # map_location: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results/map-gt-boreas-2024-12-03-12-54'
+  odometry_prior:
+    use_odometry_prior: false
+    translation_std: 0.1  # m
+    rotation_std: 0.1  # degrees
+  map_location: '/home/dl/Documents/phd/dev/dr_ba/output/aa_paper_ablation/drba_skyway/run_1'
+  # map_location: '/home/dl/Documents/phd/dev/dr_ba/output/ba_ablation/set_19/run_1'
+  # map_location: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results/ba-loc-boreas-2024-12-03-12-54'
+  # map_location: '/home/dl/Documents/phd/dev/dr_ba/output/aaa_paper_results/gt_maps/boreas-2024-12-03-12-54/'
+  # map_location: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results/ba-boreas-2024-12-03-12-54'
   # map_location: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results/map-pogo-boreas-2024-12-03-12-54'
-  map_seq: 'boreas-2024-12-04-11-45'
   # map_location: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results/map-pogo-boreas-2024-12-05-14-12'
-  map_location: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results/map_155'
+  # map_location: '/home/dl/Documents/phd/dev/dr_ba/output/ablation_map_loc/set_03/map_loc_3'
   # map_location: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results/map-gt-boreas-2024-12-04-11-45'
-  start_frame: 0
-  end_frame: -1  # -1 for last frame
+  start_frame: 600
+  end_frame: 700  # -1 for last frame

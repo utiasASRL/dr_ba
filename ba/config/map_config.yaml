@@ -1,27 +1,29 @@
 map:
-  voxel_res: 0.5  # m
+  voxel_res: 1.0  # m
 output:
   output_path: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results'
   visualize: true
-  save_result: false
+  save_result: true
 input:
   data_path: '/home/dl/Documents/phd/data/boreas'
   meas_path: '/home/dl/Documents/phd/dev/dr_ba/output'
-  seq_id: 'boreas-2024-12-04-11-45' # skyway
+  seq_id: boreas-2024-12-04-11-56
     # - 'boreas-2024-12-03-12-54' # glen
     # - 'boreas-2024-12-05-14-12' # industrial
     # - 'boreas-2024-12-23-16-27' # industrial
     # - 'boreas-2025-07-18-10-33' # forest
     # - 'boreas-2025-07-18-14-55' # Farm
-    # - 'boreas-2025-08-06-06-33' # urban
-    # - 'boreas-2025-08-06-07-05' # urban
-  max_dist: 80.0  # m
+    # - 'boreas-2024-12-04-11-45' # skyway
+  max_dist: 100.0  # m
   dist_field_preproc: false
-  gauss_blur_sigma: 0.0  # pixels
+  adaptive_blur: true # adaptively choose Gaussian blur sigma based on scan content
+  gauss_blur_sigma: 3.0  # pixels
+  min_int_val_tol: 0.5 # min intensity value to consider a non-zero pixel
+  min_percent_nonzero: 0.3 # Minimum percent of scan pixels above min_int_val_tol to stop blurring scan
   init_poses: 'gt'  # 'pogo' or 'gt', 'dro'
   init_translation_std: 0.0  # m
   init_rotation_std: 0.0  # degrees
-  input_type: 'scans' # 'scans' or 'local_maps' with both being images (for now)
+  input_type: 'local_maps' # 'scans' or 'local_maps' with both being images (for now)
   local_map_res: 0.1  # m/pixel (only relevant if input_type is 'local_map')
 keyframing:
   max_kf_dist: 5.0  # m
@@ -35,7 +37,7 @@ optimization:
   adaptive_alpha: true # decrease alpha if cost does not decrease
   meas_std: 0.1 # intensity units
   range_factor: 0.0005  # factor to scale range uncertainty to intensity uncertainty
-  use_cumul_thresh: false
+  use_cumul_thresh: true
   zero_thresh: 0.2 # max cumul return threshold to consider a measurement as zero return
   cumul_thresh: 0.9  # threshold to ignore measurements with too high a cumulative return
   rel_pose_prior:
@@ -47,17 +49,29 @@ optimization:
   coarse_downsample: 0.2
   refine_downsample: 1.0
   tile_size: 100.0  # m, size of tiles to process separately
-  max_loaded_scans: 300  # max number of scans to keep loaded in memory at once (>0 all)
+  max_loaded_scans: 350  # max number of scans to keep loaded in memory at once (>0 all)
 mapping:
-  map_seq: 'boreas-2024-12-04-11-45'
+  map_seq: boreas-2024-12-04-12-19
   pose_source: 'gt' # 'estimate, 'gt', 'pogo', 'dro'
-  estimate_location: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results/run_52'
-  max_dist: 80.0  # m
-  dist_field_preproc: true
-  gauss_blur_sigma: 9.0  # pixels
+  estimate_location: /home/dl/Documents/phd/dev/dr_ba/output/aaa_paper_results/ba/farm/boreas-2025-07-18-14-55
+  max_dist: 100.0  # m
+  dist_field_preproc: false
+  adaptive_blur: true # adaptively choose Gaussian blur sigma based on scan content
+  gauss_blur_sigma: 3.0  # pixels
+  min_int_val_tol: 0.5 # min intensity value to consider a non-zero pixel
+  min_percent_nonzero: 0.3 # Minimum percent of scan pixels above min_int_val_tol to stop blurring scan
   frame_ranges:
-    - [0, -1]
+  - [300, 350]
+  
+  # - [370, 540]
+  # - [1700, 1850]
+
+    # - [490, 510]
+    # - [1690, 1710]
+  
+    # - [1650, 1970]
     # - [300, 500]
     # - [3650, 3850]
     # - [365, 470]
     # - [3000, 3100]
+    # - [0, -1]
