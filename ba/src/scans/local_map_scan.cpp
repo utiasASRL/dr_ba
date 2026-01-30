@@ -113,7 +113,13 @@ void LocalMapScan::load_data() {
     if (local_map_.size() == 0) {
         // cv::Mat img = load_img_bin(img_path_);
         cv::Mat img = cv::imread(img_path_, cv::IMREAD_GRAYSCALE);
+        if (img.empty()) {
+            throw std::runtime_error(
+                "Failed to read image: " + img_path_.string()
+            );
+        }
         img.convertTo(img, CV_32F, 1.0 / 255.0);
+
         cv::cv2eigen(img, local_map_);
     }
     if (cumul_img_path_.has_value() && cumul_img_.size() == 0) {

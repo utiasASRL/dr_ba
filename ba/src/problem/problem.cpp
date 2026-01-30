@@ -1,6 +1,8 @@
 #include <ba/problem/problem.hpp>
 #include <iostream>
 #include <opencv2/opencv.hpp>
+#include <sstream>
+#include <iomanip>
 
 namespace ba {
 
@@ -11,7 +13,7 @@ void Problem::preload_images() {
     std::cout << "Preloading images for sequence: " << seq_id_ << std::endl;
 
     // Set up temporary folder for Gaussian-blurred images to be stored
-    fs::path temp_dir = opts_.meas_path / "dr_ba_temp" / seq_id_;
+    fs::path temp_dir = opts_.meas_path / seq_id_ / "blurred";
     fs::create_directories(temp_dir);
 
     // TODO: Add support for more than just local_maps
@@ -52,6 +54,29 @@ void Problem::preload_images() {
     // Loop through all images
     int num_scans = img_paths_.size();
     opts_.end_frame = (opts_.end_frame == -1) ? (num_scans - 1) : opts_.end_frame;
+    double eps = opts_.min_int_val_tol;    
+    double min_percent_nonzero = opts_.min_percent_nonzero;
+
+    // Create temporary scan path
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(2) << min_percent_nonzero;
+    std::string s_min_percent_nonzero = oss.str(); // "1.50"
+    std::replace(s_min_percent_nonzero.begin(), s_min_percent_nonzero.end(), '.', '_'); // "1_50"
+    oss.str("");
+    oss << std::fixed << std::setprecision(2) << opts_.min_int_val_tol;
+    std::string s_min_int_val_tol = oss.str(); // "0.05"
+    std::replace(s_min_int_val_tol.begin(), s_min_int_val_tol.end(), '.', '_'); // "0_05"
+
+    fs::path temp_img_dir = temp_dir / opts_.input_type;
+    fs::path temp_folder;
+    if (!opts_.adaptive_blur) {
+        temp_folder = std::to_string(static_cast<int>(std::round(opts_.gauss_blur_sigma)));
+    } else {
+        temp_folder = s_min_percent_nonzero + "pct_" + s_min_int_val_tol + "minint";
+    }
+    temp_img_dir /= temp_folder;
+    fs::create_directories(temp_img_dir);
+
     for (int idx : scan_indices_) {
         const auto& img_path = files[idx];
         std::string img_stem = img_path.stem().string(); // stem is just timestamp
@@ -60,29 +85,38 @@ void Problem::preload_images() {
         int64_t timestamp = std::stoll(img_stem); // in microseconds
         timestamps_.push_back(timestamp);
 
-        // Create temporary scan path
-        std::string int_gauss_blur = std::to_string(static_cast<int>(opts_.gauss_blur_sigma));
-        fs::path temp_img_path;
         std::string image_name = img_stem;
-        if (opts_.input_type == "local_maps")
-            image_name += "_localmap";
         if (opts_.dist_field_preproc)
             image_name += "_distfield";
-        image_name += "_" + int_gauss_blur + ".png";
-        temp_img_path = temp_dir / image_name;
+        image_name += ".png";
+        fs::path temp_img_path = temp_img_dir / image_name;
+
         // Load in image as Eigen matrix
         if (!fs::exists(temp_img_path)) {
             // Only process if the temp image does not already exist
             cv::Mat img = cv::imread(img_path.string(), cv::IMREAD_GRAYSCALE);
+            img.convertTo(img, CV_32F, 1.0 / 255.0);
 
             if (img.empty()) {
                 throw std::runtime_error("Failed to load image: " + img_path.string());
             }
 
-            if (opts_.dist_field_preproc) {
-                // Convert to float
-                img.convertTo(img, CV_32F, 1.0 / 255.0);
+            // double p_nonzero_1 = 100.0 * cv::countNonZero(img > 0.1) / (img.rows * img.cols);
+            // double p_nonzero_2 = 100.0 * cv::countNonZero(img > 0.2) / (img.rows * img.cols);
+            // double p_nonzero_3 = 100.0 * cv::countNonZero(img > 0.3) / (img.rows * img.cols);
+            // double p_nonzero_4 = 100.0 * cv::countNonZero(img > 0.4) / (img.rows * img.cols);
+            // double p_nonzero_5 = 100.0 * cv::countNonZero(img > 0.5) / (img.rows * img.cols);
+            // double p_nonzero_6 = 100.0 * cv::countNonZero(img > 0.6) / (img.rows * img.cols);
+            // std::cout << "Image " << img_path.filename().string() << " non-zero percentages (>0.1, >0.2, >0.3, >0.4, >0.5, >0.6): "
+            //           << p_nonzero_1 << "%, " << p_nonzero_2 << "%, "
+            //           << p_nonzero_3 << "%, " << p_nonzero_4 << "%, "
+            //           << p_nonzero_5 << "%, " << p_nonzero_6 << "%" << std::endl;
 
+
+            // if (fs::exists(temp_img_path))
+            //     continue;
+
+            if (opts_.dist_field_preproc) {
                 // Min–max normalization
                 double min_val, max_val;
                 cv::minMaxLoc(img, &min_val, &max_val);
@@ -95,55 +129,45 @@ void Problem::preload_images() {
                 cv::exp(-2.0 * img, img);
             }
 
-            // Apply Gaussian blur
-            if (opts_.gauss_blur_sigma > 0.0) {
-                int ksize = static_cast<int>(std::ceil(opts_.gauss_blur_sigma * 6)) | 1; // kernel size should be odd
-                cv::GaussianBlur(img, img, cv::Size(ksize, ksize), opts_.gauss_blur_sigma);
+            // Do smart selection of Gaussian sigma to ensure minimum percentage of non-zero pixels
+            cv::Mat temp_img;
+            double percent_nonzero = 0.0;
+            double sigma = 3.0;
+            if (!opts_.adaptive_blur) {
+                sigma = opts_.gauss_blur_sigma;
             }
+            while (percent_nonzero < min_percent_nonzero) {
+                int ksize = (int(std::ceil(6 * sigma)) | 1);
+                cv::GaussianBlur(img, temp_img, cv::Size(ksize, ksize), sigma);
 
-            if (opts_.dist_field_preproc) {
                 // Re-normalize after blur
                 double min_val, max_val;
-                cv::minMaxLoc(img, &min_val, &max_val);
-                img = (img - min_val) / (max_val - min_val);
+                cv::minMaxLoc(temp_img, &min_val, &max_val);
+                temp_img = (temp_img - min_val) / (max_val - min_val);
 
-                // Clip to [0, 1] (should already be in this range, but just to be safe)
-                cv::threshold(img, img, 0.0, 0.0, cv::THRESH_TOZERO);
-                cv::threshold(img, img, 1.0, 1.0, cv::THRESH_TRUNC);
+                // Recompute percentage of non-zero pixels
+                percent_nonzero = 100.0 * cv::countNonZero(temp_img > eps) / (temp_img.rows * temp_img.cols);
 
-                // Convert back to 8-bit for saving
-                img.convertTo(img, CV_8U, 255.0);
+                // Increase sigma by odd number
+                sigma += 2.0;
+
+                if (!opts_.adaptive_blur || sigma > 25.0) {
+                    // If not adaptive blur, just do one iteration
+                    break;
+                }
             }
+            img = temp_img;
 
+            // std::cout << "Final sigma: " << sigma - 2.0 << ", percent non-zero: " << percent_nonzero << "%" << std::endl;
+
+            // Clip to [0, 1] (should already be in this range, but just to be safe)
+            cv::threshold(img, img, 0.0, 0.0, cv::THRESH_TOZERO);
+            cv::threshold(img, img, 1.0, 1.0, cv::THRESH_TRUNC);
+
+            // Convert back to 8-bit for saving
+            img.convertTo(img, CV_8U, 255.0);
             // Save blurred image to temp directory for easy loading
             cv::imwrite(temp_img_path, img);
-        }
-
-        // Also store fine image path if coarse-to-fine is enabled
-        if (opts_.coarse_to_fine) {
-            // The fine image is currently hard-coded to be Gaussian blur of 3.0
-            std::string fine_img_name = img_stem;
-            if (opts_.input_type == "local_maps")
-                fine_img_name += "_localmap";
-            fine_img_name += "_" + std::to_string(3) + ".png";
-            fs::path fine_img_path = temp_dir / fine_img_name;
-            if (!fs::exists(fine_img_path)) {
-                // Only process if the temp image does not already exist
-                cv::Mat img = cv::imread(img_path.string(), cv::IMREAD_GRAYSCALE);
-
-                if (img.empty()) {
-                    throw std::runtime_error("Failed to load image: " + img_path.string());
-                }
-
-                // Apply Gaussian blur
-                double fine_sigma = 3.0;
-                int ksize = static_cast<int>(std::ceil(fine_sigma * 6)) | 1; // kernel size should be odd
-                cv::GaussianBlur(img, img, cv::Size(ksize, ksize), fine_sigma);
-
-                // Save blurred image to temp directory for easy loading
-                cv::imwrite(fine_img_path, img);
-            }
-            fine_img_paths_.push_back(fine_img_path);
         }
 
         // Store path

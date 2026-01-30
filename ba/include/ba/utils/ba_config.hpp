@@ -28,6 +28,9 @@ struct Options {
     double max_dist = 80.0;       // meters
     bool dist_field_preproc = true;
     double gauss_blur_sigma = 2.0; // pixels
+    bool adaptive_blur = true; // adaptively choose Gaussian blur sigma based on scan content
+    double min_int_val_tol = 0.05; // intensity units
+    double min_percent_nonzero = 2.5; // percent
     std::string init_poses = "gt";    // 'gt' or 'pogo'
     double init_translation_std = 0.5; // meters
     double init_rotation_std = 5.0;    // degrees
@@ -58,7 +61,6 @@ struct Options {
     double refine_downsample = 1.0; // downsampling factor for refinement iterations
     double tile_size = 0.0;     // meters, size of tiles to process separately
     int max_loaded_scans = 0;   // max number of scans to keep loaded in memory at once (>0 all)
-    bool coarse_to_fine = false; // whether to switch from coarse to fine after num_coarse_iterations
 
     // Mapping parameters
     std::string pose_source = "gt"; // 'estimate', 'gt', 'pogo', 'dro'
@@ -67,6 +69,9 @@ struct Options {
     double map_max_dist = 80.0; // meters
     bool map_dist_field_preproc = true;
     double map_gauss_blur_sigma = 3.0; // pixels
+    bool map_adaptive_blur = true; // adaptively choose Gaussian blur sigma based on scan content
+    double map_min_int_val_tol = 0.05; // intensity units
+    double map_min_percent_nonzero = 2.5; // percent
     std::vector<std::pair<int, int>> frame_ranges; // pairs of start and end frame indices
 
     // Localization parameters
