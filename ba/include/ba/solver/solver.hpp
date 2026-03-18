@@ -38,6 +38,9 @@ public:
     // Accessors
     double cost() const { return cost_; }
 
+    // Writers
+    void set_alpha(double alpha) { alpha_ = alpha; }
+
 protected:
     Problem& problem_;
     const Options& opts_;
