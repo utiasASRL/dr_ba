@@ -20,9 +20,11 @@ add_executable(dr_ba dr_ba.cpp)
 add_executable(dr_map dr_map.cpp)
 add_executable(dr_loc dr_loc.cpp)
 add_executable(dr_map_loc_test dr_map_loc_test.cpp)
+add_executable(dr_ba_video dr_ba_video.cpp)
 
 # Link all executables to the common interface
 target_link_libraries(dr_ba PRIVATE dr_common)
 target_link_libraries(dr_map PRIVATE dr_common)
 target_link_libraries(dr_loc PRIVATE dr_common)
 target_link_libraries(dr_map_loc_test PRIVATE dr_common)
+target_link_libraries(dr_ba_video PRIVATE dr_common)
