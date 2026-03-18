@@ -19,7 +19,7 @@ vox_map = Map(res=1.0)  # Resolution will get overwritten when loading
 vox_map.load_from_binary(voxel_path)
 print("Voxel map size:", vox_map.size())
 # vox_map.plot(show=True)
-vox_map.plot_paper(show=True)
+vox_map.plot_paper(show=True, plot_poses=True)
 
 
 

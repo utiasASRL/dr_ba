@@ -75,9 +75,7 @@ vox_map = Map(res=1.0)  # Resolution will get overwritten when loading
 vox_map.load_from_binary(voxel_path)
 print("Voxel map size:", vox_map.size())
 vox_map.plot_loc_result(loc_results, show=False, save_path=loc_path, title=title_name)
-vox_map.plot_loc_paper(loc_results, show=False, save_path=loc_path, title=title_name)
-# plt.show()
-# fdsa
+# vox_map.plot_loc_paper(loc_results, show=False, save_path=loc_path, title=title_name)
 
 print("RMSE (m), (m), (deg):")
 errs = np.array(errs)
