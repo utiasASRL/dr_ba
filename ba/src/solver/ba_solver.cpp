@@ -3,8 +3,18 @@
 #include <chrono>
 #include <algorithm>
 #include <omp.h>
+#include <unsupported/Eigen/SparseExtra>
 
 namespace ba {
+
+void saveBinary(const Eigen::MatrixXd& M, const std::string& path)
+{
+    std::ofstream out(path, std::ios::binary);
+    int rows = M.rows(), cols = M.cols();
+    out.write((char*)&rows, sizeof(int));
+    out.write((char*)&cols, sizeof(int));
+    out.write((char*)M.data(), rows * cols * sizeof(double));
+}
 
 void DrBASolver::tile_problem() {
     std::cout << "Tiling problem..." << std::endl;
@@ -82,8 +92,17 @@ void DrBASolver::tile_problem() {
 }
 
 void DrBASolver::construct_problem(double downsample_factor) {
+    // Ensure problem is initialized
+    if (!problem_.is_initialized()) {
+        problem_.initialize();
+    }
+    // Tile problem if not already done
+    if (tiles_.empty()) {
+        tile_problem();
+    }
+
     // Set up timer
-    // auto start_time = std::chrono::high_resolution_clock::now();
+    auto start_time = std::chrono::high_resolution_clock::now();
     double rel_pose_prior_time = 0.0;
     double avg_per_voxel_time = 0.0;
 
@@ -350,10 +369,13 @@ void DrBASolver::construct_problem(double downsample_factor) {
     auto end_time = std::chrono::high_resolution_clock::now();
     avg_per_voxel_time = avg_per_voxel_time / static_cast<double>(voxels_size);
 
-    // std::cout << "Construct Problem Timing: " << std::endl;
-    // std::cout << "  Total time: " << std::chrono::duration<double>(end_time - start_time).count() << " s" << std::endl;
-    // std::cout << "  Relative Pose Prior time: " << rel_pose_prior_time << " s" << std::endl;
-    // std::cout << "  Avg time per voxel: " << avg_per_voxel_time << " s" << std::endl;
+    std::cout << "Construct Problem Timing: " << std::endl;
+    std::cout << "  Total time: " << std::chrono::duration<double>(end_time - start_time).count() << " s" << std::endl;
+    std::cout << "  Relative Pose Prior time: " << rel_pose_prior_time << " s" << std::endl;
+    std::cout << "  Avg time per voxel: " << avg_per_voxel_time << " s" << std::endl;
+
+    // std::string H_save_path = opts_.output_path / "H.bin";
+    // saveBinary(lhs_, H_save_path);
 
     // // Look into sparsity of lhs_
     // int non_zero_count = 0;
@@ -523,7 +545,7 @@ void DrBASolver::optimize() {
 
         if (iter > 2) {
             // Slowly decrease alpha
-            alpha_ *= 0.9;
+            alpha_ *= 0.8;
         }
 
         // Occasionally re-tile problem in case poses have changed significantly
@@ -534,13 +556,13 @@ void DrBASolver::optimize() {
         //     update_map();
         // }
 
-        // if (std::find(save_map_iter_idx.begin(), save_map_iter_idx.end(), iter) != save_map_iter_idx.end()) {
+        // if ((std::find(save_map_iter_idx.begin(), save_map_iter_idx.end(), iter) != save_map_iter_idx.end()) || true) {
         //     // Update map
         //     update_map();
         //     // Save voxel map
         //     if (opts_.save_result) {
         //         // std::string voxel_path = result_.output_dir() + "voxel_map_" + std::to_string(iter) + ".bin";
-        //         fs::path voxel_path = result_.output_dir() + ("voxel_map_" + std::to_string(iter) + ".bin");
+        //         fs::path voxel_path = fs::path(result_.output_dir()) / ("voxel_map_" + std::to_string(iter) + ".bin");
         //         result_.save_voxel_map(voxel_path);
         //     }
         // }
