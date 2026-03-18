@@ -177,8 +177,8 @@ Options load_options(const YAML::Node& config) {
             opts.map_seq = config["mapping"]["map_seq"].as<std::string>();
         else
             throw std::runtime_error("Mapping sequence ID not found in config file.");
-        if (config["mapping"]["map_max_dist"])
-            opts.map_max_dist = config["mapping"]["map_max_dist"].as<double>();
+        if (config["mapping"]["max_dist"])
+            opts.map_max_dist = config["mapping"]["max_dist"].as<double>();
         if (config["mapping"]["map_dist_field_preproc"])
             opts.map_dist_field_preproc = config["mapping"]["map_dist_field_preproc"].as<bool>();
         if (config["mapping"]["map_gauss_blur_sigma"])
