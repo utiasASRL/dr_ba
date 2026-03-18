@@ -151,7 +151,7 @@ void Problem::preload_images() {
                 // Increase sigma by odd number
                 sigma += 2.0;
 
-                if (!opts_.adaptive_blur || sigma > 25.0) {
+                if (!opts_.adaptive_blur || sigma > 15.0) {
                     // If not adaptive blur, just do one iteration
                     break;
                 }

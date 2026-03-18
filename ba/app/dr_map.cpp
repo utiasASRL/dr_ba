@@ -54,6 +54,7 @@ int main() {
     ba::DrBASolver solver(problem);
     solver.update_map();
     
+    // solver.construct_problem(); // Temporarily constructing to get H saving
 
     auto end_time = std::chrono::high_resolution_clock::now();
     double total_time = std::chrono::duration<double>(end_time - start_time).count();
