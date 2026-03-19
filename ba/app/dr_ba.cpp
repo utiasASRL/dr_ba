@@ -19,9 +19,8 @@ int main(int argc, char** argv) {
         // Use config path provided at runtime
         config_path = fs::path(argv[1]);
     } else {
-        // Default config: ba/config/ba_config.yaml
-        config_path = fs::path(__FILE__).parent_path().parent_path()
-                    / "config" / "ba_config.yaml";
+        // Default config
+        config_path = fs::path(__FILE__).parent_path().parent_path() / "config" / "ba_config.yaml";
     }
 
     if (!fs::exists(config_path)) {

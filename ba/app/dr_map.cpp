@@ -11,8 +11,21 @@
 namespace fs = std::filesystem;
 
 int main() {
-    // Load in config from ba/config/map_config.yaml
-    fs::path config_path = fs::path(__FILE__).parent_path().parent_path() / "config" / "map_config.yaml";
+    fs::path config_path;
+    if (argc > 1) {
+        // Use config path provided at runtime
+        config_path = fs::path(argv[1]);
+    } else {
+        // Default config
+        config_path = fs::path(__FILE__).parent_path().parent_path() / "config" / "map_config.yaml";
+    }
+
+    if (!fs::exists(config_path)) {
+        throw std::runtime_error("Config file not found: " + config_path.string());
+    }
+
+    std::cout << "Using config file: " << config_path.string() << std::endl;
+
     YAML::Node config = YAML::LoadFile(config_path.string());
     ba::Options opts = ba::load_options(config);
 
@@ -53,8 +66,6 @@ int main() {
     std::cout << "Solving for map..." << std::endl;
     ba::DrBASolver solver(problem);
     solver.update_map();
-    
-    // solver.construct_problem(); // Temporarily constructing to get H saving
 
     auto end_time = std::chrono::high_resolution_clock::now();
     double total_time = std::chrono::duration<double>(end_time - start_time).count();
