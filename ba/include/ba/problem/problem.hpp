@@ -74,7 +74,6 @@ protected:
 
     std::vector<int> scan_indices_;
     std::vector<fs::path> img_paths_;
-    std::vector<fs::path> fine_img_paths_;
     std::vector<fs::path> cumul_paths_;
     std::vector<int64_t> timestamps_;
     std::vector<lgmath::se3::Transformation> T_est_abs_list_;

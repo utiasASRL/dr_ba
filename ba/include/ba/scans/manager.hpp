@@ -67,16 +67,6 @@ public:
         return count;
     }
 
-    void switch_all_to_fine() {
-        for (const auto& kv : scans_) {
-            auto scan = kv.second;
-            auto local_map_scan = std::dynamic_pointer_cast<LocalMapScan>(scan);
-            if (local_map_scan) {
-                local_map_scan->switch_to_fine();
-            }
-        }
-    }
-
     void load_data(std::vector<int> scan_ids = {}) {
         std::vector<int> load_scan_ids;
         if (scan_ids.empty()) {
