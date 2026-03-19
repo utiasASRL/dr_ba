@@ -10,7 +10,7 @@
 
 namespace fs = std::filesystem;
 
-int main() {
+int main(int argc, char** argv) {
     fs::path config_path;
     if (argc > 1) {
         // Use config path provided at runtime
