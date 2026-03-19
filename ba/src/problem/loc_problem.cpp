@@ -70,8 +70,13 @@ void LocProblem::load_map_from_estimate() {
     const std::vector<int> pose_ids = voxel_map_.pose_ids();
     const std::vector<lgmath::se2::Transformation> map_poses = voxel_map_.poses();
 
-    if (files.size() < pose_ids.back()) {
-        throw std::runtime_error("Less image files than pose ids in voxel map. Are you sure the map was built from the same sequence? map_seq_id: " + map_seq_id);
+    if (pose_ids.empty()) {
+        throw std::runtime_error("voxel_map pose_ids is empty.");
+    }
+
+    const int max_pose_id = pose_ids.back();
+    if (max_pose_id < 0 || static_cast<std::size_t>(max_pose_id) >= files.size()) {
+        throw std::runtime_error("Pose id out of range for image files. Are you sure the map was built from the same sequence? max_pose_id: " + std::to_string(max_pose_id) + ", num_files: " + std::to_string(files.size()) + ", map_seq_id: " + map_seq_id);
     }
 
     for (size_t i = 0; i < pose_ids.size(); i++) {
