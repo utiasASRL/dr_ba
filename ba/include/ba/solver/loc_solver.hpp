@@ -13,28 +13,15 @@ namespace ba {
 
 class LocSolver : public Solver {
 public:
-    LocSolver(Problem& problem) : Solver(problem) {
-        alpha_ = problem.opts().alpha;
-    }
+    LocSolver(Problem& problem) : Solver(problem) {}
 
-    void construct_problem(double downsample_factor = 1.0) override;
     void construct_problem(const std::shared_ptr<Scan>& scan);
-    bool solve() override;
-    void update_poses() override;
-    void update_map() override;
     void optimize() override;
-
-    // accesor
-    double cost() const { return cost_; }
 
     ~LocSolver() = default;
 
 private:
     // Variables to be passed around
-    std::vector<ba::VoxelMap::Index> voxel_keys_;
-    Eigen::Matrix3d lhs_;
-    Eigen::Vector3d rhs_;
-    double alpha_;
     int num_scans_;
     lgmath::se3::Transformation curr_pose_;
     Eigen::Matrix3d curr_cov_;

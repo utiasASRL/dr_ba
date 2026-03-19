@@ -17,14 +17,11 @@ public:
     DrBASolver(Problem& problem) : Solver(problem) {}
 
     void tile_problem();
-    void construct_problem(double downsample_factor = 1.0) override;
-    bool solve() override;
-    void update_poses() override;
-    void update_map() override;
+    void construct_problem(double downsample_factor = 1.0);
+    bool solve();
+    void update_poses();
+    void update_map();
     void optimize() override;
-
-    // accesor
-    double cost() const { return cost_; }
 
     ~DrBASolver() = default;
 
@@ -33,10 +30,7 @@ private:
     std::vector<Tile> tiles_;
     
     // Variables to be passed around
-    std::vector<ba::VoxelMap::Index> voxel_keys_;
     Eigen::VectorXd del_x_;
-    Eigen::MatrixXd lhs_;
-    Eigen::VectorXd rhs_;
 };
 
 

@@ -119,8 +119,8 @@ void DrBASolver::construct_problem(double downsample_factor) {
     cost_ = 0.0;
 
     // Downsample desired voxels
-    voxel_keys_ = voxel_map_.get_sorted_keys_downsampled(downsample_factor);
-    int voxels_size = static_cast<int>(voxel_keys_.size());
+    std::vector<ba::VoxelMap::Index> voxel_keys = voxel_map_.get_sorted_keys_downsampled(downsample_factor);
+    int voxels_size = static_cast<int>(voxel_keys.size());
 
     // Initialize matrices
     lhs_.setZero(states_size, states_size);
@@ -233,10 +233,10 @@ void DrBASolver::construct_problem(double downsample_factor) {
 
         // Pre-filter voxels in this tile with downsampled keys (both are sorted)
         std::vector<decltype(tile.voxel_indices)::value_type> filtered_voxels;
-        filtered_voxels.reserve(std::min(tile.voxel_indices.size(), voxel_keys_.size()));
+        filtered_voxels.reserve(std::min(tile.voxel_indices.size(), voxel_keys.size()));
         std::set_intersection(
             tile.voxel_indices.begin(), tile.voxel_indices.end(),
-            voxel_keys_.begin(), voxel_keys_.end(),
+            voxel_keys.begin(), voxel_keys.end(),
             std::back_inserter(filtered_voxels)
         );
         const auto start_voxel_time = std::chrono::high_resolution_clock::now();

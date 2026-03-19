@@ -42,7 +42,9 @@ void LocSolver::construct_problem(const std::shared_ptr<Scan>& scan) {
     // Loop through all voxels in the scan's coverage
     int num_voxels_used = 0;
     std::vector<double> voxel_errors;
-    for (const auto& voxel_idx : voxel_keys_) {
+    // Get voxels in range of initial pose
+    std::vector<ba::VoxelMap::Index> voxel_keys = voxel_map_.get_voxels_in_range(scan->pose2d(), opts_.max_dist);
+    for (const auto& voxel_idx : voxel_keys) {
         double voxel_x = static_cast<double>(voxel_idx.first) * voxel_map_.res();
         double voxel_y = static_cast<double>(voxel_idx.second) * voxel_map_.res();
         double vox_intensity = voxel_map_.at(voxel_idx);
@@ -79,21 +81,6 @@ void LocSolver::construct_problem(const std::shared_ptr<Scan>& scan) {
     if (num_voxels_used == 0) {
         throw std::runtime_error("Error: No voxels used in localization optimization! Check if your map and loc entries overlap?");
     }
-}
-
-void LocSolver::construct_problem(double downsample_factor) {
-    // Implementation as above
-}
-
-bool LocSolver::solve() {
-    return true;
-}
-
-void LocSolver::update_poses() {
-}
-
-void LocSolver::update_map() {
-    // No map updating needed for localization solver
 }
 
 void LocSolver::compute_errors(LocProblem& loc_problem, const std::shared_ptr<Scan>& scan, int i) {
@@ -240,8 +227,7 @@ void LocSolver::optimize() {
         std::cout << "----------------------------------------" << std::endl;
         int64_t scan_timestamp = scan->timestamp();
         double time_from_start = static_cast<double>(scan_timestamp - start_timestamp) / 1e6;
-        // Get voxels in range of initial pose
-        voxel_keys_ = voxel_map_.get_voxels_in_range(scan->pose2d(), opts_.max_dist);
+
         std::cout << "Optimizing scan ID: " << scan_id << "/" << max_id
                   << " (timestamp: " << scan->timestamp() << ", " << time_from_start << " s from start)" << std::endl;
         scan->load_data();

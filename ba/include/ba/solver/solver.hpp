@@ -29,10 +29,6 @@ public:
     ~Solver() = default;
 
     // Functions to be fulfilled by derived classes
-    virtual void construct_problem(double downsample_factor = 1.0) = 0;
-    virtual bool solve() = 0;
-    virtual void update_poses() = 0;
-    virtual void update_map() = 0;
     virtual void optimize() = 0;
 
     // Accessors
@@ -53,6 +49,8 @@ protected:
     double cost_;
     double prev_cost_;
     double alpha_;
+    Eigen::MatrixXd lhs_;
+    Eigen::VectorXd rhs_;
 };
 
 
