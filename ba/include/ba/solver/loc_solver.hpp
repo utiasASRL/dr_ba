@@ -5,6 +5,7 @@
 #include <Eigen/Dense>
 #include <ba/solver/solver.hpp>
 #include <ba/problem/problem.hpp>
+#include <ba/problem/loc_problem.hpp>
 #include <ba/scans/scan.hpp>
 #include <memory>
 
@@ -34,6 +35,14 @@ private:
     Eigen::Matrix3d lhs_;
     Eigen::Vector3d rhs_;
     double alpha_;
+    int num_scans_;
+    lgmath::se3::Transformation curr_pose_;
+    Eigen::Matrix3d curr_cov_;
+    Eigen::Vector3d avg_pose_error_;
+
+    // local functions
+    void compute_errors(LocProblem& loc_problem, const std::shared_ptr<Scan>& scan, int i);
+    void odometry_step(LocProblem& loc_problem, int i);
 };
 
 
