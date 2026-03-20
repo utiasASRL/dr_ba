@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
         fs::copy_file(config_path, output_config_path);
 
         // Copy voxel map to output folder
-        fs::path voxel_map_src = opts.map_location.string() + "/voxel_map.bin";
+        fs::path voxel_map_src = opts.loc_opts.map_location.string() + "/voxel_map.bin";
         fs::path voxel_map_dst = output_run_dir / "voxel_map.bin";
         fs::copy_file(voxel_map_src, voxel_map_dst);
     }

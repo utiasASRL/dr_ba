@@ -6,24 +6,39 @@
 
 namespace ba {
 
+void MapProblem::validate_opts() {
+    // Check that mapping opts exist
+    if (opts_.map_opts.seq_id.empty()) {
+        throw std::invalid_argument("MapProblem: seq_id must be specified in mapping options");
+    }
+    if (opts_.map_opts.pose_source == "estimate") {
+        if (opts_.map_opts.estimate_location.empty()) {
+            throw std::invalid_argument("MapProblem: estimate_location must be specified in mapping options when pose_source is 'estimate'");
+        }
+    }
+}
+
+void MapProblem::init_seq_id() {
+    seq_id_ = opts_.map_opts.seq_id;
+}
+
 void MapProblem::get_scan_indeces() {
     std::cout << "Selecting scan indices based on frame ranges..." << std::endl;
-    std::string seq_id = opts_.map_seq;
 
     // Load groundtruth poses
     std::vector<lgmath::se3::Transformation> all_gt_poses;
     std::vector<double> all_gt_times;
-    ba::load_groundtruth_poses_and_times(opts_.data_path / seq_id, all_gt_poses, all_gt_times);
+    ba::load_groundtruth_poses_and_times(opts_.data_path / seq_id_, all_gt_poses, all_gt_times);
 
     // Load pogo poses
     std::vector<lgmath::se3::Transformation> all_pogo_poses;
     std::vector<double> all_pogo_times;
-    ba::load_pogo_poses_and_times(opts_.meas_path / seq_id, all_pogo_poses, all_pogo_times);
+    ba::load_pogo_poses_and_times(opts_.meas_path / seq_id_, all_pogo_poses, all_pogo_times);
 
     // Load DRO poses
     std::vector<lgmath::se3::Transformation> all_dro_poses;
     std::vector<double> all_dro_times;
-    ba::load_dro_poses_and_times(opts_.meas_path / seq_id, all_dro_poses, all_dro_times);
+    ba::load_dro_poses_and_times(opts_.meas_path / seq_id_, all_dro_poses, all_dro_times);
 
     // Initialize looping through trajectory
     lgmath::se3::Transformation T_est_abs_0(Eigen::Matrix4d(Eigen::Matrix4d::Identity()));
@@ -32,7 +47,7 @@ void MapProblem::get_scan_indeces() {
 
     // Loop through all images
     // TODO: This is already done in preload_images, refactor to avoid duplicate work
-    fs::path all_img_dir = opts_.meas_path / seq_id / opts_.input_type;
+    fs::path all_img_dir = opts_.meas_path / seq_id_ / opts_.map_opts.frame_processing_opts.input_type;
     // Sort files in directory
     std::vector<fs::path> files;
     for (const auto& entry : fs::directory_iterator(all_img_dir)) {
@@ -48,7 +63,8 @@ void MapProblem::get_scan_indeces() {
     // Check validity of frame ranges
     int num_scans = files.size();
     int max_frame = 0;
-    for (auto& range : opts_.frame_ranges) {
+    std::vector<std::pair<int, int>> frame_ranges = opts_.map_opts.frame_ranges;
+    for (auto& range : frame_ranges) {
         if (range.second == -1) {
             range.second = num_scans - 1;
         }
@@ -63,9 +79,9 @@ void MapProblem::get_scan_indeces() {
 
     int num_checked = -1;
 
-    if (opts_.pose_source == "estimate") {
+    if (opts_.map_opts.pose_source == "estimate") {
         // Load in voxel map from estimates
-        std::string estimate_location = opts_.estimate_location.string() + "/voxel_map.bin";
+        std::string estimate_location = opts_.map_opts.estimate_location.string() + "/voxel_map.bin";
         std::cout << "Loading voxel map from estimates: " << estimate_location << std::endl;
         voxel_map_.load_poses_from_file(estimate_location);
         const std::vector<int> pose_ids = voxel_map_.pose_ids();
@@ -83,7 +99,7 @@ void MapProblem::get_scan_indeces() {
 
             // Check if frame in desired ranges
             bool in_range = false;
-            for (const auto& range : opts_.frame_ranges) {
+            for (const auto& range : frame_ranges) {
                 if (num_checked >= range.first && num_checked <= range.second) {
                     in_range = true;
                     break;
@@ -122,7 +138,7 @@ void MapProblem::get_scan_indeces() {
 
         // Check if frame in desired ranges
         bool in_range = false;
-        for (const auto& range : opts_.frame_ranges) {
+        for (const auto& range : frame_ranges) {
             if (num_checked >= range.first && num_checked <= range.second) {
                 in_range = true;
                 break;
@@ -138,14 +154,14 @@ void MapProblem::get_scan_indeces() {
 
         // Load in initial guess pose
         lgmath::se3::Transformation T_est_abs;
-        if (opts_.pose_source == "pogo") {
+        if (opts_.map_opts.pose_source == "pogo") {
             T_est_abs = ba::get_interpolated_pose(all_pogo_poses, all_pogo_times, timestamp_seconds);
-        } else if (opts_.pose_source == "gt") {
+        } else if (opts_.map_opts.pose_source == "gt") {
             T_est_abs = ba::get_interpolated_pose(all_gt_poses, all_gt_times, timestamp_seconds);
-        } else if (opts_.pose_source == "dro") {
+        } else if (opts_.map_opts.pose_source == "dro") {
             T_est_abs = ba::get_interpolated_pose(all_dro_poses, all_dro_times, timestamp_seconds);
         } else {
-            throw std::invalid_argument("Invalid pose_source option: " + opts_.pose_source);
+            throw std::invalid_argument("Invalid pose_source option: " + opts_.map_opts.pose_source);
         }
 
         if (num_loaded != 0) {
@@ -156,7 +172,7 @@ void MapProblem::get_scan_indeces() {
             double del_theta = T_kf_rel.vec()(5); // Yaw angle
             double translation_mag = std::sqrt(std::pow(del_x, 2) + std::pow(del_y, 2));
             double rotation_mag = std::abs(del_theta) * 180.0 / M_PI; // convert to degrees
-            if (translation_mag < opts_.max_kf_dist && rotation_mag < opts_.max_kf_rot) {
+            if (translation_mag < opts_.map_opts.max_kf_dist && rotation_mag < opts_.map_opts.max_kf_rot) {
                 // Not a keyframe, skip
                 continue;
             }
@@ -192,7 +208,7 @@ void MapProblem::get_scan_indeces() {
 }
     
 void MapProblem::init_scans_and_map() {
-    if (opts_.pose_source == "estimate") {
+    if (opts_.map_opts.pose_source == "estimate") {
         init_scans_and_map_from_estimates();
     } else {
         init_scans_and_map_from_data();
@@ -200,17 +216,15 @@ void MapProblem::init_scans_and_map() {
 }
 
 void MapProblem::init_scans_and_map_from_estimates() {
-    std::string seq_id = opts_.map_seq;
-
     // Load in voxel map from estimates
-    std::string estimate_location = opts_.estimate_location.string() + "/voxel_map.bin";
+    std::string estimate_location = opts_.map_opts.estimate_location.string() + "/voxel_map.bin";
     std::cout << "Loading voxel map from estimates: " << estimate_location << std::endl;
     std::cout << "Map spanning from " << timestamps_.front() << " to " << timestamps_.back() << " microseconds." << std::endl;
     voxel_map_.load_poses_from_file(estimate_location);
     const std::vector<int> pose_ids = voxel_map_.pose_ids();
     const std::vector<lgmath::se2::Transformation> poses_se2 = voxel_map_.poses();
     // Re-initialize a new voxel_map
-    voxel_map_ = VoxelMap(opts_.voxel_res);
+    voxel_map_ = VoxelMap(opts_.map_opts.voxel_res);
 
     for (size_t i=0; i < scan_indices_.size(); i++) {
         int idx = scan_indices_[i];
@@ -226,7 +240,7 @@ void MapProblem::init_scans_and_map_from_estimates() {
         // Load in image paths
         const auto& img_path = img_paths_[i];
         std::optional<fs::path> cumul_img_path = std::nullopt;
-        if (opts_.use_cumul_thresh) {
+        if (opts_.map_opts.optimization_opts.use_cumul_thresh) {
             if (cumul_paths_.empty()) {
                 throw std::runtime_error("Cumulative image paths are empty but use_cumul_thresh is true.");
             }
@@ -237,23 +251,24 @@ void MapProblem::init_scans_and_map_from_estimates() {
         auto scan = std::make_shared<LocalMapScan>(
             timestamps_[i],
             idx,
-            opts_,
+            opts_.map_opts.frame_processing_opts.local_map_res,
+            opts_.map_opts.optimization_opts,
             T_est_se2.toSE3(),
             T_gt_rel,
             img_path,
             cumul_img_path);
+
         scan_manager_.add_scan(scan);
-        voxel_map_.init_map(T_est_se2, opts_.map_max_dist, idx);
+        voxel_map_.init_map(T_est_se2, opts_.map_opts.frame_processing_opts.max_dist, idx);
     }
 }
 
 void MapProblem::init_scans_and_map_from_data() {
-    std::string seq_id = opts_.map_seq;
-    std::cout << "Initializing scans and map from data for sequence: " << seq_id << std::endl;
+    std::cout << "Initializing scans and map from data for sequence: " << seq_id_ << std::endl;
 
     // Initialize uniform distribution for noise
-    std::uniform_real_distribution<double> translation_dist(-opts_.init_translation_std, opts_.init_translation_std);
-    double rotation_std_rad = opts_.init_rotation_std * M_PI / 180.0;
+    std::uniform_real_distribution<double> translation_dist(-opts_.map_opts.init_translation_std, opts_.map_opts.init_translation_std);
+    double rotation_std_rad = opts_.map_opts.init_rotation_std * M_PI / 180.0;
     std::uniform_real_distribution<double> rotation_dist(-rotation_std_rad, rotation_std_rad);
     std::mt19937 rng(99); // Fixed seed for reproducibility
 
@@ -271,7 +286,7 @@ void MapProblem::init_scans_and_map_from_data() {
         // Load in image paths
         const auto& img_path = img_paths_[i];
         std::optional<fs::path> cumul_img_path = std::nullopt;
-        if (opts_.use_cumul_thresh) {
+        if (opts_.map_opts.optimization_opts.use_cumul_thresh) {
             if (cumul_paths_.empty()) {
                 throw std::runtime_error("Cumulative image paths are empty but use_cumul_thresh is true.");
             }
@@ -279,7 +294,7 @@ void MapProblem::init_scans_and_map_from_data() {
         }
 
         // Add noise to initial pose estimate if specified
-        if (opts_.init_translation_std > 0.0 || opts_.init_rotation_std > 0.0) {
+        if (opts_.map_opts.init_translation_std > 0.0 || opts_.map_opts.init_rotation_std > 0.0) {
             // Add noise to gt pose sampled from uniform distribution
             Eigen::Vector3d noise;
             noise << translation_dist(rng), translation_dist(rng), rotation_dist(rng);
@@ -287,7 +302,16 @@ void MapProblem::init_scans_and_map_from_data() {
             T_est_rel = T_est_rel * T_noise;
         }
 
-        auto scan = std::make_shared<ba::LocalMapScan>(timestamps_[i], idx, opts_, T_est_rel, T_gt_rel, img_path, cumul_img_path);
+        auto scan = std::make_shared<LocalMapScan>(
+            timestamps_[i],
+            idx,
+            opts_.map_opts.frame_processing_opts.local_map_res,
+            opts_.map_opts.optimization_opts,
+            T_est_rel,
+            T_gt_rel,
+            img_path,
+            cumul_img_path);
+
         scan_manager_.add_scan(scan);
     }
 
@@ -297,7 +321,7 @@ void MapProblem::init_scans_and_map_from_data() {
     std::cout << "Initializing voxel map..." << std::endl;
     for (int scan_id : scan_manager_.get_all_scan_ids()) {
         auto scan = scan_manager_.get_scan(scan_id);
-        voxel_map_.init_map(scan->pose(), opts_.map_max_dist, scan_id);
+        voxel_map_.init_map(scan->pose(), opts_.map_opts.frame_processing_opts.max_dist, scan_id);
     }
 
     std::pair<double, double> x_bounds = voxel_map_.x_bounds();

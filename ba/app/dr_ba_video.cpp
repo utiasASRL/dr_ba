@@ -72,16 +72,16 @@ int main(int argc, char** argv) {
 
     // We want to re-initialize
     int temp_loaded_scans = 0;
-    int max_frame_range = opts.frame_ranges.front().first + 1;
+    int max_frame_range = opts.ba_opts.frame_ranges.front().first + 1;
     int num_voxel_maps = 0;
     while (temp_loaded_scans < num_loaded_scans) {
         std::cout << "Initializing problem with frame range [0, " << max_frame_range << "]..." << std::endl;
         ba::Options opts_temp = ba::load_options(config);
         // Change frame range
-        opts_temp.frame_ranges.clear();
-        int start_frame = opts.frame_ranges.front().first;
+        opts_temp.ba_opts.frame_ranges.clear();
+        int start_frame = opts.ba_opts.frame_ranges.front().first;
         int end_frame = max_frame_range;
-        opts_temp.frame_ranges.push_back({start_frame, end_frame});
+        opts_temp.ba_opts.frame_ranges.push_back({start_frame, end_frame});
 
         ba::BAProblem temp_problem(opts_temp);
         temp_problem.initialize();
@@ -110,7 +110,7 @@ int main(int argc, char** argv) {
     double curr_cost = std::numeric_limits<double>::max() - 1000.0;
     double prev_cost = std::numeric_limits<double>::max();
     int num_iter = 0;
-    double alpha = opts.alpha;
+    double alpha = opts.ba_opts.optimization_opts.alpha;
     while (num_iter < 12) {
         prev_cost = curr_cost;
         solver.optimize();

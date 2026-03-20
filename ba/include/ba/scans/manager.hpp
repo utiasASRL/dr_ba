@@ -20,7 +20,14 @@ public:
             // Set equal to max int to effectively disable limit
             max_loaded_scans_ = std::numeric_limits<size_t>::max();
         }
-        
+    }
+
+    void set_max_loaded_scans(int max_loaded_scans) {
+        if (max_loaded_scans >= 1) {
+            max_loaded_scans_ = static_cast<size_t>(max_loaded_scans);
+        } else {
+            throw std::invalid_argument("max_loaded_scans must be >= 1");
+        }
     }
 
     void add_scan(std::shared_ptr<Scan> scan) {

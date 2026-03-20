@@ -5,9 +5,8 @@
 #include <ba/utils/ba_config.hpp>
 
 // Create constant Options for tests
-ba::Options create_test_options() {
-    ba::Options opts;
-    opts.local_map_res = 1.0;
+ba::OptimizationOptions create_test_options() {
+    ba::OptimizationOptions opts;
     opts.cumul_thresh = 0.8;
     opts.range_factor = 0.1;
     opts.meas_std = 0.5;
@@ -23,10 +22,10 @@ TEST(LocalMapScanTests, ValidateCoordToPixel) {
     int64_t timestamp = 1;
     int scan_id = 1;
     lgmath::se3::Transformation pose;
-    ba::Options opts = create_test_options();
+    ba::OptimizationOptions opts = create_test_options();
 
     // Create LocalMapScan instance
-    ba::LocalMapScan scan(timestamp, scan_id, opts, pose, pose, local_map);
+    ba::LocalMapScan scan(timestamp, scan_id, 1.0, opts, pose, pose, local_map);
 
     // Test point at in world coordinates
     // This point should be top left corner of the image
@@ -42,7 +41,7 @@ TEST(LocalMapScanTests, ValidateCoordToPixel) {
     local_map = Eigen::MatrixXf(4, 4);
 
     // The same world coordinates should now map to pixel (0.5, 0.5)
-    ba::LocalMapScan scan2(timestamp, scan_id, opts, pose, pose, local_map);
+    ba::LocalMapScan scan2(timestamp, scan_id, 1.0, opts, pose, pose, local_map);
     px = scan2.coord_to_pixel(x_world, y_world);
     EXPECT_EQ(px.first, 0.5);
     EXPECT_EQ(px.second, 0.5);
@@ -56,10 +55,10 @@ TEST(LocalMapScanTests, ValidateRootPixelCoords) {
     int64_t timestamp = 1;
     int scan_id = 1;
     lgmath::se3::Transformation pose;
-    ba::Options opts = create_test_options();
+    ba::OptimizationOptions opts = create_test_options();
 
     // Create LocalMapScan instance
-    ba::LocalMapScan scan(timestamp, scan_id, opts, pose, pose, local_map);
+    ba::LocalMapScan scan(timestamp, scan_id, 1.0, opts, pose, pose, local_map);
 
     // First try the top left corner, this should correspond to pixel (0,0)
     // so the root pixel coords should also be (0,0)
@@ -96,10 +95,10 @@ TEST(LocalMapScanTests, ValidateCoverageCheck) {
     int64_t timestamp = 1;
     int scan_id = 1;
     lgmath::se3::Transformation pose;
-    ba::Options opts = create_test_options();
+    ba::OptimizationOptions opts = create_test_options();
 
     // Create LocalMapScan instance
-    ba::LocalMapScan scan(timestamp, scan_id, opts, pose, pose, local_map);
+    ba::LocalMapScan scan(timestamp, scan_id, 1.0, opts, pose, pose, local_map);
 
     // Test point well within bounds
     double x_in = 0.0;
@@ -134,14 +133,14 @@ TEST(LocalMapScanTests, ValidateInterpolation) {
     int64_t timestamp = 1;
     int scan_id = 1;
     lgmath::se3::Transformation pose;
-    ba::Options opts = create_test_options();
+    ba::OptimizationOptions opts = create_test_options();
 
     // Create a simple local map (3x3) with identical intensity values
     Eigen::MatrixXf local_map(3, 3);
     local_map << 1.0, 1.0, 1.0,
                  1.0, 1.0, 1.0,
                  1.0, 1.0, 1.0;
-    ba::LocalMapScan scan(timestamp, scan_id, opts, pose, pose, local_map);
+    ba::LocalMapScan scan(timestamp, scan_id, 1.0, opts, pose, pose, local_map);
     // Test interpolation within the local map, it should produce 1.0 everywhere
     double x_query = 0.5;
     double y_query = 0.5;
@@ -160,7 +159,7 @@ TEST(LocalMapScanTests, ValidateInterpolation) {
     local_map << 0.0, 1.0, 0.0,
                 1.0, 0.0, 1.0,
                 0.0, 1.0, 0.0;
-    ba::LocalMapScan scan2(timestamp, scan_id, opts, pose, pose, local_map);
+    ba::LocalMapScan scan2(timestamp, scan_id, 1.0, opts, pose, pose, local_map);
 
     // Test point at center (0,0), should be exactly 0.0
     x_query = 0.0;

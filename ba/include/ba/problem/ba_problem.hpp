@@ -7,9 +7,10 @@ namespace ba {
 
 class BAProblem : public Problem {
 public:
-    BAProblem(Options& opts)
-        : Problem(opts, opts.seq_id) {}
+    BAProblem(Options& opts) : Problem("ba", opts) {}
 
+    void validate_opts() override;
+    void init_seq_id() override;
     void get_scan_indeces() override;
     void init_scans();
     void init_map();

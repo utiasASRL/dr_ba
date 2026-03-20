@@ -12,17 +12,32 @@ void Problem::preload_images() {
     }
     std::cout << "Preloading images for sequence: " << seq_id_ << std::endl;
 
+    FrameProcessingOptions proc_opts;
+    bool use_cumul_thresh = false;
+    if (type_ == "ba") {
+        proc_opts = opts_.ba_opts.frame_processing_opts;
+        use_cumul_thresh = opts_.ba_opts.optimization_opts.use_cumul_thresh;
+    } else if (type_ == "map") {
+        proc_opts = opts_.map_opts.frame_processing_opts;
+        use_cumul_thresh = opts_.map_opts.optimization_opts.use_cumul_thresh;
+    } else if (type_ == "loc") {
+        proc_opts = opts_.loc_opts.frame_processing_opts;
+        use_cumul_thresh = opts_.loc_opts.optimization_opts.use_cumul_thresh;
+    } else {
+        throw std::invalid_argument("Unknown problem type: " + type_);
+    }
+
     // Set up temporary folder for Gaussian-blurred images to be stored
     fs::path temp_dir = opts_.meas_path / seq_id_ / "blurred";
     fs::create_directories(temp_dir);
 
     // TODO: Add support for more than just local_maps
-    if (opts_.input_type != "scans" && opts_.input_type != "local_maps") {
-        throw std::invalid_argument("Input type " + opts_.input_type + " not supported yet.");
+    if (proc_opts.input_type != "scans" && proc_opts.input_type != "local_maps") {
+        throw std::invalid_argument("Input type " + proc_opts.input_type + " not supported yet.");
     }
 
     // Load in images
-    fs::path all_img_dir = opts_.meas_path / seq_id_ / opts_.input_type;
+    fs::path all_img_dir = opts_.meas_path / seq_id_ / proc_opts.input_type;
     // Sort files in directory
     std::vector<fs::path> files;
     for (const auto& entry : fs::directory_iterator(all_img_dir)) {
@@ -37,7 +52,7 @@ void Problem::preload_images() {
 
     // Load in cumulative return images
     std::vector<fs::path> cumul_files;
-    if (opts_.use_cumul_thresh) {
+    if (use_cumul_thresh) {
         fs::path cumul_img_dir = opts_.meas_path / seq_id_ / "cumulated_returns";
         for (const auto& entry : fs::directory_iterator(cumul_img_dir)) {
             if (entry.is_regular_file()) {
@@ -52,10 +67,8 @@ void Problem::preload_images() {
     scan_manager_.set_ref_timestamp(ref_timestamp);
 
     // Loop through all images
-    int num_scans = img_paths_.size();
-    opts_.end_frame = (opts_.end_frame == -1) ? (num_scans - 1) : opts_.end_frame;
-    double eps = opts_.min_int_val_tol;    
-    double min_percent_nonzero = opts_.min_percent_nonzero;
+    double eps = proc_opts.min_int_val_tol;    
+    double min_percent_nonzero = proc_opts.min_percent_nonzero;
 
     // Create temporary scan path
     std::ostringstream oss;
@@ -63,14 +76,14 @@ void Problem::preload_images() {
     std::string s_min_percent_nonzero = oss.str(); // "1.50"
     std::replace(s_min_percent_nonzero.begin(), s_min_percent_nonzero.end(), '.', '_'); // "1_50"
     oss.str("");
-    oss << std::fixed << std::setprecision(2) << opts_.min_int_val_tol;
+    oss << std::fixed << std::setprecision(2) << proc_opts.min_int_val_tol;
     std::string s_min_int_val_tol = oss.str(); // "0.05"
     std::replace(s_min_int_val_tol.begin(), s_min_int_val_tol.end(), '.', '_'); // "0_05"
 
-    fs::path temp_img_dir = temp_dir / opts_.input_type;
+    fs::path temp_img_dir = temp_dir / proc_opts.input_type;
     fs::path temp_folder;
-    if (!opts_.adaptive_blur) {
-        temp_folder = std::to_string(static_cast<int>(std::round(opts_.gauss_blur_sigma)));
+    if (!proc_opts.adaptive_blur) {
+        temp_folder = std::to_string(static_cast<int>(std::round(proc_opts.gauss_blur_sigma)));
     } else {
         temp_folder = s_min_percent_nonzero + "pct_" + s_min_int_val_tol + "minint";
     }
@@ -86,7 +99,7 @@ void Problem::preload_images() {
         timestamps_.push_back(timestamp);
 
         std::string image_name = img_stem;
-        if (opts_.dist_field_preproc)
+        if (proc_opts.dist_field_preproc)
             image_name += "_distfield";
         image_name += ".png";
         fs::path temp_img_path = temp_img_dir / image_name;
@@ -116,7 +129,7 @@ void Problem::preload_images() {
             // if (fs::exists(temp_img_path))
             //     continue;
 
-            if (opts_.dist_field_preproc) {
+            if (proc_opts.dist_field_preproc) {
                 // Min–max normalization
                 double min_val, max_val;
                 cv::minMaxLoc(img, &min_val, &max_val);
@@ -133,8 +146,8 @@ void Problem::preload_images() {
             cv::Mat temp_img;
             double percent_nonzero = 0.0;
             double sigma = 3.0;
-            if (!opts_.adaptive_blur) {
-                sigma = opts_.gauss_blur_sigma;
+            if (!proc_opts.adaptive_blur) {
+                sigma = proc_opts.gauss_blur_sigma;
             }
             while (percent_nonzero < min_percent_nonzero) {
                 int ksize = (int(std::ceil(6 * sigma)) | 1);
@@ -151,7 +164,7 @@ void Problem::preload_images() {
                 // Increase sigma by odd number
                 sigma += 2.0;
 
-                if (!opts_.adaptive_blur || sigma > 15.0) {
+                if (!proc_opts.adaptive_blur || sigma > 15.0) {
                     // If not adaptive blur, just do one iteration
                     break;
                 }
@@ -172,9 +185,9 @@ void Problem::preload_images() {
 
         // Store path
         img_paths_.push_back(temp_img_path);
-        if (opts_.use_cumul_thresh) {
+        if (use_cumul_thresh)
             cumul_paths_.push_back(cumul_files[idx]);
-        }
+
     }
     std::cout << "Preloaded " << img_paths_.size() << " images out of " << files.size() << " total images." << std::endl;
 }

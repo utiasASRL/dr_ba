@@ -3,226 +3,233 @@
 
 namespace ba {
 
+OptimizationOptions load_optimization_options(const YAML::Node& config) {
+    OptimizationOptions opts;
+
+    if (config["max_iterations"])
+        opts.max_iterations = config["max_iterations"].as<int>();
+    if (config["convergence_tol"])
+        opts.convergence_tol = config["convergence_tol"].as<double>();
+    if (config["alpha"])
+        opts.alpha = config["alpha"].as<double>();
+    if (config["meas_std"])
+        opts.meas_std = config["meas_std"].as<double>();
+    if (config["use_rel_pose_prior"])
+        opts.use_rel_pose_prior = config["use_rel_pose_prior"].as<bool>();
+    if (config["rel_pose_prior_translation_std"])
+        opts.rel_pose_prior_translation_std = config["rel_pose_prior_translation_std"].as<double>();
+    if (config["rel_pose_prior_rotation_std"])
+        opts.rel_pose_prior_rotation_std = config["rel_pose_prior_rotation_std"].as<double>();
+    if (config["range_factor"])
+        opts.range_factor = config["range_factor"].as<double>();
+    if (config["use_cumul_thresh"])
+        opts.use_cumul_thresh = config["use_cumul_thresh"].as<bool>();
+    if (config["cumul_thresh"])
+        opts.cumul_thresh = config["cumul_thresh"].as<double>();
+    if (config["zero_thresh"])
+        opts.zero_thresh = config["zero_thresh"].as<double>();
+    if (config["num_coarse_iterations"])
+        opts.num_coarse_iterations = config["num_coarse_iterations"].as<int>();
+    if (config["coarse_downsample"])
+        opts.coarse_downsample = config["coarse_downsample"].as<double>();
+    if (config["refine_downsample"])
+        opts.refine_downsample = config["refine_downsample"].as<double>();
+    if (config["tile_size"])
+        opts.tile_size = config["tile_size"].as<double>();
+    if (config["max_loaded_scans"])
+        opts.max_loaded_scans = config["max_loaded_scans"].as<int>();
+
+    return opts;
+}
+
+FrameProcessingOptions load_frame_processing_options(const YAML::Node& config) {
+    FrameProcessingOptions opts;
+
+    if (config["max_dist"])
+        opts.max_dist = config["max_dist"].as<double>();
+    if (config["dist_field_preproc"])
+        opts.dist_field_preproc = config["dist_field_preproc"].as<bool>();
+    if (config["gauss_blur_sigma"])
+        opts.gauss_blur_sigma = config["gauss_blur_sigma"].as<double>();
+    if (config["adaptive_blur"])
+        opts.adaptive_blur = config["adaptive_blur"].as<bool>();
+    if (config["min_int_val_tol"])
+        opts.min_int_val_tol = config["min_int_val_tol"].as<double>();
+    if (config["min_percent_nonzero"])
+        opts.min_percent_nonzero = config["min_percent_nonzero"].as<double>();
+
+    return opts;
+}
+
+BAOptions load_ba_options(const YAML::Node& config) {
+    BAOptions opts;
+
+    if (config["voxel_res"])
+        opts.voxel_res = config["voxel_res"].as<double>();
+    if (config["seq_id"])
+        opts.seq_id = config["seq_id"].as<std::string>();
+    if (config["init_poses"])
+        opts.init_poses = config["init_poses"].as<std::string>();
+    if (config["init_translation_std"])
+        opts.init_translation_std = config["init_translation_std"].as<double>();
+    if (config["init_rotation_std"])
+        opts.init_rotation_std = config["init_rotation_std"].as<double>();
+    if (config["frame_ranges"]) {
+        opts.frame_ranges.clear();
+        for (const auto& range_node : config["frame_ranges"]) {
+            if (range_node.IsSequence() && range_node.size() == 2) {
+                int start_frame = range_node[0].as<int>();
+                int end_frame = range_node[1].as<int>();
+                opts.frame_ranges.emplace_back(start_frame, end_frame);
+            } else {
+                throw std::runtime_error("Invalid frame range format in config file.");
+            }
+        }
+    }
+    // Keyframing
+    if (config["keyframing"]) {
+        if (config["keyframing"]["max_kf_dist"])
+            opts.max_kf_dist = config["keyframing"]["max_kf_dist"].as<double>();
+        if (config["keyframing"]["max_kf_rot"])
+            opts.max_kf_rot = config["keyframing"]["max_kf_rot"].as<double>();
+        if (config["keyframing"]["fix_first_scan"])
+            opts.fix_first_scan = config["keyframing"]["fix_first_scan"].as<bool>();
+    }
+    // Frame processing
+    if (config["frame_processing"]) {
+        opts.frame_processing_opts = load_frame_processing_options(config["frame_processing"]);
+    }
+    // BA optimization
+    if (config["ba_optimization_opts"]) {
+        opts.optimization_opts = load_optimization_options(config["ba_optimization_opts"]);
+    }
+
+    return opts;
+}
+
+MappingOptions load_mapping_options(const YAML::Node& config) {
+    MappingOptions opts;
+
+    if (config["voxel_res"])
+        opts.voxel_res = config["voxel_res"].as<double>();
+    if (config["seq_id"])
+        opts.seq_id = config["seq_id"].as<std::string>();
+    if (config["pose_source"])
+        opts.pose_source = config["pose_source"].as<std::string>();
+    if (config["init_translation_std"])
+        opts.init_translation_std = config["init_translation_std"].as<double>();
+    if (config["init_rotation_std"])
+        opts.init_rotation_std = config["init_rotation_std"].as<double>();
+    if (config["estimate_location"])
+        opts.estimate_location = std::filesystem::path(config["estimate_location"].as<std::string>());
+    if (config["frame_ranges"]) {
+        opts.frame_ranges.clear();
+        for (const auto& range_node : config["frame_ranges"]) {
+            if (range_node.IsSequence() && range_node.size() == 2) {
+                int start_frame = range_node[0].as<int>();
+                int end_frame = range_node[1].as<int>();
+                opts.frame_ranges.emplace_back(start_frame, end_frame);
+            } else {
+                throw std::runtime_error("Invalid frame range format in config file.");
+            }
+        }
+    }
+    // Keyframing
+    if (config["keyframing"]) {
+        if (config["keyframing"]["max_kf_dist"])
+            opts.max_kf_dist = config["keyframing"]["max_kf_dist"].as<double>();
+        if (config["keyframing"]["max_kf_rot"])
+            opts.max_kf_rot = config["keyframing"]["max_kf_rot"].as<double>();
+        if (config["keyframing"]["fix_first_scan"])
+            opts.fix_first_scan = config["keyframing"]["fix_first_scan"].as<bool>();
+    }
+
+    // Frame processing
+    if (config["frame_processing"]) {
+        opts.frame_processing_opts = load_frame_processing_options(config["frame_processing"]);
+    }
+
+    // Map optimization
+    if (config["map_optimization_opts"]) {
+        opts.optimization_opts = load_optimization_options(config["map_optimization_opts"]);
+    }
+
+    return opts;
+}
+
+LocalizationOptions load_localization_options(const YAML::Node& config) {
+    LocalizationOptions opts;
+
+    if (config["seq_id"])
+        opts.seq_id = config["seq_id"].as<std::string>();
+    if (config["map_seq_id"])
+        opts.map_seq_id = config["map_seq_id"].as<std::string>();
+    if (config["map_location"])
+        opts.map_location = std::filesystem::path(config["map_location"].as<std::string>());
+    if (config["first_frame"])
+        opts.start_frame = config["first_frame"].as<int>();
+    if (config["last_frame"])
+        opts.end_frame = config["last_frame"].as<int>();
+    if (config["odometry_prior"]) {
+        if (config["odometry_prior"]["use_odometry_prior"])
+            opts.use_odometry_prior = config["odometry_prior"]["use_odometry_prior"].as<bool>();
+        if (config["odometry_prior"]["translation_std"])
+            opts.odom_translation_std = config["odometry_prior"]["translation_std"].as<double>();
+        if (config["odometry_prior"]["rotation_std"])
+            opts.odom_rotation_std = config["odometry_prior"]["rotation_std"].as<double>();
+    }
+
+    // Localization frame processing
+    if (config["frame_processing"]) {
+        opts.frame_processing_opts = load_frame_processing_options(config["frame_processing"]);
+    }
+
+    // Localization optimization
+    if (config["localization_optimization_opts"]) {
+        opts.optimization_opts = load_optimization_options(config["localization_optimization_opts"]);
+    }
+
+    return opts;
+}
+
 Options load_options(const YAML::Node& config) {
     Options opts;
 
-    if (config["map"]) {
-        if (config["map"]["voxel_res"])
-            opts.voxel_res = config["map"]["voxel_res"].as<double>();
-        else
-            throw std::runtime_error("Voxel resolution not found in config file.");
+    if (config["num_threads"])
+        opts.num_threads = config["num_threads"].as<int>();
+
+    if (config["data"]) {
+        if (config["data"]["data_path"])
+            opts.data_path = std::filesystem::path(config["data"]["data_path"].as<std::string>());
+        if (config["data"]["meas_path"])
+            opts.meas_path = std::filesystem::path(config["data"]["meas_path"].as<std::string>());
     } else {
-        throw std::runtime_error("Map configuration not found in config file.");
+        throw std::runtime_error("Config file missing required 'data' section with required fields 'data_path' and 'meas_path'");
     }
 
     if (config["output"]) {
         if (config["output"]["save_result"])
             opts.save_result = config["output"]["save_result"].as<bool>();
         else
-            opts.save_result = true;
+            opts.save_result = false;
         if (config["output"]["output_path"])
             opts.output_path = std::filesystem::path(config["output"]["output_path"].as<std::string>());
-        else {
-            if (opts.save_result)
-                throw std::runtime_error("Output path not found in config file.");
-        }
         if (config["output"]["visualize"])
             opts.visualize_result = config["output"]["visualize"].as<bool>();
         else
             opts.visualize_result = true;
-    } else {
-        throw std::runtime_error("Output configuration not found in config file.");
     }
 
-    if (config["input"]) {
-        if (config["input"]["data_path"])
-            opts.data_path = std::filesystem::path(config["input"]["data_path"].as<std::string>());
-        else
-            throw std::runtime_error("Data path not found in config file.");
-        if (config["input"]["meas_path"])
-            opts.meas_path = std::filesystem::path(config["input"]["meas_path"].as<std::string>());
-        else
-            throw std::runtime_error("Measurement path not found in config file.");
-        if (config["input"]["seq_id"]) {
-            opts.seq_id = config["input"]["seq_id"].as<std::string>();
-        } else
-            throw std::runtime_error("Sequence ID not found in config file.");
-        if (config["input"]["max_dist"])
-            opts.max_dist = config["input"]["max_dist"].as<double>();
-        else
-            throw std::runtime_error("Max distance not found in config file.");
-        if (config["input"]["dist_field_preproc"])
-            opts.dist_field_preproc = config["input"]["dist_field_preproc"].as<bool>();
-        if (config["input"]["gauss_blur_sigma"])
-            opts.gauss_blur_sigma = config["input"]["gauss_blur_sigma"].as<double>();
-        if (config["input"]["adaptive_blur"])
-            opts.adaptive_blur = config["input"]["adaptive_blur"].as<bool>();
-        if (config["input"]["min_int_val_tol"])
-            opts.min_int_val_tol = config["input"]["min_int_val_tol"].as<double>();
-        if (config["input"]["min_percent_nonzero"])
-            opts.min_percent_nonzero = config["input"]["min_percent_nonzero"].as<double>();
-        if (config["input"]["init_poses"])
-            opts.init_poses = config["input"]["init_poses"].as<std::string>();
-        else
-            throw std::runtime_error("Initial poses type not found in config file.");
-        if (config["input"]["init_translation_std"])
-            opts.init_translation_std = config["input"]["init_translation_std"].as<double>();
-        else
-            throw std::runtime_error("Initial translation std not found in config file.");
-        if (config["input"]["init_rotation_std"])
-            opts.init_rotation_std = config["input"]["init_rotation_std"].as<double>();
-        else
-            throw std::runtime_error("Initial rotation std not found in config file.");
-        if (config["input"]["input_type"])
-            opts.input_type = config["input"]["input_type"].as<std::string>();
-        else
-            throw std::runtime_error("Input type not found in config file.");
-        if (config["input"]["local_map_res"])
-            opts.local_map_res = config["input"]["local_map_res"].as<double>();
-        else
-            throw std::runtime_error("Local map resolution not found in config file.");
-    } else {
-        throw std::runtime_error("Input configuration not found in config file.");
+    if (config["ba"]) {
+        opts.ba_opts = load_ba_options(config["ba"]);
     }
 
-    if (config["keyframing"]) {
-        if (config["keyframing"]["max_kf_dist"])
-            opts.max_kf_dist = config["keyframing"]["max_kf_dist"].as<double>();
-        else
-            throw std::runtime_error("Max keyframe distance not found in config file.");
-        if (config["keyframing"]["max_kf_rot"])
-            opts.max_kf_rot = config["keyframing"]["max_kf_rot"].as<double>();
-        else
-            throw std::runtime_error("Max keyframe rotation not found in config file.");
-        if (config["keyframing"]["fix_first_scan"])
-            opts.fix_first_scan = config["keyframing"]["fix_first_scan"].as<bool>();
-    } else {
-        throw std::runtime_error("Keyframing configuration not found in config file.");
-    }
-
-    if (config["optimization"]) {
-        if (config["optimization"]["num_threads"])
-            opts.num_threads = config["optimization"]["num_threads"].as<int>();
-        if (config["optimization"]["max_iterations"])
-            opts.max_iterations = config["optimization"]["max_iterations"].as<int>();
-        else
-            throw std::runtime_error("Max iterations not found in config file.");
-        if (config["optimization"]["convergence_tol"])
-            opts.convergence_tol = config["optimization"]["convergence_tol"].as<double>();
-        else
-            throw std::runtime_error("Convergence tolerance not found in config file.");
-        if (config["optimization"]["alpha"])
-            opts.alpha = config["optimization"]["alpha"].as<double>();
-        if (config["optimization"]["adaptive_alpha"])
-            opts.adaptive_alpha = config["optimization"]["adaptive_alpha"].as<bool>();
-        if (config["optimization"]["meas_std"])
-            opts.meas_std = config["optimization"]["meas_std"].as<double>();
-        else
-            throw std::runtime_error("Measurement standard deviation not found in config file.");
-        if (config["optimization"]["rel_pose_prior"]) {
-            if (config["optimization"]["rel_pose_prior"]["use_pose_prior"])
-                opts.use_rel_pose_prior = config["optimization"]["rel_pose_prior"]["use_pose_prior"].as<bool>();
-            else
-                throw std::runtime_error("Use relative pose prior flag not found in config file.");
-            if (config["optimization"]["rel_pose_prior"]["translation_std"])
-                opts.rel_pose_prior_translation_std = config["optimization"]["rel_pose_prior"]["translation_std"].as<double>();
-            else
-                throw std::runtime_error("Relative pose prior translation std not found in config file.");
-            if (config["optimization"]["rel_pose_prior"]["rotation_std"])
-                opts.rel_pose_prior_rotation_std = config["optimization"]["rel_pose_prior"]["rotation_std"].as<double>();
-        } else {
-            throw std::runtime_error("Relative pose prior configuration not found in config file.");
-        }
-        if (config["optimization"]["range_factor"])
-            opts.range_factor = config["optimization"]["range_factor"].as<double>();
-        else
-            throw std::runtime_error("Range factor not found in config file.");
-        if (config["optimization"]["use_cumul_thresh"])
-            opts.use_cumul_thresh = config["optimization"]["use_cumul_thresh"].as<bool>();
-        else
-            throw std::runtime_error("Use cumulative threshold flag not found in config file.");
-        if (config["optimization"]["cumul_thresh"])
-            opts.cumul_thresh = config["optimization"]["cumul_thresh"].as<double>();
-        else
-            throw std::runtime_error("Cumulative threshold not found in config file.");
-        if (config["optimization"]["zero_thresh"])
-            opts.zero_thresh = config["optimization"]["zero_thresh"].as<double>();
-        else
-            throw std::runtime_error("Zero return threshold not found in config file.");
-        if (config["optimization"]["num_coarse_iterations"])
-            opts.num_coarse_iterations = config["optimization"]["num_coarse_iterations"].as<int>();
-        else
-            throw std::runtime_error("Number of coarse iterations not found in config file.");
-        if (config["optimization"]["coarse_downsample"])
-            opts.coarse_downsample = config["optimization"]["coarse_downsample"].as<double>();
-        else
-            throw std::runtime_error("Coarse downsample factor not found in config file.");
-        if (config["optimization"]["refine_downsample"])
-            opts.refine_downsample = config["optimization"]["refine_downsample"].as<double>();
-        else
-            throw std::runtime_error("Refine downsample factor not found in config file.");
-        if (config["optimization"]["tile_size"])
-            opts.tile_size = config["optimization"]["tile_size"].as<double>();
-        if (config["optimization"]["max_loaded_scans"])
-            opts.max_loaded_scans = config["optimization"]["max_loaded_scans"].as<int>();
-    }
-
-    // Mapping parameters
     if (config["mapping"]) {
-        if (config["mapping"]["pose_source"])
-            opts.pose_source = config["mapping"]["pose_source"].as<std::string>();
-        if (config["mapping"]["estimate_location"])
-            opts.estimate_location = std::filesystem::path(config["mapping"]["estimate_location"].as<std::string>());
-        if (config["mapping"]["map_seq"])
-            opts.map_seq = config["mapping"]["map_seq"].as<std::string>();
-        else
-            throw std::runtime_error("Mapping sequence ID not found in config file.");
-        if (config["mapping"]["max_dist"])
-            opts.map_max_dist = config["mapping"]["max_dist"].as<double>();
-        if (config["mapping"]["map_dist_field_preproc"])
-            opts.map_dist_field_preproc = config["mapping"]["map_dist_field_preproc"].as<bool>();
-        if (config["mapping"]["map_gauss_blur_sigma"])
-            opts.map_gauss_blur_sigma = config["mapping"]["map_gauss_blur_sigma"].as<double>();
-        if (config["mapping"]["map_adaptive_blur"])
-            opts.map_adaptive_blur = config["mapping"]["map_adaptive_blur"].as<bool>();
-        if (config["mapping"]["map_min_int_val_tol"])
-            opts.map_min_int_val_tol = config["mapping"]["map_min_int_val_tol"].as<double>();
-        if (config["mapping"]["map_min_percent_nonzero"])
-            opts.map_min_percent_nonzero = config["mapping"]["map_min_percent_nonzero"].as<double>();
-        if (config["mapping"]["map_gauss_blur_sigma"])
-            opts.map_gauss_blur_sigma = config["mapping"]["map_gauss_blur_sigma"].as<double>();
-        if (config["mapping"]["frame_ranges"]) {
-            opts.frame_ranges.clear();
-            for (const auto& range_node : config["mapping"]["frame_ranges"]) {
-                if (range_node.IsSequence() && range_node.size() == 2) {
-                    int start_frame = range_node[0].as<int>();
-                    int end_frame = range_node[1].as<int>();
-                    opts.frame_ranges.emplace_back(start_frame, end_frame);
-                } else {
-                    throw std::runtime_error("Invalid frame range format in config file.");
-                }
-            }
-        }
+        opts.map_opts = load_mapping_options(config["mapping"]);
     }
 
-    // Localization parameters
     if (config["localization"]) {
-        if (config["localization"]["odometry_prior"]) {
-            if (config["localization"]["odometry_prior"]["use_odometry_prior"])
-                opts.use_odometry_prior = config["localization"]["odometry_prior"]["use_odometry_prior"].as<bool>();
-            if (config["localization"]["odometry_prior"]["translation_std"])
-                opts.odom_translation_std = config["localization"]["odometry_prior"]["translation_std"].as<double>();
-            if (config["localization"]["odometry_prior"]["rotation_std"])
-                opts.odom_rotation_std = config["localization"]["odometry_prior"]["rotation_std"].as<double>();
-        }
-        if (config["localization"]["map_location"])
-            opts.map_location = std::filesystem::path(config["localization"]["map_location"].as<std::string>());
-        else
-            throw std::runtime_error("Map location not found in config file.");
-        if (config["localization"]["start_frame"])
-            opts.start_frame = config["localization"]["start_frame"].as<int>();
-        if (config["localization"]["end_frame"])
-            opts.end_frame = config["localization"]["end_frame"].as<int>();
+        opts.loc_opts = load_localization_options(config["localization"]);
     }
 
     return opts;

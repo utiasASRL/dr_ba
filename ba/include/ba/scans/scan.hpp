@@ -103,9 +103,9 @@ public:
 	virtual bool data_loaded() const = 0;
 
 protected:
-	Scan(int64_t timestamp, int scan_id, const Options &opts, const lgmath::se3::Transformation &pose,
+	Scan(int64_t timestamp, int scan_id, const double meas_std, const lgmath::se3::Transformation &pose,
 		 const lgmath::se3::Transformation &gt_pose)
-		: timestamp_(timestamp), id_(scan_id), meas_std_(opts.meas_std), pose_(pose), gt_pose_(gt_pose) {}
+		: timestamp_(timestamp), id_(scan_id), meas_std_(meas_std), pose_(pose), gt_pose_(gt_pose) {}
 
 	int64_t timestamp_;
 	int id_;

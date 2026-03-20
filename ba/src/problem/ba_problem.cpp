@@ -6,34 +6,43 @@
 
 namespace ba {
 
+void BAProblem::validate_opts() {
+    // Check that BA opts exist
+    if (opts_.ba_opts.seq_id.empty()) {
+        throw std::invalid_argument("BAProblem: seq_id must be specified in BA options");
+    }
+}
+
+void BAProblem::init_seq_id() {
+    seq_id_ = opts_.ba_opts.seq_id;
+}
+
 void BAProblem::get_scan_indeces() {
     std::cout << "Selecting scan indices based on frame ranges..." << std::endl;
-    std::string seq_id = opts_.seq_id;
 
     // Load groundtruth poses
     std::vector<lgmath::se3::Transformation> all_gt_poses;
     std::vector<double> all_gt_times;
-    ba::load_groundtruth_poses_and_times(opts_.data_path / seq_id, all_gt_poses, all_gt_times);
+    ba::load_groundtruth_poses_and_times(opts_.data_path / seq_id_, all_gt_poses, all_gt_times);
 
     // Load pogo poses
     std::vector<lgmath::se3::Transformation> all_pogo_poses;
     std::vector<double> all_pogo_times;
-    ba::load_pogo_poses_and_times(opts_.meas_path / seq_id, all_pogo_poses, all_pogo_times);
+    ba::load_pogo_poses_and_times(opts_.meas_path / seq_id_, all_pogo_poses, all_pogo_times);
 
     // Load DRO poses
     std::vector<lgmath::se3::Transformation> all_dro_poses;
     std::vector<double> all_dro_times;
-    ba::load_dro_poses_and_times(opts_.meas_path / seq_id, all_dro_poses, all_dro_times);
+    ba::load_dro_poses_and_times(opts_.meas_path / seq_id_, all_dro_poses, all_dro_times);
 
     // Initialize looping through trajectory
-    lgmath::se3::Transformation T_gt_abs_0(Eigen::Matrix4d(Eigen::Matrix4d::Identity()));
     lgmath::se3::Transformation T_est_abs_0(Eigen::Matrix4d(Eigen::Matrix4d::Identity()));
     lgmath::se3::Transformation T_kf_prev(Eigen::Matrix4d(Eigen::Matrix4d::Identity()));  // Previous keyframe pose
     int kf_prev_id = 0;
 
     // Loop through all images
     // TODO: This is already done in preload_images, refactor to avoid duplicate work
-    fs::path all_img_dir = opts_.meas_path / seq_id / opts_.input_type;
+    fs::path all_img_dir = opts_.meas_path / seq_id_ / opts_.ba_opts.frame_processing_opts.input_type;
     // Sort files in directory
     std::vector<fs::path> files;
     for (const auto& entry : fs::directory_iterator(all_img_dir)) {
@@ -49,7 +58,8 @@ void BAProblem::get_scan_indeces() {
     // Check validity of frame ranges
     int num_scans = files.size();
     int max_frame = 0;
-    for (auto& range : opts_.frame_ranges) {
+    std::vector<std::pair<int, int>> frame_ranges = opts_.ba_opts.frame_ranges;
+    for (auto& range : frame_ranges) {
         if (range.second == -1) {
             range.second = num_scans - 1;
         }
@@ -63,7 +73,7 @@ void BAProblem::get_scan_indeces() {
     }
 
     std::cout << "Ranges are:" << std::endl;
-    for (const auto& range : opts_.frame_ranges) {
+    for (const auto& range : frame_ranges) {
         std::cout << "[" << range.first << ", " << range.second << "]" << std::endl;
     }
 
@@ -78,7 +88,7 @@ void BAProblem::get_scan_indeces() {
 
         // Check if frame in desired ranges
         bool in_range = false;
-        for (const auto& range : opts_.frame_ranges) {
+        for (const auto& range : frame_ranges) {
             if (num_checked >= range.first && num_checked <= range.second) {
                 in_range = true;
                 break;
@@ -94,14 +104,14 @@ void BAProblem::get_scan_indeces() {
 
         // Load in initial guess pose
         lgmath::se3::Transformation T_est_abs;
-        if (opts_.init_poses == "pogo") {
+        if (opts_.ba_opts.init_poses == "pogo") {
             T_est_abs = ba::get_interpolated_pose(all_pogo_poses, all_pogo_times, timestamp_seconds);
-        } else if (opts_.init_poses == "gt") {
+        } else if (opts_.ba_opts.init_poses == "gt") {
             T_est_abs = ba::get_interpolated_pose(all_gt_poses, all_gt_times, timestamp_seconds);
-        } else if (opts_.init_poses == "dro") {
+        } else if (opts_.ba_opts.init_poses == "dro") {
             T_est_abs = ba::get_interpolated_pose(all_dro_poses, all_dro_times, timestamp_seconds);
         } else {
-            throw std::invalid_argument("Invalid init_poses option: " + opts_.init_poses);
+            throw std::invalid_argument("Invalid init_poses option: " + opts_.ba_opts.init_poses);
         }
 
         if (num_loaded != 0) {
@@ -118,7 +128,7 @@ void BAProblem::get_scan_indeces() {
             double del_theta = T_kf_rel.vec()(5); // Yaw angle
             double translation_mag = std::sqrt(std::pow(del_x, 2) + std::pow(del_y, 2));
             double rotation_mag = std::abs(del_theta) * 180.0 / M_PI; // convert to degrees
-            if (translation_mag < opts_.max_kf_dist && rotation_mag < opts_.max_kf_rot) {
+            if (translation_mag < opts_.ba_opts.max_kf_dist && rotation_mag < opts_.ba_opts.max_kf_rot) {
                 // Not a keyframe, skip
                 continue;
             }
@@ -155,26 +165,25 @@ void BAProblem::get_scan_indeces() {
 
 void BAProblem::init_scans() {
     std::cout << "Loading scans..." << std::endl;
-    std::string seq_id = opts_.seq_id;
 
     // Load groundtruth poses
     std::vector<lgmath::se3::Transformation> all_gt_poses;
     std::vector<double> all_gt_times;
-    ba::load_groundtruth_poses_and_times(opts_.data_path / seq_id, all_gt_poses, all_gt_times);
+    ba::load_groundtruth_poses_and_times(opts_.data_path / seq_id_, all_gt_poses, all_gt_times);
 
     // Load pogo poses
     std::vector<lgmath::se3::Transformation> all_pogo_poses;
     std::vector<double> all_pogo_times;
-    ba::load_pogo_poses_and_times(opts_.meas_path / seq_id, all_pogo_poses, all_pogo_times);
+    ba::load_pogo_poses_and_times(opts_.meas_path / seq_id_, all_pogo_poses, all_pogo_times);
 
     // Load DRO poses
     std::vector<lgmath::se3::Transformation> all_dro_poses;
     std::vector<double> all_dro_times;
-    ba::load_dro_poses_and_times(opts_.meas_path / seq_id, all_dro_poses, all_dro_times);
+    ba::load_dro_poses_and_times(opts_.meas_path / seq_id_, all_dro_poses, all_dro_times);
 
     // Initialize uniform distribution for noise
-    std::uniform_real_distribution<double> translation_dist(-opts_.init_translation_std, opts_.init_translation_std);
-    double rotation_std_rad = opts_.init_rotation_std * M_PI / 180.0;
+    std::uniform_real_distribution<double> translation_dist(-opts_.ba_opts.init_translation_std, opts_.ba_opts.init_translation_std);
+    double rotation_std_rad = opts_.ba_opts.init_rotation_std * M_PI / 180.0;
     std::uniform_real_distribution<double> rotation_dist(-rotation_std_rad, rotation_std_rad);
     std::mt19937 rng(99); // Fixed seed for reproducibility
 
@@ -192,7 +201,7 @@ void BAProblem::init_scans() {
         // Load in image paths
         const auto& img_path = img_paths_[i];
         std::optional<fs::path> cumul_img_path = std::nullopt;
-        if (opts_.use_cumul_thresh) {
+        if (opts_.ba_opts.optimization_opts.use_cumul_thresh) {
             if (cumul_paths_.empty()) {
                 throw std::runtime_error("Cumulative image paths are empty but use_cumul_thresh is true.");
             }
@@ -200,7 +209,7 @@ void BAProblem::init_scans() {
         }
 
         // Add noise to initial pose estimate if specified
-        if (i != 0 && (opts_.init_translation_std > 0.0 || opts_.init_rotation_std > 0.0)) {
+        if (i != 0 && (opts_.ba_opts.init_translation_std > 0.0 || opts_.ba_opts.init_rotation_std > 0.0)) {
             // Add noise to gt pose sampled from uniform distribution
             Eigen::Vector3d noise;
             noise << translation_dist(rng), translation_dist(rng), rotation_dist(rng);
@@ -208,8 +217,15 @@ void BAProblem::init_scans() {
             T_est_rel = T_est_rel * T_noise;
         }
 
-        auto scan = std::make_shared<ba::LocalMapScan>(timestamps_[i], idx, opts_, T_est_rel, T_gt_rel, img_path, cumul_img_path);
-        if (opts_.fix_first_scan && i == 0) {
+        auto scan = std::make_shared<ba::LocalMapScan>(timestamps_[i],
+                                                        idx,
+                                                        opts_.ba_opts.frame_processing_opts.local_map_res,
+                                                        opts_.ba_opts.optimization_opts,
+                                                        T_est_rel,
+                                                        T_gt_rel,
+                                                        img_path,
+                                                        cumul_img_path);
+        if (opts_.ba_opts.fix_first_scan && i == 0) {
             scan->set_fixed(true); // Fix the first scan's pose
         }
         scan_manager_.add_scan(scan);
@@ -219,11 +235,13 @@ void BAProblem::init_scans() {
 }
 
 void BAProblem::init_map() {
+    // Create voxel_map
+    voxel_map_ = VoxelMap(opts_.ba_opts.voxel_res);
     // Initialize voxel map around all scans
     std::cout << "Initializing voxel map..." << std::endl;
     for (int scan_id : scan_manager_.get_all_scan_ids()) {
         auto scan = scan_manager_.get_scan(scan_id);
-        voxel_map_.init_map(scan->pose(), opts_.max_dist, scan_id);
+        voxel_map_.init_map(scan->pose(), opts_.ba_opts.frame_processing_opts.max_dist, scan_id);
     }
 
     std::pair<double, double> x_bounds = voxel_map_.x_bounds();

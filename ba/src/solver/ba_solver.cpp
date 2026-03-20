@@ -44,7 +44,7 @@ void DrBASolver::tile_problem() {
         double min_y = y_bounds.first - tile_size;
         double max_y = y_bounds.second + tile_size;
 
-        double max_dist = 1.2 * opts_.max_dist; // consider scans within this distance
+        double max_dist = 1.2 * max_dist_; // consider scans within this distance
         int num_tiles_x = static_cast<int>(std::ceil((max_x - min_x) / tile_size));
         int num_tiles_y = static_cast<int>(std::ceil((max_y - min_y) / tile_size));
         int max_num_scans_in_tile = 0;
@@ -559,7 +559,7 @@ void DrBASolver::optimize() {
         //     // Update map
         //     update_map();
         //     // Save voxel map
-        //     if (opts_.save_result) {
+        //     if (save_results_) {
         //         // std::string voxel_path = result_.output_dir() + "voxel_map_" + std::to_string(iter) + ".bin";
         //         fs::path voxel_path = fs::path(result_.output_dir()) / ("voxel_map_" + std::to_string(iter) + ".bin");
         //         result_.save_voxel_map(voxel_path);
@@ -610,11 +610,6 @@ void DrBASolver::optimize() {
             if (!success) continue;
             // Save cost
             result_.add_cost(cost_);
-
-            // Slightly increase alpha if adaptive
-            if (opts_.adaptive_alpha && iter > opts_.num_coarse_iterations) {
-                alpha_ = std::min(alpha_ * 1.1, 5.0);
-            }
         }
 
         // Update poses
@@ -632,7 +627,7 @@ void DrBASolver::optimize() {
         result_.add_rmse(scan_manager_.compute_pose_rmse());
         result_.add_ate(scan_manager_.compute_ate());
         result_.add_epe(scan_manager_.compute_epe());
-        if (opts_.save_result)
+        if (save_results_)
             result_.save_full_result();
 
         if (iter != 0 && iter > opts_.num_coarse_iterations && (del_x_.norm() < opts_.convergence_tol || std::abs(prev_cost_ - cost_) < opts_.convergence_tol)) {

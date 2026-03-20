@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
     opts.output_path = output_run_dir;
     start_time = std::chrono::high_resolution_clock::now();
 
-    opts.map_location = output_run_dir;
+    opts.loc_opts.map_location = output_run_dir;
 
     ba::LocProblem loc_problem(opts);
     loc_problem.initialize();

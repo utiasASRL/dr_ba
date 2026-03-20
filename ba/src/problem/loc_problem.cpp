@@ -8,10 +8,20 @@
 
 namespace ba {
 
+void LocProblem::validate_opts() {
+    // Check that localization opts exist
+    if (opts_.loc_opts.seq_id.empty()) {
+        throw std::invalid_argument("LocProblem: seq_id must be specified in localization options");
+    }
+}
+
+void LocProblem::init_seq_id() {
+    seq_id_ = opts_.loc_opts.seq_id;
+}
+
 void LocProblem::get_scan_indeces() {
     // For localization load all scans
-    std::string seq_id = opts_.seq_id;
-    fs::path all_img_dir = opts_.meas_path / seq_id / opts_.input_type;
+    fs::path all_img_dir = opts_.meas_path / seq_id_ / opts_.loc_opts.frame_processing_opts.input_type;
     int count = -1;
     for (const auto& entry : fs::directory_iterator(all_img_dir)) {
         // Only consider files ending with .png
@@ -20,11 +30,11 @@ void LocProblem::get_scan_indeces() {
         }
         if (entry.is_regular_file()) {
             count++;
-            if (count < opts_.start_frame) {
+            if (count < opts_.loc_opts.start_frame) {
                 continue;
             }
             scan_indices_.push_back(count);
-            if (opts_.end_frame >= 0 && count >= opts_.end_frame) {
+            if (opts_.loc_opts.end_frame >= 0 && count >= opts_.loc_opts.end_frame) {
                 break;
             }
         }
@@ -41,9 +51,9 @@ void LocProblem::init_scans_and_map() {
 }
 
 void LocProblem::load_map_from_estimate() {
-    std::string map_seq_id = opts_.map_seq;
+    std::string map_seq_id = opts_.loc_opts.map_seq_id;
     // Load in voxel map from estimates
-    std::string map_location = opts_.map_location.string() + "/voxel_map.bin";
+    std::string map_location = opts_.loc_opts.map_location.string() + "/voxel_map.bin";
     voxel_map_.load_from_file(map_location);
 
     std::cout << "Voxel map loaded from: " << map_location << std::endl;
@@ -52,12 +62,11 @@ void LocProblem::load_map_from_estimate() {
     std::vector<lgmath::se3::Transformation> all_gt_poses;
     std::vector<double> all_gt_times;
 
-    // TODO: Make seq_id configurable and make everything not hardcoded...
     // seq id for map should be encoded in the map object
     ba::load_groundtruth_poses_and_times(opts_.data_path / map_seq_id, all_gt_poses, all_gt_times);
 
     // Store gt poses corresponding to map poses
-    fs::path all_map_img_dir = opts_.meas_path / map_seq_id / opts_.input_type;
+    fs::path all_map_img_dir = opts_.meas_path / map_seq_id / opts_.loc_opts.frame_processing_opts.input_type;
     // Sort files in directory
     std::vector<fs::path> files;
     for (const auto& entry : fs::directory_iterator(all_map_img_dir)) {
@@ -95,22 +104,21 @@ void LocProblem::load_map_from_estimate() {
 
 void LocProblem::load_scans() {
     std::cout << "Loading scans for localization..." << std::endl;
-    std::string seq_id = opts_.seq_id;
 
     // Load groundtruth poses
     std::vector<lgmath::se3::Transformation> all_gt_poses;
     std::vector<double> all_gt_times;
-    ba::load_groundtruth_poses_and_times(opts_.data_path / seq_id, all_gt_poses, all_gt_times);
+    ba::load_groundtruth_poses_and_times(opts_.data_path / seq_id_, all_gt_poses, all_gt_times);
 
     // Load DRO poses
     std::vector<lgmath::se3::Transformation> all_dro_poses;
     std::vector<double> all_dro_times;
-    ba::load_dro_poses_and_times(opts_.meas_path / seq_id, all_dro_poses, all_dro_times);
+    ba::load_dro_poses_and_times(opts_.meas_path / seq_id_, all_dro_poses, all_dro_times);
 
     // Load pogo poses
     std::vector<lgmath::se3::Transformation> all_pogo_poses;
     std::vector<double> all_pogo_times;
-    ba::load_pogo_poses_and_times(opts_.meas_path / seq_id, all_pogo_poses, all_pogo_times);
+    ba::load_pogo_poses_and_times(opts_.meas_path / seq_id_, all_pogo_poses, all_pogo_times);
 
     // Loop through indeces
     for (size_t i=0; i < scan_indices_.size(); i++) {
@@ -125,7 +133,7 @@ void LocProblem::load_scans() {
         // Load in image paths
         fs::path img_path = img_paths_[i];
         std::optional<fs::path> cumul_img_path = std::nullopt;
-        if (opts_.use_cumul_thresh) {
+        if (opts_.ba_opts.optimization_opts.use_cumul_thresh) {
             if (cumul_paths_.empty()) {
                 throw std::runtime_error("Cumulative image paths are empty but use_cumul_thresh is true.");
             }
@@ -134,7 +142,16 @@ void LocProblem::load_scans() {
 
         // Just initialize all poses with identity matrix. We'll handle initialization later.
         lgmath::se3::Transformation T_init;
-        auto scan = std::make_shared<ba::LocalMapScan>(timestamps_[i], idx, opts_, T_init, T_init, img_path, cumul_img_path);
+
+
+        auto scan = std::make_shared<ba::LocalMapScan>(timestamps_[i],
+                                                        idx,
+                                                        opts_.loc_opts.frame_processing_opts.local_map_res,
+                                                        opts_.loc_opts.optimization_opts,
+                                                        T_init,
+                                                        T_init,
+                                                        img_path,
+                                                        cumul_img_path);
         scan_manager_.add_scan(scan);
     }
 
@@ -142,7 +159,8 @@ void LocProblem::load_scans() {
 }
 
 void LocProblem::save_loc_results(const fs::path &output_path) {
-    fs::path loc_results_path = output_path / "loc_results.csv";
+    const fs::path resolved_output_path = output_path.empty() ? opts_.output_path : output_path;
+    fs::path loc_results_path = resolved_output_path / "loc_results.csv";
     // Remove existing file if it exists
     if (fs::exists(loc_results_path)) {
         fs::remove(loc_results_path);
@@ -172,7 +190,7 @@ void LocProblem::visualize_loc_results() {
         // Save all map results to temporary directory
         save_loc_results(temp_dir);
         // Also copy over voxel_map.bin to temp directory
-        fs::path voxel_map_src = opts_.map_location / "voxel_map.bin";
+        fs::path voxel_map_src = opts_.loc_opts.map_location / "voxel_map.bin";
         fs::path voxel_map_dst = temp_dir / "voxel_map.bin";
         fs::copy_file(voxel_map_src, voxel_map_dst);
         cmd = "python3 /home/dl/Documents/phd/dev/dr_ba/ba_py/visualize_loc_result.py --loc_path " + temp_dir.string();
@@ -197,7 +215,7 @@ void LocProblem::visualize_loc_results() {
 
 void LocProblem::finalize() {
     if (opts_.save_result) {
-        save_loc_results(opts_.output_path);
+        save_loc_results();
     }
     if (opts_.visualize_result || opts_.save_result) {
         visualize_loc_results();

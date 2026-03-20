@@ -22,28 +22,28 @@ void LocSolver::construct_problem(const std::shared_ptr<Scan>& scan) {
     rhs_.setZero(3);
 
     // Add prior
-    if (opts_.use_odometry_prior) {
-        // Form error between pose prior and current estimate
-        lgmath::se3::Transformation T_prior_err = scan->pose().inverse() * curr_pose_;
-        Eigen::Matrix<double, 3, 1> prior_err = T_prior_err.toSE2().vec();
-        Eigen::Matrix<double, 3, 3> prior_info = curr_cov_.inverse();
-        // lhs_ += prior_info;
-        // rhs_ += prior_info * prior_err;
+    // if (opts_.use_odometry_prior) {
+    //     // Form error between pose prior and current estimate
+    //     lgmath::se3::Transformation T_prior_err = scan->pose().inverse() * curr_pose_;
+    //     Eigen::Matrix<double, 3, 1> prior_err = T_prior_err.toSE2().vec();
+    //     Eigen::Matrix<double, 3, 3> prior_info = curr_cov_.inverse();
+    //     // lhs_ += prior_info;
+    //     // rhs_ += prior_info * prior_err;
 
-        Eigen::Matrix3d dro_process_noise = Eigen::Matrix3d::Zero();
-        dro_process_noise(0, 0) = std::pow(opts_.odom_translation_std, 2);
-        dro_process_noise(1, 1) = std::pow(opts_.odom_translation_std, 2);
-        dro_process_noise(2, 2) = std::pow(opts_.odom_rotation_std * M_PI / 180.0, 2); // convert to radians
+    //     Eigen::Matrix3d dro_process_noise = Eigen::Matrix3d::Zero();
+    //     dro_process_noise(0, 0) = std::pow(opts_.odom_translation_std, 2);
+    //     dro_process_noise(1, 1) = std::pow(opts_.odom_translation_std, 2);
+    //     dro_process_noise(2, 2) = std::pow(opts_.odom_rotation_std * M_PI / 180.0, 2); // convert to radians
 
-        lhs_ += dro_process_noise.inverse();
-        rhs_ += dro_process_noise.inverse() * prior_err;
-    }
+    //     lhs_ += dro_process_noise.inverse();
+    //     rhs_ += dro_process_noise.inverse() * prior_err;
+    // }
 
     // Loop through all voxels in the scan's coverage
     int num_voxels_used = 0;
     std::vector<double> voxel_errors;
     // Get voxels in range of initial pose
-    std::vector<ba::VoxelMap::Index> voxel_keys = voxel_map_.get_voxels_in_range(scan->pose2d(), opts_.max_dist);
+    std::vector<ba::VoxelMap::Index> voxel_keys = voxel_map_.get_voxels_in_range(scan->pose2d(), max_dist_);
     for (const auto& voxel_idx : voxel_keys) {
         double voxel_x = static_cast<double>(voxel_idx.first) * voxel_map_.res();
         double voxel_y = static_cast<double>(voxel_idx.second) * voxel_map_.res();
@@ -141,8 +141,8 @@ void LocSolver::compute_errors(LocProblem& loc_problem, const std::shared_ptr<Sc
     loc_problem.add_loc_result(result_entry);
 
     // Periodically save results to memory
-    if (opts_.save_result && (i % 10 == 0 || i == num_scans_ - 1)) {
-        loc_problem.save_loc_results(opts_.output_path);
+    if (save_results_ && (i % 10 == 0 || i == num_scans_ - 1)) {
+        loc_problem.save_loc_results();
     }
 
     // Print pose error for this scan
@@ -189,9 +189,9 @@ void LocSolver::odometry_step(LocProblem& loc_problem, int i) {
 
     // Load in process noise
     Eigen::Matrix3d dro_process_noise = Eigen::Matrix3d::Zero();
-    dro_process_noise(0, 0) = std::pow(opts_.odom_translation_std, 2);
-    dro_process_noise(1, 1) = std::pow(opts_.odom_translation_std, 2);
-    dro_process_noise(2, 2) = std::pow(opts_.odom_rotation_std * M_PI / 180.0, 2); // convert to radians
+    // dro_process_noise(0, 0) = std::pow(opts_.odom_translation_std, 2);
+    // dro_process_noise(1, 1) = std::pow(opts_.odom_translation_std, 2);
+    // dro_process_noise(2, 2) = std::pow(opts_.odom_rotation_std * M_PI / 180.0, 2); // convert to radians
 
     // Propagate covariance
     curr_cov_ = dro_pose_jacobian * curr_cov_ * dro_pose_jacobian.transpose() + dro_noise_jacobian * dro_process_noise * dro_noise_jacobian.transpose();

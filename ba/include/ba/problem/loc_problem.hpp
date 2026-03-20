@@ -21,9 +21,10 @@ public:
         double std_yaw;
     };
 
-    LocProblem(Options& opts)
-        : Problem(opts, opts.seq_id) {}
+    LocProblem(Options& opts) : Problem("loc", opts) {}
 
+    void validate_opts() override;
+    void init_seq_id() override;
     void get_scan_indeces() override;
     void init_scans_and_map() override;
     void finalize() override;
@@ -35,7 +36,7 @@ public:
     }
 
     // Output
-    void save_loc_results(const fs::path &output_path);
+    void save_loc_results(const fs::path &output_path = fs::path());
     void visualize_loc_results();
 
     std::vector<lgmath::se3::Transformation> gt_map_poses() const { return gt_map_poses_; }
