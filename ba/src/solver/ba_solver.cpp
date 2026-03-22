@@ -318,17 +318,6 @@ void DrBASolver::construct_problem(double downsample_factor) {
 
             // Compute residual
             Eigen::VectorXd err = P * B_raw;
-
-            // Apply robust cost (Huber)
-            // double huber_delta = 0.3;
-            // for (int k = 0; k < err.size(); ++k) {
-            //     double abs_val = std::abs(err(k));
-            //     if (abs_val > huber_delta) {
-            //         // Downweight P values
-            //         P(k) *= huber_delta / abs_val;
-            //     }
-            // }
-
             Eigen::MatrixXd PtP = P.transpose() * P;
 
             // Compute local contributions
