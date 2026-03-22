@@ -23,12 +23,8 @@ void DrBASolver::tile_problem() {
     // Get all voxel keys
     auto all_voxel_keys = voxel_map_.get_sorted_keys_downsampled();
 
-    std::cout << "Total voxels: " << all_voxel_keys.size() << std::endl;
-
     // Create tiles
     double tile_size = opts_.tile_size;
-    std::cout << "Tile size: " << tile_size << " meters" << std::endl;
-    std::cout << "max_dist_: " << max_dist_ << " meters" << std::endl;
     if (tile_size <= 0.0) {
         // No tiling
         Tile single_tile;
@@ -371,19 +367,6 @@ void DrBASolver::construct_problem(double downsample_factor) {
 
     // std::string H_save_path = opts_.output_path / "H.bin";
     // saveBinary(lhs_, H_save_path);
-
-    // // Look into sparsity of lhs_
-    // int non_zero_count = 0;
-    // for (int r = 0; r < lhs_.rows(); ++r) {
-    //     for (int c = 0; c < lhs_.cols(); ++c) {
-    //         if (std::abs(lhs_(r,c)) > 1e-12) {
-    //             non_zero_count++;
-    //         }
-    //     }
-    // }
-    // std::cout << "LHS matrix sparsity: " 
-    //           << static_cast<double>(non_zero_count) / static_cast<double>(lhs_.rows() * lhs_.cols()) * 100.0 
-    //           << " %" << std::endl;
 }
 
 bool DrBASolver::solve() {
