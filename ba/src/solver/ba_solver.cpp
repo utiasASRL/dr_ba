@@ -44,7 +44,7 @@ void DrBASolver::tile_problem() {
         double min_y = y_bounds.first - tile_size;
         double max_y = y_bounds.second + tile_size;
 
-        double max_dist = 1.2 * max_dist_; // consider scans within this distance
+        double max_dist = 1.2 * full_opts_.ba_opts.frame_processing_opts.max_dist; // consider scans within this distance
         // Given that max_dist should be >10m and we expect an initial guess within a few meters,
         // we should effectively never need to re-tile the problem after initial tiling
         int num_tiles_x = static_cast<int>(std::ceil((max_x - min_x) / tile_size));

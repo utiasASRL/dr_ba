@@ -43,7 +43,8 @@ void LocSolver::construct_problem(const std::shared_ptr<Scan>& scan) {
     int num_voxels_used = 0;
     std::vector<double> voxel_errors;
     // Get voxels in range of initial pose
-    std::vector<ba::VoxelMap::Index> voxel_keys = voxel_map_.get_voxels_in_range(scan->pose2d(), max_dist_);
+    double max_dist = full_opts_.loc_opts.frame_processing_opts.max_dist;
+    std::vector<ba::VoxelMap::Index> voxel_keys = voxel_map_.get_voxels_in_range(scan->pose2d(), max_dist);
     for (const auto& voxel_idx : voxel_keys) {
         double voxel_x = static_cast<double>(voxel_idx.first) * voxel_map_.res();
         double voxel_y = static_cast<double>(voxel_idx.second) * voxel_map_.res();

@@ -30,23 +30,14 @@ public:
 
     Solver(Problem& problem)
         : problem_(problem),
-          opts_(select_optimization_options(problem)),
+          full_opts_(problem.opts()),
           result_(problem.result()),
           scan_manager_(problem.scan_manager()),
           voxel_map_(problem.voxel_map()),
           pose_priors_(problem.pose_priors()),
           save_results_(problem_.opts().save_result)
         {
-            if (problem_.type() == "ba") {
-                max_dist_ = problem_.opts().ba_opts.frame_processing_opts.max_dist;
-            } else if (problem_.type() == "map") {
-                max_dist_ = problem_.opts().map_opts.frame_processing_opts.max_dist;
-            }
-            else if (problem_.type() == "loc") {
-                max_dist_ = problem_.opts().loc_opts.frame_processing_opts.max_dist;
-            } else {
-                throw std::invalid_argument("Unknown problem type: " + problem_.type());
-            }
+            opts_ = select_optimization_options(problem);
             cost_ = std::numeric_limits<double>::max();
             prev_cost_ = std::numeric_limits<double>::max();
             alpha_ = opts_.alpha;
@@ -65,13 +56,13 @@ public:
 
 protected:
     Problem& problem_;
-    const OptimizationOptions opts_;
+    Options& full_opts_;
     Result& result_;
     ScanManager& scan_manager_;
     VoxelMap& voxel_map_;
     const Problem::PriorMap& pose_priors_;
     bool save_results_;
-    double max_dist_;
+    OptimizationOptions opts_;
 
     // Variables to be passed around
     double cost_;
