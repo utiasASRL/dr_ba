@@ -52,8 +52,6 @@ FrameProcessingOptions load_frame_processing_options(const YAML::Node& config) {
 
     if (config["max_dist"])
         opts.max_dist = config["max_dist"].as<double>();
-    if (config["dist_field_preproc"])
-        opts.dist_field_preproc = config["dist_field_preproc"].as<bool>();
     if (config["gauss_blur_sigma"])
         opts.gauss_blur_sigma = config["gauss_blur_sigma"].as<double>();
     if (config["adaptive_blur"])

@@ -21,30 +21,29 @@ if __name__ == "__main__":
     common_overrides = {
         "input.input_type": "local_maps",
         "optimization.range_factor": 0.0005,
-        "input.dist_field_preproc": False,
         "input.adaptive_blur": False,
         "input.gauss_blur_sigma": 3.0,
         "input.min_int_val_tol": 0.1,
         "input.min_percent_nonzero": 3.0,
 
-        "localization.map_location": "/home/dl/Documents/phd/dev/dr_ba/output/aa_paper_ablation/no_map_glen/run_1",
+        "localization.map_location": "/home/dl/Documents/phd/dev/dr_ba/output/aa_paper_ablation/no_map_skyway/run_1",
 
         # "localization.map_location": "/home/dl/Documents/phd/dev/dr_ba/output/aaa_paper_results/ba/forest/boreas-2025-07-18-10-33",
-        "mapping.map_seq": "boreas-2024-12-03-12-54",
+        "mapping.map_seq": "boreas-2024-12-04-11-45",
     }
 
     # Glen (boreas-2024-12-03-12-54)
-    param_sets = [
-        {
-            "input.seq_id": "boreas-2025-01-08-10-59",
-        },
-        {
-            "input.seq_id": "boreas-2025-01-08-11-22",
-        },
-        {
-            "input.seq_id": "boreas-2025-01-08-12-28",
-        },
-    ]
+    # param_sets = [
+    #     {
+    #         "input.seq_id": "boreas-2025-01-08-10-59",
+    #     },
+    #     {
+    #         "input.seq_id": "boreas-2025-01-08-11-22",
+    #     },
+    #     {
+    #         "input.seq_id": "boreas-2025-01-08-12-28",
+    #     },
+    # ]
 
     # Industrial (boreas-2024-12-05-14-12)
     # param_sets = [
@@ -60,17 +59,17 @@ if __name__ == "__main__":
     # ]
 
     # Skyway (boreas-2024-12-04-11-45)
-    # param_sets = [
-    #     {
-    #         "input.seq_id": "boreas-2024-12-04-11-56",
-    #     },
-    #     {
-    #         "input.seq_id": "boreas-2024-12-04-12-08",
-    #     },
-    #     {
-    #         "input.seq_id": "boreas-2024-12-04-12-19",
-    #     },
-    # ]
+    param_sets = [
+        {
+            "input.seq_id": "boreas-2024-12-04-11-56",
+        },
+        {
+            "input.seq_id": "boreas-2024-12-04-12-08",
+        },
+        {
+            "input.seq_id": "boreas-2024-12-04-12-19",
+        },
+    ]
 
     # Forest (boreas-2025-07-18-10-33)
     # param_sets = [

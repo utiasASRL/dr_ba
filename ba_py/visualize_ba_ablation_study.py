@@ -24,7 +24,6 @@ def format_label(cfg, label_fields):
     Example:
       label_fields = {
           "input.gauss_blur_sigma": "σ",
-          "input.dist_field_preproc": "DF",
       }
     """
     parts = []
@@ -121,6 +120,5 @@ if __name__ == "__main__":
         ablation_root="/home/dl/Documents/phd/dev/dr_ba/output/aa_paper_ablation/drba_skyway",
         label_fields={
             "input.gauss_blur_sigma": "σ",
-            "input.dist_field_preproc": "DF",
         },
     )

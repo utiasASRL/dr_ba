@@ -21,13 +21,11 @@ if __name__ == "__main__":
         "map.voxel_res": 1.0,
         "optimization.range_factor": 0.02,
 
-        "input.dist_field_preproc": False,
         "input.adaptive_blur": False,
         "input.gauss_blur_sigma": 3.0,
         "input.min_int_val_tol": 0.1,
         "input.min_percent_nonzero": 3.0,
 
-        "mapping.dist_field_preproc": False,
         "mapping.adaptive_blur": False,
         "mapping.gauss_blur_sigma": 3.0,
         "mapping.min_int_val_tol": 0.1,
@@ -125,9 +123,7 @@ if __name__ == "__main__":
 # {
 #     "map.voxel_res": 1.0,
 #     "optimization.range_factor": 0.001,
-#     "input.dist_field_preproc": True,
 #     "input.gauss_blur_sigma": 3.0,
-#     "mapping.dist_field_preproc": True,
 #     "mapping.gauss_blur_sigma": 3.0,
 #     "localization.odometry_prior.use_odometry_prior": True,
 #     "localization.odometry_prior.translation_std": 0.1,
@@ -141,9 +137,7 @@ if __name__ == "__main__":
 # {
 #     "map.voxel_res": 1.0,
 #     "optimization.range_factor": 0.001,
-#     "input.dist_field_preproc": True,
 #     "input.gauss_blur_sigma": 3.0,
-#     "mapping.dist_field_preproc": True,
 #     "mapping.gauss_blur_sigma": 3.0,
 #     "localization.odometry_prior.use_odometry_prior": True,
 #     "localization.odometry_prior.translation_std": 0.1,
@@ -157,9 +151,7 @@ if __name__ == "__main__":
 # {
 #     "map.voxel_res": 1.0,
 #     "optimization.range_factor": 0.001,
-#     "input.dist_field_preproc": True,
 #     "input.gauss_blur_sigma": 3.0,
-#     "mapping.dist_field_preproc": True,
 #     "mapping.gauss_blur_sigma": 3.0,
 #     "localization.odometry_prior.use_odometry_prior": True,
 #     "localization.odometry_prior.translation_std": 0.1,
@@ -173,9 +165,7 @@ if __name__ == "__main__":
 # {
 #     "map.voxel_res": 1.0,
 #     "optimization.range_factor": 0.001,
-#     "input.dist_field_preproc": True,
 #     "input.gauss_blur_sigma": 3.0,
-#     "mapping.dist_field_preproc": True,
 #     "mapping.gauss_blur_sigma": 3.0,
 #     "localization.odometry_prior.use_odometry_prior": True,
 #     "localization.odometry_prior.translation_std": 0.1,

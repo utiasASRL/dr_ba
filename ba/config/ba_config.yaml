@@ -23,7 +23,6 @@ ba:
     input_type: 'local_maps' # 'scans' or 'local_maps' with both being images (for now)
     local_map_res: 0.1  # m/pixel (only relevant if input_type is 'local_map')
     max_dist: 100.0  # m
-    dist_field_preproc: false
     adaptive_blur: true # adaptively choose Gaussian blur sigma based on scan content
     gauss_blur_sigma: 3.0  # pixels
     min_int_val_tol: 0.5 # min intensity value to consider a non-zero pixel

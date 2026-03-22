@@ -176,9 +176,7 @@ if __name__ == "__main__":
         ablation_root="/home/dl/Documents/phd/dev/dr_ba/output/ablation_map_loc/set_85",
         label_fields={
             "map.voxel_res": "vox",
-            "input.dist_field_preproc": "DF-scan",
             "input.gauss_blur_sigma": "σ-scan",
-            "mapping.dist_field_preproc": "DF-map",
             "mapping.gauss_blur_sigma": "σ-map",
         },
     )

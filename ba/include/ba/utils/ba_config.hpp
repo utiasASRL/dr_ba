@@ -33,7 +33,6 @@ struct FrameProcessingOptions {
     std::string input_type = "local_maps"; // 'scans' or 'local_maps' with both being images (for now)
     double local_map_res = 0.1;  // m/pixel (only relevant if input_type is 'local_map')
     double max_dist = 80.0; // meters
-    bool dist_field_preproc = true;
     double gauss_blur_sigma = 3.0; // pixels
     bool adaptive_blur = true; // adaptively choose Gaussian blur sigma based on scan content
     double min_int_val_tol = 0.5; // intensity units

@@ -20,10 +20,10 @@ if __name__ == "__main__":
     common_overrides = {
         "optimization.alpha": 2.0,
         "map.voxel_res": 1.0,
-        "input.adaptive_blur": True,
+        "input.adaptive_blur": False,
         "optimization.use_cumul_thresh": True,
         "keyframing.max_kf_dist": 5.0,
-        "input.input_type": "scans",
+        "input.input_type": "local_maps",
     }
 
     param_sets = [
@@ -32,29 +32,29 @@ if __name__ == "__main__":
         #     "input.seq_id": "boreas-2024-12-03-12-54",
         #     # "mapping.frame_ranges": [[300, 700], [3300, 3600]],
         # },
-        # {
-        #     "input.seq_id": "boreas-2025-01-08-10-59",
-        #     "mapping.frame_ranges": [[300, 700], [3250, 3600]],
-        # },
-        # {
-        #     "input.seq_id": "boreas-2025-01-08-11-22",
-        #     "mapping.frame_ranges": [[300, 700], [3350, 3600]],
-        # },
-        # {
-        #     "input.seq_id": "boreas-2025-01-08-12-28",
-        #     "mapping.frame_ranges": [[300, 700], [3350, 3600]],
-        # },
+        {
+            "input.seq_id": "boreas-2025-01-08-10-59",
+            # "mapping.frame_ranges": [[300, 700], [3250, 3600]],
+        },
+        {
+            "input.seq_id": "boreas-2025-01-08-11-22",
+            # "mapping.frame_ranges": [[300, 700], [3350, 3600]],
+        },
+        {
+            "input.seq_id": "boreas-2025-01-08-12-28",
+            # "mapping.frame_ranges": [[300, 700], [3350, 3600]],
+        },
         # Industrial
         # {
         #     "input.seq_id": "boreas-2024-12-05-14-12",
         #     "mapping.frame_ranges": [[0, 600], [2000, -1]],
         # }
         # Skyway
-        {
-            "input.seq_id": "boreas-2024-12-04-11-45",
-            # "mapping.frame_ranges": [[550, 730], [1500, 1660]],
-            # "mapping.frame_ranges": [[490, 510], [1690, 1710]],
-        },
+        # {
+        #     "input.seq_id": "boreas-2024-12-04-11-45",
+        #     # "mapping.frame_ranges": [[550, 730], [1500, 1660]],
+        #     # "mapping.frame_ranges": [[490, 510], [1690, 1710]],
+        # },
         # {
         #     "input.seq_id": "boreas-2024-12-04-11-56",
         #     # "mapping.frame_ranges": [[400, 570], [1800, 1970]],

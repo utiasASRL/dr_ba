@@ -99,8 +99,6 @@ void Problem::preload_images() {
         timestamps_.push_back(timestamp);
 
         std::string image_name = img_stem;
-        if (proc_opts.dist_field_preproc)
-            image_name += "_distfield";
         image_name += ".png";
         fs::path temp_img_path = temp_img_dir / image_name;
 
@@ -128,19 +126,6 @@ void Problem::preload_images() {
 
             // if (fs::exists(temp_img_path))
             //     continue;
-
-            if (proc_opts.dist_field_preproc) {
-                // Min–max normalization
-                double min_val, max_val;
-                cv::minMaxLoc(img, &min_val, &max_val);
-                img = (img - min_val) / (max_val - min_val);
-
-                // Invert: 1 - normalized
-                img = 1.0 - img;
-
-                // Exponential transform
-                cv::exp(-2.0 * img, img);
-            }
 
             // Do smart selection of Gaussian sigma to ensure minimum percentage of non-zero pixels
             cv::Mat temp_img;

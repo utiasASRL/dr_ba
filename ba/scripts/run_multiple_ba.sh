@@ -9,15 +9,15 @@ sequences=(
     'boreas-2025-01-08-11-22' # Glenshield
     'boreas-2025-01-08-12-28' # Glenshield
 
-    'boreas-2024-12-04-11-45' # Skyway
-    'boreas-2024-12-04-11-56' # Skyway
-    'boreas-2024-12-04-12-08' # Skyway
-    'boreas-2024-12-04-12-19' # Skyway
-
     'boreas-2024-12-05-14-12' # Industrial
     'boreas-2024-12-23-16-27' # Industrial
     'boreas-2024-12-23-16-44' # Industrial
     'boreas-2024-12-23-17-01' # Industrial
+
+    'boreas-2024-12-04-11-45' # Skyway
+    'boreas-2024-12-04-11-56' # Skyway
+    'boreas-2024-12-04-12-08' # Skyway
+    'boreas-2024-12-04-12-19' # Skyway
 
     'boreas-2025-07-18-10-33' # Forest
     'boreas-2025-07-18-11-00' # Forest
