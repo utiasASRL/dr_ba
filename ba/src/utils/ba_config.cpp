@@ -71,6 +71,8 @@ BAOptions load_ba_options(const YAML::Node& config) {
         opts.voxel_res = config["voxel_res"].as<double>();
     if (config["seq_id"])
         opts.seq_id = config["seq_id"].as<std::string>();
+    if (config["save_H"])
+        opts.save_H = config["save_H"].as<bool>();
     if (config["init_poses"])
         opts.init_poses = config["init_poses"].as<std::string>();
     if (config["init_translation_std"])

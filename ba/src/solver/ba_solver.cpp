@@ -365,8 +365,10 @@ void DrBASolver::construct_problem(double downsample_factor) {
     std::cout << "  Relative Pose Prior time: " << rel_pose_prior_time << " s" << std::endl;
     std::cout << "  Avg time per voxel: " << avg_per_voxel_time << " s" << std::endl;
 
-    // std::string H_save_path = opts_.output_path / "H.bin";
-    // saveBinary(lhs_, H_save_path);
+    if (full_opts_.ba_opts.save_H && save_results_) {
+        std::string H_save_path = full_opts_.output_path / "H.bin";
+        saveBinary(lhs_, H_save_path);
+    }
 }
 
 bool DrBASolver::solve() {
