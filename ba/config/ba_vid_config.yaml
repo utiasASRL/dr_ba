@@ -1,70 +1,49 @@
-map:
-  voxel_res: 1.0  # m
-output:
-  output_path: '/home/dl/Documents/phd/dev/dr_ba/output/ba_vid'
-  visualize: false
-  save_result: true
-input:
+num_threads: 16
+data:
   data_path: '/home/dl/Documents/phd/data/boreas'
   meas_path: '/home/dl/Documents/phd/dev/dr_ba/output'
+output:
+  output_path: '/home/dl/Documents/phd/dev/dr_ba/output/ba_vid'
+  visualize: true
+  save_result: false
+ba:
+  voxel_res: 1.0  # m
   seq_id: boreas-2024-12-03-12-54
-  max_dist: 120.0  # m
-  dist_field_preproc: false
-  adaptive_blur: false # adaptively choose Gaussian blur sigma based on scan content
-  gauss_blur_sigma: 3.0  # pixels
-  min_int_val_tol: 0.5 # min intensity value to consider a non-zero pixel
-  min_percent_nonzero: 0.3 # Minimum percent of scan pixels above min_int_val_tol to stop blurring scan
+  frame_ranges:
+  - [40, 240]
   init_poses: 'gt'  # 'pogo' or 'gt', 'dro'
   init_translation_std: 3.0  # m
   init_rotation_std: 3.0  # degrees
-  input_type: 'local_maps' # 'local_maps' or 'scans'
-  local_map_res: 0.1  # m/pixel (only relevant if input_type is 'local_map')
-keyframing:
-  max_kf_dist: 5.0  # m
-  max_kf_rot: 30.0  # degrees
-  fix_first_scan: true
-optimization:
-  num_threads: 16
-  max_iterations: 30
-  convergence_tol: 1e-2
-  alpha: 4.0  # step size
-  adaptive_alpha: true # decrease alpha if cost does not decrease
-  meas_std: 0.1 # intensity units
-  range_factor: 0.0005  # factor to scale range uncertainty to intensity uncertainty
-  use_cumul_thresh: true
-  zero_thresh: 0.1 # max cumul return threshold to consider a measurement as zero return
-  cumul_thresh: 0.9  # threshold to ignore measurements with too high a cumulative return
-  rel_pose_prior:
-    use_pose_prior: false
-    translation_std: 1.0  # m
-    rotation_std: 0.1  # degrees
-  # Downsample control
-  num_coarse_iterations: 0
-  coarse_downsample: 1.0
-  refine_downsample: 1.0
-  tile_size: 100.0  # m, size of tiles to process separately
-  max_loaded_scans: 400  # max number of scans to keep loaded in memory at once (>0 all)
-mapping:
-  map_seq: boreas-2025-07-18-14-55
-  frame_ranges:
-  - [40, 240]
-  # - [0, 200]
-  # - [3000, -1]
-  # - [3300, 3600]
-  # - [300, 320]
-    # - [400, 600]
-    # - [1600, 1780]
-    # - [400, 600]
-    # - [1600, 1770]
-
-    # - [490, 510]
-    # - [1690, 1710]
-
-
-# - 'boreas-2024-12-03-12-54' # glen
-# - 'boreas-2024-12-05-14-12' # industrial
-# - 'boreas-2024-12-04-11-45' # skyway
-# - 'boreas-2025-07-18-10-33' # forest
-# - 'boreas-2025-07-18-14-55' # Farm
-# - 'boreas-2025-08-06-06-33' # urban
-# - 'boreas-2025-08-06-07-05' # urban
+  keyframing:
+    max_kf_dist: 5.0  # m
+    max_kf_rot: 30.0  # degrees
+    fix_first_scan: true
+  frame_processing:
+    input_type: 'local_maps' # 'scans' or 'local_maps' with both being images (for now)
+    local_map_res: 0.1  # m/pixel (only relevant if input_type is 'local_map')
+    max_dist: 120.0  # m
+    dist_field_preproc: false
+    adaptive_blur: true # adaptively choose Gaussian blur sigma based on scan content
+    gauss_blur_sigma: 3.0  # pixels
+    min_int_val_tol: 0.5 # min intensity value to consider a non-zero pixel
+    min_percent_nonzero: 0.3 # Minimum percent of scan pixels above min_int_val_tol to stop blurring scan
+  optimization:
+    max_iterations: 30
+    convergence_tol: 1e-2
+    alpha: 4.0  # step size
+    meas_std: 0.1 # intensity units
+    range_factor: 0.0005  # factor to scale range uncertainty to intensity uncertainty
+    use_cumul_thresh: true
+    zero_thresh: 0.1 # max cumul return threshold to consider a measurement as zero return
+    cumul_thresh: 0.9  # threshold to ignore measurements with too high a cumulative return
+    rel_pose_prior:
+      use_pose_prior: false
+      translation_std: 1.0  # m
+      rotation_std: 0.1  # degrees
+    # Downsample control
+    num_coarse_iterations: 0
+    coarse_downsample: 1.0
+    refine_downsample: 1.0
+    tile_size: 100.0  # m, size of tiles to process separately
+    retile_dist: 1.0 # m, distance for average pose change to trigger retile and reprocess of tiles
+    max_loaded_scans: 400  # max number of scans to keep loaded in memory at once (<1 all)
