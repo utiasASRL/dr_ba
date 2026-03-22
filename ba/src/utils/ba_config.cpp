@@ -12,6 +12,8 @@ OptimizationOptions load_optimization_options(const YAML::Node& config) {
         opts.convergence_tol = config["convergence_tol"].as<double>();
     if (config["alpha"])
         opts.alpha = config["alpha"].as<double>();
+    if (config["max_cost_increases"])
+        opts.max_cost_increases = config["max_cost_increases"].as<int>();
     if (config["meas_std"])
         opts.meas_std = config["meas_std"].as<double>();
     if (config["rel_pose_prior"]) {

@@ -13,6 +13,7 @@ struct OptimizationOptions {
     int max_iterations = 20;
     double convergence_tol = 1e-3;
     double alpha = 0.5;        // step size
+    int max_cost_increases = 3; // max number of consecutive iterations with cost increase before stopping
     double meas_std = 1.0;       // intensity units
     bool use_pose_prior = false;
     double rel_pose_prior_translation_std = 0.1; // meters

@@ -533,7 +533,7 @@ void DrBASolver::optimize() {
         avg_construct_time += std::chrono::duration<double>(end - start).count();
 
         if (iter > 0 && iter > opts_.num_coarse_iterations && cost_ > prev_cost_) {
-            if (num_cost_rises >= 3 || alpha_ < 1e-2) {
+            if (num_cost_rises >= opts_.max_cost_increases) {
                 std::cout << "Stopping optimization due to repeated cost increases." << std::endl;
                 cost_ = prev_cost_; // Revert to previous cost since we failed to find a better solve
                 break;

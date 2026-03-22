@@ -31,6 +31,7 @@ ba:
     max_iterations: 30
     convergence_tol: 1e-2
     alpha: 2.0  # step size
+    max_cost_increases: 3  # number of times we allow cost to increase before stopping optimization
     meas_std: 0.1 # intensity units
     range_factor: 0.0005  # factor to scale range uncertainty to intensity uncertainty
     use_cumul_thresh: true
