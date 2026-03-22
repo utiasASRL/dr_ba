@@ -49,6 +49,8 @@ void DrBASolver::tile_problem() {
         double max_y = y_bounds.second + tile_size;
 
         double max_dist = 1.2 * max_dist_; // consider scans within this distance
+        // Given that max_dist should be >10m and we expect an initial guess within a few meters,
+        // we should effectively never need to re-tile the problem after initial tiling
         int num_tiles_x = static_cast<int>(std::ceil((max_x - min_x) / tile_size));
         int num_tiles_y = static_cast<int>(std::ceil((max_y - min_y) / tile_size));
         int max_num_scans_in_tile = 0;
@@ -550,14 +552,6 @@ void DrBASolver::optimize() {
             // Slowly decrease alpha
             alpha_ *= 0.8;
         }
-
-        // Occasionally re-tile problem in case poses have changed significantly
-        // if (iter != 0 && opts_.tile_size > 0.0 && (iter % 5 == 0) && num_cost_rises == 0) {
-        //     // std::cout << "Re-tiling problem..." << std::endl;
-        //     // tile_problem();
-        //     // Update map
-        //     update_map();
-        // }
 
         // if ((std::find(save_map_iter_idx.begin(), save_map_iter_idx.end(), iter) != save_map_iter_idx.end()) || true) {
         //     // Update map

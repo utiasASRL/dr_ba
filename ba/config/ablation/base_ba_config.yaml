@@ -45,5 +45,4 @@ ba:
     coarse_downsample: 1.0
     refine_downsample: 1.0
     tile_size: 100.0  # m, size of tiles to process separately
-    retile_dist: 1.0 # m, distance for average pose change to trigger retile and reprocess of tiles
     max_loaded_scans: 400  # max number of scans to keep loaded in memory at once (<1 all)
