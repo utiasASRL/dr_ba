@@ -177,8 +177,8 @@ void LocSolver::odometry_step(LocProblem& loc_problem, int i) {
 
     // Propagate curr_pose_ using DRO estimates
     lgmath::se3::Transformation dro_rel_pose;
-    lgmath::se3::Transformation curr_dro_pose = loc_problem.dro_poses().at(i);
-    lgmath::se3::Transformation next_dro_pose = loc_problem.dro_poses().at(i + 1);
+    lgmath::se3::Transformation curr_dro_pose = loc_problem.dro_poses().at(i-1);
+    lgmath::se3::Transformation next_dro_pose = loc_problem.dro_poses().at(i);
     dro_rel_pose = curr_dro_pose.inverse() * next_dro_pose;
     Eigen::Vector3d dro_rel_pose_xi = dro_rel_pose.toSE2().vec();
     curr_pose_ = curr_pose_ * dro_rel_pose;

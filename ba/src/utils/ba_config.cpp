@@ -14,12 +14,15 @@ OptimizationOptions load_optimization_options(const YAML::Node& config) {
         opts.alpha = config["alpha"].as<double>();
     if (config["meas_std"])
         opts.meas_std = config["meas_std"].as<double>();
-    if (config["use_rel_pose_prior"])
-        opts.use_rel_pose_prior = config["use_rel_pose_prior"].as<bool>();
-    if (config["rel_pose_prior_translation_std"])
-        opts.rel_pose_prior_translation_std = config["rel_pose_prior_translation_std"].as<double>();
-    if (config["rel_pose_prior_rotation_std"])
-        opts.rel_pose_prior_rotation_std = config["rel_pose_prior_rotation_std"].as<double>();
+    if (config["rel_pose_prior"]) {
+        if (config["use_pose_prior"])
+            opts.use_pose_prior = config["use_pose_prior"].as<bool>();
+        if (config["rel_pose_prior_translation_std"])
+            opts.rel_pose_prior_translation_std = config["rel_pose_prior_translation_std"].as<double>();
+        if (config["rel_pose_prior_rotation_std"])
+            opts.rel_pose_prior_rotation_std = config["rel_pose_prior_rotation_std"].as<double>();
+    }
+
     if (config["range_factor"])
         opts.range_factor = config["range_factor"].as<double>();
     if (config["use_cumul_thresh"])
@@ -100,8 +103,8 @@ BAOptions load_ba_options(const YAML::Node& config) {
         opts.frame_processing_opts = load_frame_processing_options(config["frame_processing"]);
     }
     // BA optimization
-    if (config["ba_optimization_opts"]) {
-        opts.optimization_opts = load_optimization_options(config["ba_optimization_opts"]);
+    if (config["optimization"]) {
+        opts.optimization_opts = load_optimization_options(config["optimization"]);
     }
 
     return opts;
@@ -150,8 +153,8 @@ MappingOptions load_mapping_options(const YAML::Node& config) {
     }
 
     // Map optimization
-    if (config["map_optimization_opts"]) {
-        opts.optimization_opts = load_optimization_options(config["map_optimization_opts"]);
+    if (config["optimization"]) {
+        opts.optimization_opts = load_optimization_options(config["optimization"]);
     }
 
     return opts;
@@ -166,10 +169,10 @@ LocalizationOptions load_localization_options(const YAML::Node& config) {
         opts.map_seq_id = config["map_seq_id"].as<std::string>();
     if (config["map_location"])
         opts.map_location = std::filesystem::path(config["map_location"].as<std::string>());
-    if (config["first_frame"])
-        opts.start_frame = config["first_frame"].as<int>();
-    if (config["last_frame"])
-        opts.end_frame = config["last_frame"].as<int>();
+    if (config["start_frame"])
+        opts.start_frame = config["start_frame"].as<int>();
+    if (config["end_frame"])
+        opts.end_frame = config["end_frame"].as<int>();
     if (config["odometry_prior"]) {
         if (config["odometry_prior"]["use_odometry_prior"])
             opts.use_odometry_prior = config["odometry_prior"]["use_odometry_prior"].as<bool>();
@@ -185,8 +188,8 @@ LocalizationOptions load_localization_options(const YAML::Node& config) {
     }
 
     // Localization optimization
-    if (config["localization_optimization_opts"]) {
-        opts.optimization_opts = load_optimization_options(config["localization_optimization_opts"]);
+    if (config["optimization"]) {
+        opts.optimization_opts = load_optimization_options(config["optimization"]);
     }
 
     return opts;

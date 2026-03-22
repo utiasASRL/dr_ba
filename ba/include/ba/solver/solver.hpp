@@ -7,18 +7,30 @@
 #include <ankerl/unordered_dense.h>
 #include <ba/solver/result.hpp>
 #include <ba/problem/problem.hpp>
+#include <limits>
+#include <stdexcept>
 
 namespace ba {
 
 class Solver {
 public:
 
+    static OptimizationOptions select_optimization_options(Problem& problem) {
+        if (problem.type() == "ba") {
+            return problem.opts().ba_opts.optimization_opts;
+        }
+        if (problem.type() == "map") {
+            return problem.opts().map_opts.optimization_opts;
+        }
+        if (problem.type() == "loc") {
+            return problem.opts().loc_opts.optimization_opts;
+        }
+        throw std::invalid_argument("Unknown problem type: " + problem.type());
+    }
+
     Solver(Problem& problem)
         : problem_(problem),
-          opts_((problem_.type() == "ba") ? problem_.opts().ba_opts.optimization_opts :
-                (problem_.type() == "map") ? problem_.opts().map_opts.optimization_opts :
-                (problem_.type() == "loc") ? problem_.opts().loc_opts.optimization_opts :
-                throw std::invalid_argument("Unknown problem type: " + problem_.type())),
+          opts_(select_optimization_options(problem)),
           result_(problem.result()),
           scan_manager_(problem.scan_manager()),
           voxel_map_(problem.voxel_map()),
@@ -53,7 +65,7 @@ public:
 
 protected:
     Problem& problem_;
-    const OptimizationOptions& opts_;
+    const OptimizationOptions opts_;
     Result& result_;
     ScanManager& scan_manager_;
     VoxelMap& voxel_map_;

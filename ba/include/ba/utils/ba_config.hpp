@@ -14,7 +14,7 @@ struct OptimizationOptions {
     double convergence_tol = 1e-3;
     double alpha = 0.5;        // step size
     double meas_std = 1.0;       // intensity units
-    bool use_rel_pose_prior = true;
+    bool use_pose_prior = false;
     double rel_pose_prior_translation_std = 0.1; // meters
     double rel_pose_prior_rotation_std = 5.0;    // degrees
     double range_factor = 0.0;   // factor to scale range uncertainty to intensity uncertainty
@@ -25,7 +25,7 @@ struct OptimizationOptions {
     double coarse_downsample = 0.2; // downsampling factor for coarse iterations
     double refine_downsample = 1.0; // downsampling factor for refinement iterations
     double tile_size = 0.0;     // meters, size of tiles to process separately
-    int max_loaded_scans = 0;   // max number of scans to keep loaded in memory at once (>0 all)
+    int max_loaded_scans = 0;   // max number of scans to keep loaded in memory at once (<1 all)
 };
 
 struct FrameProcessingOptions {

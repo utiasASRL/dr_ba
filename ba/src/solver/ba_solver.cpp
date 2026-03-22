@@ -23,8 +23,12 @@ void DrBASolver::tile_problem() {
     // Get all voxel keys
     auto all_voxel_keys = voxel_map_.get_sorted_keys_downsampled();
 
+    std::cout << "Total voxels: " << all_voxel_keys.size() << std::endl;
+
     // Create tiles
-    double tile_size = opts_.tile_size;;
+    double tile_size = opts_.tile_size;
+    std::cout << "Tile size: " << tile_size << " meters" << std::endl;
+    std::cout << "max_dist_: " << max_dist_ << " meters" << std::endl;
     if (tile_size <= 0.0) {
         // No tiling
         Tile single_tile;
@@ -128,7 +132,7 @@ void DrBASolver::construct_problem(double downsample_factor) {
 
     // Load in relative SE2 pose priors
     auto rel_pose_start_time = std::chrono::high_resolution_clock::now();
-    if (opts_.use_rel_pose_prior) {
+    if (opts_.use_pose_prior) {
         for (const auto& prior : pose_priors_) {
             int scan_id_a = prior.first.first;
             int scan_id_b = prior.first.second;
