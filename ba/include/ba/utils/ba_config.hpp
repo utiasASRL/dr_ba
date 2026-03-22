@@ -35,6 +35,7 @@ struct FrameProcessingOptions {
     double max_dist = 80.0; // meters
     double gauss_blur_sigma = 3.0; // pixels
     bool adaptive_blur = true; // adaptively choose Gaussian blur sigma based on scan content
+    double max_blur_sigma = 15.0; // max sigma to use for adaptive blur
     double min_int_val_tol = 0.5; // intensity units
     double min_percent_nonzero = 0.3; // percent
 };

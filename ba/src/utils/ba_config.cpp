@@ -56,6 +56,8 @@ FrameProcessingOptions load_frame_processing_options(const YAML::Node& config) {
         opts.gauss_blur_sigma = config["gauss_blur_sigma"].as<double>();
     if (config["adaptive_blur"])
         opts.adaptive_blur = config["adaptive_blur"].as<bool>();
+    if (config["max_blur_sigma"])
+        opts.max_blur_sigma = config["max_blur_sigma"].as<double>();
     if (config["min_int_val_tol"])
         opts.min_int_val_tol = config["min_int_val_tol"].as<double>();
     if (config["min_percent_nonzero"])

@@ -79,13 +79,17 @@ void Problem::preload_images() {
     oss << std::fixed << std::setprecision(2) << proc_opts.min_int_val_tol;
     std::string s_min_int_val_tol = oss.str(); // "0.05"
     std::replace(s_min_int_val_tol.begin(), s_min_int_val_tol.end(), '.', '_'); // "0_05"
+    oss.str("");
+    oss << std::fixed << std::setprecision(2) << proc_opts.max_blur_sigma;
+    std::string s_max_blur_sigma = oss.str(); // "15.00"
+    std::replace(s_max_blur_sigma.begin(), s_max_blur_sigma.end(), '.', '_'); // "15_00"
 
     fs::path temp_img_dir = temp_dir / proc_opts.input_type;
     fs::path temp_folder;
     if (!proc_opts.adaptive_blur) {
         temp_folder = std::to_string(static_cast<int>(std::round(proc_opts.gauss_blur_sigma)));
     } else {
-        temp_folder = s_min_percent_nonzero + "pct_" + s_min_int_val_tol + "minint";
+        temp_folder = s_min_percent_nonzero + "pct_" + s_min_int_val_tol + "minint" + s_max_blur_sigma + "maxsigma";
     }
     temp_img_dir /= temp_folder;
     fs::create_directories(temp_img_dir);
@@ -112,21 +116,6 @@ void Problem::preload_images() {
                 throw std::runtime_error("Failed to load image: " + img_path.string());
             }
 
-            // double p_nonzero_1 = 100.0 * cv::countNonZero(img > 0.1) / (img.rows * img.cols);
-            // double p_nonzero_2 = 100.0 * cv::countNonZero(img > 0.2) / (img.rows * img.cols);
-            // double p_nonzero_3 = 100.0 * cv::countNonZero(img > 0.3) / (img.rows * img.cols);
-            // double p_nonzero_4 = 100.0 * cv::countNonZero(img > 0.4) / (img.rows * img.cols);
-            // double p_nonzero_5 = 100.0 * cv::countNonZero(img > 0.5) / (img.rows * img.cols);
-            // double p_nonzero_6 = 100.0 * cv::countNonZero(img > 0.6) / (img.rows * img.cols);
-            // std::cout << "Image " << img_path.filename().string() << " non-zero percentages (>0.1, >0.2, >0.3, >0.4, >0.5, >0.6): "
-            //           << p_nonzero_1 << "%, " << p_nonzero_2 << "%, "
-            //           << p_nonzero_3 << "%, " << p_nonzero_4 << "%, "
-            //           << p_nonzero_5 << "%, " << p_nonzero_6 << "%" << std::endl;
-
-
-            // if (fs::exists(temp_img_path))
-            //     continue;
-
             // Do smart selection of Gaussian sigma to ensure minimum percentage of non-zero pixels
             cv::Mat temp_img;
             double percent_nonzero = 0.0;
@@ -146,13 +135,13 @@ void Problem::preload_images() {
                 // Recompute percentage of non-zero pixels
                 percent_nonzero = 100.0 * cv::countNonZero(temp_img > eps) / (temp_img.rows * temp_img.cols);
 
-                // Increase sigma by odd number
-                sigma += 2.0;
-
-                if (!proc_opts.adaptive_blur || sigma > 15.0) {
+                if (!proc_opts.adaptive_blur || sigma > proc_opts.max_blur_sigma) {
                     // If not adaptive blur, just do one iteration
                     break;
                 }
+
+                // Increase sigma for next attempt
+                sigma += 2.0;
             }
             img = temp_img;
 
