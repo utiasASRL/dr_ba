@@ -543,7 +543,6 @@ void DrBASolver::optimize() {
     double downsample_factor = 1.0;
     int num_cost_rises = 0;
 
-    std::vector<int> save_map_iter_idx = {0, 1, 2, 4, 10, 20, 50};
     for (int iter = 0; iter < opts_.max_iterations; iter++) {
         std::cout << "Iteration " << iter << " / " << opts_.max_iterations << std::endl;
         downsample_factor = (iter < opts_.num_coarse_iterations) ? opts_.coarse_downsample : opts_.refine_downsample;
@@ -552,17 +551,6 @@ void DrBASolver::optimize() {
             // Slowly decrease alpha
             alpha_ *= 0.8;
         }
-
-        // if ((std::find(save_map_iter_idx.begin(), save_map_iter_idx.end(), iter) != save_map_iter_idx.end()) || true) {
-        //     // Update map
-        //     update_map();
-        //     // Save voxel map
-        //     if (save_results_) {
-        //         // std::string voxel_path = result_.output_dir() + "voxel_map_" + std::to_string(iter) + ".bin";
-        //         fs::path voxel_path = fs::path(result_.output_dir()) / ("voxel_map_" + std::to_string(iter) + ".bin");
-        //         result_.save_voxel_map(voxel_path);
-        //     }
-        // }
 
         // Construct problem
         start = std::chrono::high_resolution_clock::now();
