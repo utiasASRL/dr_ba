@@ -428,13 +428,10 @@ class Map:
 
         # Cap vals at 0.5 for better visualization
         vals = np.clip(vals, 0.0, 0.6)
-        # Normalize to [0, 1]
         vals = (vals - 0.0) / (0.3 - 0.0)
-        # vals = np.clip(vals, 0.1, 1.0)
 
-        ix = keys[:, 0]
-        iy = keys[:, 1]
-
+        ix, iy = keys[:, 0], keys[:, 1]
+        iy = -iy  # flip y for correct orientation
         ix_min, ix_max = ix.min(), ix.max()
         iy_min, iy_max = iy.min(), iy.max()
 
@@ -507,38 +504,45 @@ class Map:
             est_in_map = map_pose @ est_pose
             gt_in_map = map_pose @ gt_pose
 
+            # Flip y for correct orientation
             est_xs.append(est_in_map[0, 3])
-            est_ys.append(est_in_map[1, 3])
+            est_ys.append(-est_in_map[1, 3]) 
             gt_xs.append(gt_in_map[0, 3])
-            gt_ys.append(gt_in_map[1, 3])
+            gt_ys.append(-gt_in_map[1, 3])
 
         # Plot trajectories
         ax.plot(
             gt_xs, gt_ys,
             color="red",
-            linewidth=1,
+            linewidth=2,
             linestyle="-",
             label=r"ground truth"
         )
         ax.plot(
             est_xs, est_ys,
             color="black",
-            linewidth=1,
+            linewidth=2,
             linestyle="--",
             label=r"localized"
         )
 
-        leg = ax.legend(facecolor="white", edgecolor="black", labelcolor="black", loc='lower right', fontsize=22)
+        leg = ax.legend(facecolor="white", edgecolor="black", labelcolor="black", loc='upper right', fontsize=22)
         for legline in leg.get_lines():
             legline.set_linewidth(5)  # set the line thickness in the legend
 
-        add_scale_bar(ax, ix_min, ix_max, iy_min, iy_max, self.res)
+        add_scale_bar(ax, ix_min, ix_max, iy_min, iy_max, self.res, fraction=0.30)
 
         ax.set_aspect("equal")
-        # ax.set_title(title, fontsize=14)
+        ax.set_title(title, fontsize=14)
         ax.axis("off")
         ax.margins(0)
         plt.tight_layout(pad=0)
+
+        if save_path is not None:
+            plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
+        if show:
+            plt.show()
+            plt.close(fig)
 
 
     def plot_paper(self, save_path=None, show=False, title="Map", global_extent=None, plot_poses=True):
@@ -1102,7 +1106,7 @@ def add_scale_bar(ax, ix_min, ix_max, iy_min, iy_max, res, fraction=0.3):
     raw_length = map_width_m * fraction
     def round_to_nice(x):
         exp = 10 ** (len(str(int(x))) - 1)
-        for n in [1, 2, 5, 10]:
+        for n in [1, 2, 2.5, 3, 5, 10, 50]:
             if x <= n * exp:
                 return n * exp
         return 10 * exp
@@ -1127,7 +1131,7 @@ def add_scale_bar(ax, ix_min, ix_max, iy_min, iy_max, res, fraction=0.3):
     ax.text(
         bar_x + length_m / 2,
         bar_y + 1 * bar_height,
-        f"{length_m} m",
+        f"{round(length_m)} m",
         ha='center',
         va='bottom',
         fontsize=42,
