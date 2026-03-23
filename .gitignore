@@ -1,7 +1,11 @@
 output
+build
 venv
 *pycache*
-*build*
 *ini*
 .vscode
 .DS_Store
+
+# Project-specific stuff
+pogo/config_temp.yaml
+*temp_*_config*

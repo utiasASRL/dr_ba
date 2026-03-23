@@ -152,9 +152,9 @@ class GPStateEstimator:
                 self.save_scans = opts['log']['save_scans']
                 self.local_map_path  = opts['log']['local_map_path']
                 self.cumulated_returns_path  = opts['log']['cumulated_returns_path']
+                self.scan_path  = opts['log']['scan_path']
                 if self.save_scans and ('max_scan_bins' in opts['log']):
                     self.max_scan_bins = int(opts['log']['max_scan_bins'])
-                    self.scan_path  = opts['log']['scan_path']
                 else:
                     self.max_scan_bins = 100000000
 
@@ -809,6 +809,7 @@ class GPStateEstimator:
                             print("Max cumulated return: ", torch.max(local_map_update_cumulative))
                             lm = (local_map_update_cumulative.detach().cpu().numpy()).clip(0,255).astype('uint8')
                             cv2.imwrite(self.cumulated_returns_path + "/" + str(timestamps[0]) + ".png", lm)
+                            cv2.imwrite(self.scan_path + "/" + str(timestamps[0]) + ".png", (local_map_update.detach().cpu().numpy().clip(0,1)*255).astype('uint8'))
 
 
 

@@ -16,6 +16,7 @@ kDataPaths = [
     "/media/ced/Extreme Pro/data/boreas/rss/ba",
     "/media/ced/Extreme Pro/data/boreas/rss/test",
     "/media/ced/Extreme Pro/data/boreas/original_train",
+    "/media/ced/Extreme Pro/data/boreas/rt_radar",
     "/home/ced/Documents/data/boreas/rss/test",
     "/home/ced/Documents/data/boreas/original_train",
     "/home/ced/Documents/data/boreas/for_tbv/rss/boreas",
@@ -185,13 +186,13 @@ def getGTRadarPosesAndTimes(seq_id):
     gt_poses = np.array(poses)
     return gt_poses, gt_times
 
-def getPogoPosesAndTimes(seq_id, ouput_path='output'):
+def getPogoPosesAndTimes(seq_id, ouput_path='output', file_name="pose_graph_traj.txt", delimiter=' '):
     # Get the results path
-    data_path = os.path.join(ouput_path, seq_id, "pose_graph_traj.txt")
+    data_path = os.path.join(ouput_path, seq_id, file_name)
     if not os.path.exists(data_path):
         print(f"Skipping sequence {seq_id} due to missing results.")
         return None, None
-    data_raw = pd.read_csv(data_path, delimiter=' ')
+    data_raw = pd.read_csv(data_path, delimiter=delimiter)
     times = data_raw.iloc[:, 0].to_numpy()
     poses = []
     for i in range(len(times)):
@@ -448,6 +449,10 @@ def nameToTime(name):
     # Extract the timestamp from the filename
     time_str = name.split('.')[0]
     return float(time_str)*1e-6
+def timeToName(time):
+    # Convert the timestamp to the filename
+    time_int = int(time)
+    return str(time_int).zfill(16) + '.png'
 
 def align2DTrajectories(gt_poses, gt_times, est_poses, est_times):
     gt_interp_poses = getInterpolatedTrajectory(gt_poses, gt_times, est_times)
@@ -553,6 +558,7 @@ def getSeqType(seq_id):
         'boreas-2025-01-08-11-22': 'Glenshield',
         'boreas-2025-01-08-11-44': 'Glenshield',
         'boreas-2025-01-08-12-28': 'Glenshield',
+        'boreas-2024-12-05-14-25': 'Glenshield',
 
         'boreas-2024-12-03-13-13': 'Highway',
         'boreas-2024-12-03-13-34': 'Highway',
@@ -588,6 +594,24 @@ def getSeqType(seq_id):
         'boreas-2021-10-15-12-35': 'Original_train',
         'boreas-2021-11-14-09-47': 'Original_train',
         'boreas-2021-11-23-14-27': 'Original_train',
+
+        'boreas-2025-07-18-10-00': 'Forest',
+        'boreas-2025-07-18-10-33': 'Forest',
+        'boreas-2025-07-18-11-00': 'Forest',
+        'boreas-2025-07-18-11-25': 'Forest',
+        'boreas-2025-07-18-11-53': 'Forest',
+
+        'boreas-2025-07-18-14-55': 'Farm',
+        'boreas-2025-07-18-15-12': 'Farm',
+        'boreas-2025-07-18-15-30': 'Farm',
+        'boreas-2025-07-18-15-48': 'Farm',
+        'boreas-2025-07-18-16-05': 'Farm',
+
+        'boreas-2025-08-06-06-33': 'Urban',
+        'boreas-2025-08-06-07-05': 'Urban',
+        'boreas-2025-08-06-07-41': 'Urban',
+        'boreas-2025-08-06-08-35': 'Urban',
+        'boreas-2025-08-06-10-48': 'Urban',
     }
     if seq_id in seqs:
         return seqs[seq_id]

@@ -14,7 +14,7 @@ class LocalMapScan(BaseScan):
     def coord_to_pixel(self, x, y, jac=False):
         # Convert world frame coordinates to pixel coordinates
         D = np.array([[0, 1/self.res, 0], [-1/self.res, 0, 0]])
-        p = D @ np.linalg.inv(self.pose_2d) @ np.array([[x], [y], [1]]) + 0.5 * np.array([[self.img_width-1], [self.img_height-1]])
+        p = D @ np.linalg.inv(self.pose_2d) @ np.array([[x], [y], [1]]) + 0.5 * np.array([[self.img_width - 1], [self.img_height - 1]])
 
         if jac:
             return p[0, 0], p[1, 0], D @ np.linalg.inv(self.pose_2d) @ circle_dot_operator(np.array([[x], [y]]))

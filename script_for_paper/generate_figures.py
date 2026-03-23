@@ -39,9 +39,244 @@ def main():
     #crossCorrelationExample()
     #plotPublicBoreas()
 
-    plottrajectories()
+    #baOverlayFigure()
+    #baOverlayFigure(seq_id='boreas-2024-12-04-11-45', tbv_path='/home/ced/Documents/data/boreas/for_tbv/TBV_Eval/boreas_tbv_model_8_2026-01-20_21-18/job_0')
+    testOverlap(seq_id='boreas-2024-12-04-11-45', scan_ref = 1700, method='ba', black_background=True)
+    testOverlap(seq_id='boreas-2024-12-04-11-45', scan_ref = 1700, method='ba')
+    #testOverlap(seq_id='boreas-2024-12-04-11-45', scan_ref = 1700, method='gt')
+    #testOverlap(seq_id='boreas-2024-12-04-11-45', scan_ref = 1700, method='pogo')
+    #testOverlap(seq_id='boreas-2024-12-03-12-54', scan_ref = 1700, method='ba')
+    #testOverlap(seq_id='boreas-2024-12-03-12-54', scan_ref = 1700, method='gt')
+    #testOverlap(seq_id='boreas-2024-12-03-12-54', scan_ref = 1700, method='pogo')
+
+    #plottrajectories()
 
     #timing()
+
+def testOverlap(seq_id='boreas-2024-12-03-12-54', scan_ref = 1000, method='gt', black_background=False):
+    # Load the Dr-PoGO trajectory
+
+    ref = scan_ref
+    if method == 'gt':
+        pogo_traj, times = utils.getPogoPosesAndTimes(seq_id, ouput_path='output')
+        gt_traj, gt_times = utils.getGTRadarPosesAndTimes(seq_id)
+        gt_times = gt_times*1e6
+        traj = utils.getInterpolatedTrajectory(gt_traj, gt_times, times)
+    elif method == 'pogo':
+        traj, times = utils.getPogoPosesAndTimes(seq_id, ouput_path='output')
+    elif method == 'ba':
+        pogo_traj, times = utils.getPogoPosesAndTimes(seq_id, ouput_path='output')
+        time_ref = times[scan_ref]
+        traj, times = utils.getPogoPosesAndTimes(seq_id, ouput_path='output', file_name='ba_traj.csv', delimiter=',')
+        # Find the closest time to time_ref
+        ref = np.argmin(np.abs(times - time_ref))
+
+    distances = [0]
+    for i in range(1, traj.shape[0]):
+        delta = traj[i, 0:3, 3] - traj[i-1, 0:3, 3]
+        dist = np.linalg.norm(delta)
+        distances.append(distances[-1] + dist)
+
+    distances = np.array(distances)
+
+    # Get the closest scan to scan_ref that is at least 300m apart in terms of travelled distance
+    min_dist_gap = 300.0  # meters
+    last_selected_range = 10000.0
+    for i in range(traj.shape[0]):
+        if np.abs(distances[i] - distances[ref]) < min_dist_gap:
+            continue
+        dist = np.linalg.norm(traj[i, 0:3, 3] - traj[ref, 0:3, 3])
+        if dist < last_selected_range:
+            last_selected_range = dist
+            min_j = i
+    print(f"Selected scan {min_j} at distance {last_selected_range} m from scan {ref}")
+    os.makedirs('figures/overlays', exist_ok=True)
+
+    score = overlapScans(traj[ref], times[ref], traj[min_j], times[min_j], scan_path=os.path.join('output', seq_id, 'local_maps'), labels=[f'Scan {ref}', f'Scan {min_j}'], visualize=True, output_path='figures/overlays/' + f'{method}_overlay_{seq_id}_scan_{ref}_{min_j}.pdf', black_background=black_background)
+        
+
+
+
+
+
+
+def baOverlayFigure(seq_id='boreas-2024-12-03-12-54', tbv_path='/home/ced/Documents/data/boreas/for_tbv/TBV_Eval/boreas_tbv_model_8_2026-01-20_08-06/job_0', black_background=False):
+
+    # Load the Dr-PoGO trajectory
+    # Get the BA trajectory
+    ba_traj, ba_times = utils.getPogoPosesAndTimes(seq_id, ouput_path='output', file_name='ba_traj.csv', delimiter=',')
+    pogo_traj, pogo_times = utils.getPogoPosesAndTimes(seq_id, ouput_path='output')
+
+    pogo_traj = utils.getInterpolatedTrajectory(pogo_traj, pogo_times, ba_times)
+    pogo_times = ba_times
+
+    dro_traj, dro_times = utils.getDroPosesAndTimes(seq_id, ouput_path='output')
+
+    # Get the TBV trajectory
+    tbv_traj, tbv_times, _ = utils.readTBV2DTraj(tbv_path)
+    # Interpolate to pogo times
+    tbv_traj_interp = utils.getInterpolatedTrajectory(tbv_traj, tbv_times*1e6, pogo_times)
+
+    distances = [0]
+    for i in range(1, pogo_traj.shape[0]):
+        delta = pogo_traj[i, 0:3, 3] - pogo_traj[i-1, 0:3, 3]
+        dist = np.linalg.norm(delta)
+        distances.append(distances[-1] + dist)
+    distances = np.array(distances)
+
+    min_dist_gap = 300.0  # meters
+    max_range = 50.0  # meters
+    min_step = 10  # meters
+    last_selected_dist = -10000.0
+    scan_pairs = []
+    for i in range(pogo_traj.shape[0]):
+        if distances[i] - last_selected_dist < min_step:
+            continue
+        min_scan_dist = 2*min_dist_gap
+        for j in range(i + 1, pogo_traj.shape[0]):
+            if distances[j] - distances[i] < min_dist_gap:
+                continue
+            dist_ij = np.linalg.norm(pogo_traj[i, 0:3, 3] - pogo_traj[j, 0:3, 3])
+            if dist_ij < min_scan_dist:
+                min_scan_dist = dist_ij
+                min_j = j
+        if min_scan_dist < max_range:
+            scan_pairs.append((i, min_j))
+            last_selected_dist = distances[i]
+
+
+    # Scores for each pair
+    scores = []
+    for (i, j) in scan_pairs:
+        scores.append(overlapScans(pogo_traj[i], pogo_times[i], pogo_traj[j], pogo_times[j], scan_path=os.path.join('output', seq_id, 'local_maps'), labels=[f'Scan {i}', f'Scan {j}'], black_background=black_background))
+
+    # Get the n lowest scores that are at least 50m apart and display their overlays
+    distance_threshold = 50.0  # meters
+    n = 10
+    sorted_indices = np.argsort(scores)
+    selected_indices = []
+    selected_positions = []
+    for idx in sorted_indices:
+        i, j = scan_pairs[idx]
+        pos_i = pogo_traj[i, 0:2, 3]
+        pos_j = pogo_traj[j, 0:2, 3]
+        too_close = False
+        for pos in selected_positions:
+            if np.linalg.norm(pos - pos_i) < distance_threshold or np.linalg.norm(pos - pos_j) < distance_threshold:
+                too_close = True
+                break
+        if not too_close:
+            selected_indices.append(idx)
+            selected_positions.append(pos_i)
+            selected_positions.append(pos_j)
+        if len(selected_indices) >= n:
+            break
+
+
+    # Empty the overlays folder
+    overlay_path = os.path.join('figures', 'overlays', seq_id)
+    os.makedirs(overlay_path, exist_ok=True)
+    if os.path.exists(overlay_path):
+        for file in os.listdir(overlay_path):
+            os.remove(os.path.join(overlay_path, file))
+    scan_path = os.path.join('output', seq_id, 'local_maps')
+    for idx in selected_indices:
+        i, j = scan_pairs[idx]
+        output_path = os.path.join(overlay_path, f'pogo_overlay_scan_{i}_{j}.pdf')
+        overlapScans(pogo_traj[i], pogo_times[i], pogo_traj[j], pogo_times[j], scan_path=scan_path, output_path=output_path, labels=[f'Scan {i}', f'Scan {j}'], black_background=black_background)
+
+        output_path = os.path.join(overlay_path, f'tbv_overlay_scan_{i}_{j}.pdf')
+        overlapScans(tbv_traj_interp[i], pogo_times[i], tbv_traj_interp[j], pogo_times[j], scan_path=scan_path, output_path=output_path, labels=[f'Scan {i}', f'Scan {j}'], black_background=black_background)
+
+        output_path = os.path.join(overlay_path, f'ba_overlay_scan_{i}_{j}.pdf')
+        overlapScans(ba_traj[i], pogo_times[i], ba_traj[j], pogo_times[j], scan_path=scan_path, output_path=output_path, labels=[f'Scan {i}', f'Scan {j}'], black_background=black_background)
+
+        output_path = os.path.join(overlay_path, f'dro_overlay_scan_{i}_{j}.pdf')
+        overlapScans(dro_traj[i], pogo_times[i], dro_traj[j], pogo_times[j], scan_path=scan_path, output_path=output_path, labels=[f'Scan {i}', f'Scan {j}'], black_background=black_background)
+
+    # Plot the scores a link colormap on the trajectory
+    fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+    ax.plot(pogo_traj[:, 0, 3], -pogo_traj[:, 1, 3], 'blue', label='PoGO', linewidth=1)
+    norm = matplotlib.colors.Normalize(vmin=min(scores), vmax=max(scores))
+    cmap = plt.get_cmap('hot')
+    for idx, (i, j) in enumerate(scan_pairs):
+        color = cmap(norm(scores[idx]))
+        ax.plot([pogo_traj[i, 0, 3], pogo_traj[j, 0, 3]], [-pogo_traj[i, 1, 3], -pogo_traj[j, 1, 3]], color=color, linewidth=1.5)
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm, ax=ax)
+    cbar.set_label('Registration Score', rotation=270, labelpad=15)
+    ax.set_title('Dr-PoGO Loop Closure Candidates with Registration Scores', {'fontweight': 'bold'})
+    ax.set_xlabel('X [m]')
+    ax.set_ylabel('Y [m]')
+    ax.axis('equal')
+    ax.legend(loc='upper right')
+    plt.tight_layout()
+    plt.show()
+
+
+
+
+
+def overlapScans(pose1, time1, pose2, time2, scan_path, output_path = None, labels = None, visualize=False, black_background=False):
+    res = utils.getPixelResolution()
+    scan1 = cv2.imread(os.path.join(scan_path, utils.timeToName(time1)), cv2.IMREAD_GRAYSCALE)
+    scan2 = cv2.imread(os.path.join(scan_path, utils.timeToName(time2)), cv2.IMREAD_GRAYSCALE)
+
+    rel_pose = np.linalg.inv(pose1) @ pose2
+
+    xy, theta = utils.poseToXYTheta(rel_pose)
+
+    gp_doppler_reg = gp_doppler.LocalMapRegistrator(scan2, scan1, res, np.array([xy[0], xy[1], theta]))
+    overlay = gp_doppler_reg.getOverlay()
+    
+    score = gp_doppler_reg.getRegistrationScore().detach().cpu().item()
+
+    print(f"Registration score: {score}")
+
+
+    if output_path is not None or visualize:
+        print(f"Saving overlay to {output_path}...")
+        print("Relative pose:", xy, np.rad2deg(theta))
+        plt.figure(figsize=(12,12))
+        if black_background:
+            plt.imshow(scan1, cmap='gray')
+            plt.imshow(overlay, cmap='hot', alpha=0.7)
+        else:
+            offset = 1.5
+            scan1 = (scan1.astype(np.float32) / np.max(scan1)) * offset
+            image_blend = np.zeros((scan1.shape[0], scan1.shape[1], 3), dtype=np.float32)
+            image_blend[:, :, 0] = np.clip(1-scan1, 0, 1)
+            if np.max(overlay) > 0:
+                overlay = (overlay.astype(np.float32) / np.max(overlay)) * offset
+                image_blend[:, :, 2] = np.clip(1-overlay, 0, 1)
+                image_blend[:, :, 1] = np.clip(1-(scan1 * 0.5 + overlay * 0.5), 0, 1)
+            else:
+                image_blend[:, :, 1] = 1 - scan1 * 0.5 
+                image_blend[:, :, 2] = 1
+            plt.imshow(image_blend)
+
+        if labels is not None:
+            plt.title(f"{labels[0]} & {labels[1]}\nScore: {score:.2f}", {'fontweight': 'bold'})
+        plt.axis('off')
+        plt.tight_layout()
+        if output_path is not None:
+            plt.savefig(output_path)
+        if visualize:
+            plt.show()
+        plt.close()
+
+    return score
+
+
+    #fig, ax = plt.subplots(1,2, figsize=(10,5))
+    #ax[0].imshow(scan1, cmap='gray')
+    #ax[1].imshow(scan2, cmap='gray')
+    #if labels is not None:
+    #    ax[0].set_title(labels[0])
+    #    ax[1].set_title(labels[1])
+    #plt.show()
+    
 
 
 def timing():
