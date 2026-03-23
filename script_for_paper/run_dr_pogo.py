@@ -7,30 +7,43 @@ import yaml
 
 # RSS data
 sequences = [
-    'boreas-2024-12-03-12-54', # Glenshield
-    'boreas-2025-01-08-10-59', # Glenshield
-    'boreas-2025-01-08-11-22', # Glenshield
-    'boreas-2025-01-08-12-28', # Glenshield
 
-    'boreas-2024-12-04-11-45', # Skyway
-    'boreas-2024-12-04-11-56', # Skyway
-    'boreas-2024-12-04-12-08', # Skyway
-    'boreas-2024-12-04-12-19', # Skyway
+    # Boreas leaderboard
+    'boreas-2020-11-26-13-58'
+    # 'boreas-2020-12-04-14-00'
+    # 'boreas-2021-01-26-10-59'
+    # 'boreas-2021-02-09-12-55'
+    # 'boreas-2021-03-09-14-23'
+    # 'boreas-2021-06-29-18-53'
+    # 'boreas-2021-09-08-21-00'
+    # 'boreas-2021-10-05-15-35'
+    # 'boreas-2021-10-26-12-35'
+    # 'boreas-2021-11-28-09-18'
 
-    'boreas-2024-12-05-14-12', # Industrial
-    'boreas-2024-12-23-16-27', # Industrial
-    'boreas-2024-12-23-16-44', # Industrial
-    'boreas-2024-12-23-17-01', # Industrial
+    # 'boreas-2024-12-03-12-54', # Glenshield
+    # 'boreas-2025-01-08-10-59', # Glenshield
+    # 'boreas-2025-01-08-11-22', # Glenshield
+    # 'boreas-2025-01-08-12-28', # Glenshield
 
-    'boreas-2025-07-18-10-33', # Forest
-    'boreas-2025-07-18-11-00', # Forest
-    'boreas-2025-07-18-11-25', # Forest
-    'boreas-2025-07-18-11-53', # Forest
+    # 'boreas-2024-12-04-11-45', # Skyway
+    # 'boreas-2024-12-04-11-56', # Skyway
+    # 'boreas-2024-12-04-12-08', # Skyway
+    # 'boreas-2024-12-04-12-19', # Skyway
 
-    'boreas-2025-07-18-14-55', # Farm
-    'boreas-2025-07-18-15-12', # Farm
-    'boreas-2025-07-18-15-30', # Farm
-    'boreas-2025-07-18-15-48', # Farm
+    # 'boreas-2024-12-05-14-12', # Industrial
+    # 'boreas-2024-12-23-16-27', # Industrial
+    # 'boreas-2024-12-23-16-44', # Industrial
+    # 'boreas-2024-12-23-17-01', # Industrial
+
+    # 'boreas-2025-07-18-10-33', # Forest
+    # 'boreas-2025-07-18-11-00', # Forest
+    # 'boreas-2025-07-18-11-25', # Forest
+    # 'boreas-2025-07-18-11-53', # Forest
+
+    # 'boreas-2025-07-18-14-55', # Farm
+    # 'boreas-2025-07-18-15-12', # Farm
+    # 'boreas-2025-07-18-15-30', # Farm
+    # 'boreas-2025-07-18-15-48', # Farm
 ]
 
 data_path = utils.getDataDir()

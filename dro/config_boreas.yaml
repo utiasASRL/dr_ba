@@ -1,0 +1,41 @@
+data:
+  data_path: /home/dl/Documents/phd/data/boreas/boreas-2020-11-26-13-58
+  multi_sequence: false
+direct:
+  local_map_res: 0.1
+  local_map_update_alpha: 0.1
+  max_local_map_range: 120.0
+  max_range: 70.0
+  min_range: 4.0
+doppler:
+  max_range: 200.0
+  min_range: 4.0
+estimation:
+  direct_cost: true
+  doppler_cost: false
+  gyro_bias_estimation: true
+  max_acceleration: 10.0
+  use_gyro: true
+  vy_bias_prior: 0.0
+gp:
+  lengthscale_az: 2.0
+  lengthscale_range: 4.0
+  sz: 0.6
+imu:
+  min_time_bias_init: 1.0
+  type: applanix
+log:
+  display: false
+  max_scan_range: 150.0
+  save_images: false
+  save_local_maps: true
+  save_scans: false
+  verbose: true
+radar:
+  beta_corr_fact: 0.8
+  chirp_up: true
+  del_f: 893.0E6
+  doppler_enabled: false
+  ft: 76.04E9
+  meas_freq: 1600.0
+  range_offset: -0.31
