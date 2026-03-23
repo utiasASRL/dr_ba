@@ -65,7 +65,8 @@ std::optional<Scan::Measurement> LocalMapScan::interpolate(double x, double y) c
     double raw_meas_cov = meas_std_ * meas_std_;
     double covariance = (w0 * w0 + w1 * w1 + w2 * w2 + w3 * w3) * raw_meas_cov;
     // Add range-dependent uncertainty
-    double range2 = x * x + y * y;
+    PixelCoords img_coords = coord_to_image_coord(x, y);
+    double range2 = std::pow(img_coords.first, 2) + std::pow(img_coords.second, 2);
     covariance += (range_factor_ * range_factor_) * range2;
 
     // Form measurement
@@ -87,12 +88,18 @@ bool LocalMapScan::check_coverage_at_point(double x, double y) const {
     return (a >= 0 && b >= 0 && a < (img_width_ - 1) && b < (img_height_ - 1));
 }
 
+LocalMapScan::PixelCoords LocalMapScan::coord_to_image_coord(double x, double y) const {
+    Eigen::Matrix<double, 3, 3> pose2d_inv_mat = pose_.toSE2().inverse().matrix();
+    Eigen::Matrix<double,  3, 1> p_hom = pose2d_inv_mat * Eigen::Vector3d(x, y, 1.0);
+    return {p_hom(0), p_hom(1)};
+}
+
 LocalMapScan::PixelCoords LocalMapScan::coord_to_pixel(double x, double y, Eigen::Matrix<double, 2, 3> *jacobian) const {
     Eigen::Matrix<double, 2, 3> D;
     D << 0, 1/res_, 0,
          -1/res_, 0, 0;
-    Eigen::Matrix<double, 3, 3> pose2d_inv_mat = pose_.toSE2().inverse().matrix();
-    Eigen::Matrix<double,  3, 1> p_hom = pose2d_inv_mat * Eigen::Vector3d(x, y, 1.0);
+    PixelCoords img_coords = coord_to_image_coord(x, y);
+    Eigen::Matrix<double,  3, 1> p_hom = Eigen::Vector3d(img_coords.first, img_coords.second, 1.0);
     Eigen::Vector2d p = D * p_hom + 0.5 * Eigen::Vector2d(img_width_ - 1, img_height_ - 1);
 
     if (jacobian) {

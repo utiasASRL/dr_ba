@@ -75,6 +75,9 @@ public:
     int img_width() const { return img_width_; }
     int img_height() const { return img_height_; }
 
+    // Convert world frame coordinates to local image coordinates with origin at center of image
+    PixelCoords coord_to_image_coord(double x, double y) const;
+
     // Convert world frame coordinates to root pixel index
     Index get_root_pixel_coords(double x, double y) const;
 
