@@ -50,6 +50,10 @@ OptimizationOptions load_optimization_options(const YAML::Node& config) {
 FrameProcessingOptions load_frame_processing_options(const YAML::Node& config) {
     FrameProcessingOptions opts;
 
+    if (config["input_type"])
+        opts.input_type = config["input_type"].as<std::string>();
+    if (config["local_map_res"])
+        opts.local_map_res = config["local_map_res"].as<double>();
     if (config["max_dist"])
         opts.max_dist = config["max_dist"].as<double>();
     if (config["gauss_blur_sigma"])
