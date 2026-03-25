@@ -213,5 +213,13 @@ cv::Mat load_img_bin(const std::filesystem::path &filepath) {
     return img;
 }
 
+void saveBinary(const Eigen::MatrixXd& M, const std::string& path)
+{
+    std::ofstream out(path, std::ios::binary);
+    int rows = M.rows(), cols = M.cols();
+    out.write((char*)&rows, sizeof(int));
+    out.write((char*)&cols, sizeof(int));
+    out.write((char*)M.data(), rows * cols * sizeof(double));
+}
 
 } // namespace ba

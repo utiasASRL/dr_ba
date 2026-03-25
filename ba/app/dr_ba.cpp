@@ -4,7 +4,7 @@
 #include "ba/solver/result.hpp"
 #include <ba/problem/ba_problem.hpp>
 #include <ba/solver/ba_solver.hpp>
-#include <ba/solver/loc_solver.hpp>
+#include <ba/solver/direct_solver.hpp>
 
 #include <iostream>
 #include <filesystem>
@@ -65,9 +65,18 @@ int main(int argc, char** argv) {
 
     ba::BAProblem problem(opts);
 
-    std::cout << "Starting optimization..." << std::endl;
-    ba::DrBASolver solver(problem);
-    solver.optimize();
+    std::cout << "Starting optimization with solver: " << opts.ba_opts.solver << std::endl;
+    std::unique_ptr<ba::Solver> solver;
+
+    if (opts.ba_opts.solver == "direct") {
+        solver = std::make_unique<ba::DirectSolver>(problem);
+    } else if (opts.ba_opts.solver == "drba") {
+        solver = std::make_unique<ba::DrBASolver>(problem);
+    } else {
+        throw std::runtime_error("Invalid solver specified in config: " + opts.ba_opts.solver);
+    }
+
+    solver->optimize();
 
     auto end_time = std::chrono::high_resolution_clock::now();
     double total_time = std::chrono::duration<double>(end_time - start_time).count();

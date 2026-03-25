@@ -35,4 +35,7 @@ namespace ba {
     // Handle local maps
     void save_img_bin(const std::filesystem::path &filepath, const cv::Mat &img);
     cv::Mat load_img_bin(const std::filesystem::path &filepath);
+
+    // Utility to save Eigen matrix in binary format
+    void saveBinary(const Eigen::MatrixXd& M, const std::string& path);
 }
