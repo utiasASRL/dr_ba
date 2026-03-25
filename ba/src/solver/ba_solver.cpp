@@ -292,8 +292,6 @@ void DrBASolver::construct_problem(double downsample_factor) {
             weighted_ones.conservativeResize(scan_count);
 
             // Compute projection matrix
-            // Eigen::VectorXd ones_vec = Eigen::VectorXd::Ones(scan_count);
-            // Eigen::MatrixXd P = ones_vec * ones_vec.transpose() / static_cast<double>(scan_count) - Eigen::MatrixXd::Identity(scan_count, scan_count);
             Eigen::MatrixXd P = (weighted_ones * weighted_ones.transpose()) / (weighted_ones.squaredNorm()) - Eigen::MatrixXd::Identity(scan_count, scan_count);
 
             // Compute residual
@@ -337,11 +335,6 @@ void DrBASolver::construct_problem(double downsample_factor) {
     // Finalize timing
     auto end_time = std::chrono::high_resolution_clock::now();
     avg_per_voxel_time = avg_per_voxel_time / static_cast<double>(voxels_size);
-
-    std::cout << "Construct Problem Timing: " << std::endl;
-    std::cout << "  Total time: " << std::chrono::duration<double>(end_time - start_time).count() << " s" << std::endl;
-    std::cout << "  Relative Pose Prior time: " << rel_pose_prior_time << " s" << std::endl;
-    std::cout << "  Avg time per voxel: " << avg_per_voxel_time << " s" << std::endl;
 
     if (full_opts_.ba_opts.save_H && save_results_) {
         std::string H_save_path = full_opts_.output_path / "H.bin";
