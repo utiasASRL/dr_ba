@@ -27,8 +27,11 @@ public:
 private:
     // Problem tiling
     std::vector<Tile> tiles_;
+    std::vector<VoxelMap::Index> optimized_voxel_keys_;
     
     // Variables to be passed around
+    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>, Eigen::Upper> solver_;
+    bool pattern_analyzed_ = false;
     Eigen::VectorXd del_x_;
 };
 

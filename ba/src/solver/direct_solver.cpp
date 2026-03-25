@@ -118,6 +118,12 @@ void DirectSolver::construct_problem(double downsample_factor) {
     std::vector<ba::VoxelMap::Index> voxel_keys = voxel_map_.get_sorted_keys_downsampled(downsample_factor);
     int voxels_size = static_cast<int>(voxel_keys.size());
 
+    // Keep track of exactly which voxel variables are in this linearized system.
+    optimized_voxel_keys_ = voxel_keys;
+
+    // Sparse path still needs a properly sized RHS for thread-local accumulation.
+    rhs_.setZero(states_size + voxels_size);
+
     // Create voxel lookup for quick access to column indices in the optimization variable
     std::map<VoxelMap::Index, std::size_t> vox_to_global_pos;
     for (std::size_t i = 0; i < voxel_keys.size(); ++i) {
@@ -125,15 +131,21 @@ void DirectSolver::construct_problem(double downsample_factor) {
     }
 
     // Initialize matrices
-    lhs_.setZero(states_size + voxels_size, states_size + voxels_size);
-    rhs_.setZero(states_size + voxels_size);
+    // Estimate number of non-zeros
+    // Pose-pose block: states_size x states_size, fully dense in practice
+    int nnz_pp = states_size * states_size;
+    // Pose-voxel block: each voxel connects to ~k scans, each scan is 3 DOF
+    // So each voxel contributes ~k*3 off-diagonal entries (upper triangle only)
+    int avg_scans_per_voxel = 10; // tune to your problem
+    int nnz_pv = voxels_size * avg_scans_per_voxel * 3;
+    // Voxel diagonal: one entry per voxel
+    int nnz_vv = voxels_size;
+    int estimated_nnz = nnz_pp + nnz_pv + nnz_vv;
+
+    triplets_.clear();
+    triplets_.reserve(estimated_nnz);
 
     // TODO: Add pose prior terms
-
-    // Local contributions for memory safety with multithreading
-    Eigen::MatrixXd lhs_tile = Eigen::MatrixXd::Zero(lhs_.rows(), lhs_.cols());
-    Eigen::VectorXd rhs_tile = Eigen::VectorXd::Zero(rhs_.size());
-    double cost_tile = 0.0;
 
     // Loop through each tile
     for (const auto& tile : tiles_) {
@@ -170,7 +182,7 @@ void DirectSolver::construct_problem(double downsample_factor) {
 
 #pragma omp parallel
 {
-        Eigen::MatrixXd lhs_local = Eigen::MatrixXd::Zero(lhs_.rows(), lhs_.cols());
+        std::vector<Eigen::Triplet<double>> local_triplets;
         Eigen::VectorXd rhs_local = Eigen::VectorXd::Zero(rhs_.size());
         double cost_local = 0.0;
 
@@ -224,7 +236,7 @@ void DirectSolver::construct_problem(double downsample_factor) {
                 // No scans cover this voxel
                 // Add a zero prior to keep the variable in the problem and prevent singularity
                 int voxel_index = vox_to_global_pos[voxel_idx] + states_size; // voxel variables start after state variables
-                lhs_local(voxel_index, voxel_index) += 1e-6;
+                local_triplets.emplace_back(voxel_index, voxel_index, 1e-6);
                 continue;
             }
             
@@ -244,28 +256,32 @@ void DirectSolver::construct_problem(double downsample_factor) {
             // Scatter to global lhs_ and rhs_
             // Diagonal voxel intensity variable contributions
             int voxel_index = vox_to_global_pos[voxel_idx] + states_size;
-            lhs_local(voxel_index, voxel_index) += H_local(num_active_states, num_active_states);
+            local_triplets.emplace_back(voxel_index, voxel_index, H_local(num_active_states, num_active_states));
             rhs_local(voxel_index) += g_local(num_active_states);
 
             for (size_t i = 0; i < active_state_indices.size(); ++i) {
                 int gi = active_state_indices[i];
 
                 // diagonal
-                lhs_local.block<3,3>(gi, gi) += H_local.block<3,3>(i*3, i*3);
+                for (int r = 0; r < 3; ++r)
+                    for (int c = 0; c < 3; ++c)
+                        local_triplets.emplace_back(gi + r, gi + c, H_local(i*3 + r, i*3 + c));
 
+                // only need upper diagonal since using solver that exploits symmetry
                 // off-diagonal between pose variables
                 for (size_t j = i + 1; j < active_state_indices.size(); ++j) {
                     int gj = active_state_indices[j];
                     auto Hij = H_local.block<3,3>(i*3, j*3);
 
-                    lhs_local.block<3,3>(gi, gj) += Hij;
-                    lhs_local.block<3,3>(gj, gi) += Hij.transpose();
+                    for (int r = 0; r < 3; ++r)
+                        for (int c = 0; c < 3; ++c)
+                            local_triplets.emplace_back(gi + r, gj + c, Hij(r, c));
                 }
 
                 // off-diagonal between pose variables and voxel intensity variable
                 auto Hiv = H_local.block<3,1>(i*3, num_active_states);
-                lhs_local.block<3,1>(gi, voxel_index) += Hiv;
-                lhs_local.block<1,3>(voxel_index, gi) += Hiv.transpose();
+                for (int r = 0; r < 3; ++r)
+                    local_triplets.emplace_back(gi + r, voxel_index, Hiv(r));
 
                 rhs_local.segment<3>(gi) += g_local.segment<3>(i*3);
             }
@@ -274,15 +290,12 @@ void DirectSolver::construct_problem(double downsample_factor) {
         }
         #pragma omp critical
         {
-            lhs_tile += lhs_local;
-            rhs_tile += rhs_local;
-            cost_tile += cost_local;
+            // Add local tile contributions to global matrices
+            triplets_.insert(triplets_.end(), local_triplets.begin(), local_triplets.end());
+            rhs_ += rhs_local;
+            cost_ += cost_local;
         }
 }
-        // Add local tile contributions to global matrices
-        lhs_ += lhs_tile;
-        rhs_ += rhs_tile;
-        cost_ += cost_tile;
 
         const auto end_voxel_time = std::chrono::high_resolution_clock::now();
         avg_per_voxel_time += std::chrono::duration<double>(end_voxel_time - start_voxel_time).count();
@@ -291,24 +304,26 @@ void DirectSolver::construct_problem(double downsample_factor) {
     // Finalize timing
     auto end_time = std::chrono::high_resolution_clock::now();
     avg_per_voxel_time = avg_per_voxel_time / static_cast<double>(voxels_size);
-
-    std::cout << "Construct Problem Timing: " << std::endl;
-    std::cout << "  Total time: " << std::chrono::duration<double>(end_time - start_time).count() << " s" << std::endl;
-    std::cout << "  Relative Pose Prior time: " << rel_pose_prior_time << " s" << std::endl;
-    std::cout << "  Avg time per voxel: " << avg_per_voxel_time << " s" << std::endl;
-
-    if (full_opts_.ba_opts.save_H && save_results_) {
-        std::string H_save_path = full_opts_.output_path / "H.bin";
-        saveBinary(lhs_, H_save_path);
-    }
 }
 
 bool DirectSolver::solve() {
-    // Small regularization for numerical stability
-    lhs_ += 1e-8 * Eigen::MatrixXd::Identity(lhs_.rows(), lhs_.cols());
+    // Form sparse matrix from accumulated triplets
+    lhs_sp_.resize(rhs_.size(), rhs_.size());
+    lhs_sp_.setFromTriplets(triplets_.begin(), triplets_.end());
 
-    // Solve
-    del_x_ = - alpha_ * lhs_.selfadjointView<Eigen::Upper>().ldlt().solve(rhs_);
+    // Regularize by adding to diagonal (sparse-friendly)
+    for (int i = 0; i < lhs_sp_.rows(); ++i)
+        lhs_sp_.coeffRef(i, i) += 1e-8;
+
+    solver_.analyzePattern(lhs_sp_);    // sparsity seems to change every iter... not 100% why
+    solver_.factorize(lhs_sp_);        // numeric factorization
+
+    if (solver_.info() != Eigen::Success) {
+        std::cerr << "Sparse factorization failed." << std::endl;
+        return false;
+    }
+
+    del_x_ = -alpha_ * solver_.solve(rhs_);
 
     std::cout << "alpha: " << alpha_
             << " |delta|: " << del_x_.norm()
@@ -327,6 +342,10 @@ void DirectSolver::update_states() {
 
     // Save sizes
     int size_pose_state = scan_manager_.num_active_scans() * 3;
+    int expected_state_size = size_pose_state + static_cast<int>(optimized_voxel_keys_.size());
+    if (del_x_.size() != expected_state_size) {
+        throw std::runtime_error("State update size mismatch in DirectSolver::update_states.");
+    }
 
     // Add first fixed pose to updated poses
     updated_poses.push_back(scan_manager_.get_scan(scan_id_list[0])->pose2d());
@@ -343,7 +362,7 @@ void DirectSolver::update_states() {
     voxel_map_.set_poses(scan_id_list, updated_poses);
 
     // Update map intensities
-    std::vector<ba::VoxelMap::Index> voxel_keys = voxel_map_.get_sorted_keys_downsampled();
+    std::vector<ba::VoxelMap::Index> voxel_keys = optimized_voxel_keys_;
     // Create voxel lookup for quick access to column indices in the optimization variable
     std::map<VoxelMap::Index, std::size_t> vox_to_global_pos;
     for (std::size_t i = 0; i < voxel_keys.size(); ++i) {

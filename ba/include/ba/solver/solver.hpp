@@ -9,6 +9,7 @@
 #include <ba/problem/problem.hpp>
 #include <limits>
 #include <stdexcept>
+#include <Eigen/Sparse>
 
 namespace ba {
 
@@ -70,6 +71,9 @@ protected:
     double alpha_;
     Eigen::MatrixXd lhs_;
     Eigen::VectorXd rhs_;
+    // Sparse option
+    Eigen::SparseMatrix<double> lhs_sp_;
+    std::vector<Eigen::Triplet<double>> triplets_;
 };
 
 
