@@ -199,11 +199,6 @@ void DrBASolver::construct_problem(double downsample_factor) {
 
     // Loop through each tile
     for (const auto& tile : tiles_) {
-        // Local contributions for memory safety with multithreading
-        Eigen::MatrixXd lhs_tile = Eigen::MatrixXd::Zero(lhs_.rows(), lhs_.cols());
-        Eigen::VectorXd rhs_tile = Eigen::VectorXd::Zero(rhs_.size());
-        double cost_tile = 0.0;
-
         // Load in data for scans in this tile
         // Note this will fail if max_loaded_scans is too small
         scan_manager_.load_data(tile.scan_ids);
@@ -329,15 +324,11 @@ void DrBASolver::construct_problem(double downsample_factor) {
         }
         #pragma omp critical
         {
-            lhs_tile += lhs_local;
-            rhs_tile += rhs_local;
-            cost_tile += cost_local;
+            lhs_ += lhs_local;
+            rhs_ += rhs_local;
+            cost_ += cost_local;
         }
 }
-        // Add local tile contributions to global matrices
-        lhs_ += lhs_tile;
-        rhs_ += rhs_tile;
-        cost_ += cost_tile;
 
         const auto end_voxel_time = std::chrono::high_resolution_clock::now();
         avg_per_voxel_time += std::chrono::duration<double>(end_voxel_time - start_voxel_time).count();
