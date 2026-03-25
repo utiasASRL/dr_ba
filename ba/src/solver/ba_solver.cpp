@@ -197,13 +197,13 @@ void DrBASolver::construct_problem(double downsample_factor) {
     }
     rel_pose_prior_time = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - rel_pose_start_time).count();
 
-    // Local contributions for memory safety with multithreading
-    Eigen::MatrixXd lhs_tile = Eigen::MatrixXd::Zero(lhs_.rows(), lhs_.cols());
-    Eigen::VectorXd rhs_tile = Eigen::VectorXd::Zero(rhs_.size());
-    double cost_tile = 0.0;
-
     // Loop through each tile
     for (const auto& tile : tiles_) {
+        // Local contributions for memory safety with multithreading
+        Eigen::MatrixXd lhs_tile = Eigen::MatrixXd::Zero(lhs_.rows(), lhs_.cols());
+        Eigen::VectorXd rhs_tile = Eigen::VectorXd::Zero(rhs_.size());
+        double cost_tile = 0.0;
+
         // Load in data for scans in this tile
         // Note this will fail if max_loaded_scans is too small
         scan_manager_.load_data(tile.scan_ids);
@@ -253,7 +253,6 @@ void DrBASolver::construct_problem(double downsample_factor) {
             int max_scans = tile.scan_ids.size();
             Eigen::MatrixXd J_local = Eigen::MatrixXd::Zero(max_scans, num_active_states);
             Eigen::VectorXd B = Eigen::VectorXd::Zero(max_scans);
-            Eigen::VectorXd B_raw = Eigen::VectorXd::Zero(max_scans);
             Eigen::VectorXd weighted_ones = Eigen::VectorXd::Zero(max_scans);
             int scan_count = 0;
 
@@ -276,7 +275,6 @@ void DrBASolver::construct_problem(double downsample_factor) {
 
                 // Assemble into local Jacobian
                 B(scan_count) = I_meas / std::sqrt(meas_cov);
-                B_raw(scan_count) = I_meas;
                 weighted_ones(scan_count) = 1.0 / std::sqrt(meas_cov);
                 if (scan_idx > 0) {
                     // Find position in local Jacobian
@@ -296,7 +294,6 @@ void DrBASolver::construct_problem(double downsample_factor) {
             // Trim to actual scan count
             J_local.conservativeResize(scan_count, num_active_states);
             B.conservativeResize(scan_count);
-            B_raw.conservativeResize(scan_count);
             weighted_ones.conservativeResize(scan_count);
 
             // Compute projection matrix
@@ -305,7 +302,6 @@ void DrBASolver::construct_problem(double downsample_factor) {
             Eigen::MatrixXd P = (weighted_ones * weighted_ones.transpose()) / (weighted_ones.squaredNorm()) - Eigen::MatrixXd::Identity(scan_count, scan_count);
 
             // Compute residual
-            Eigen::VectorXd err = P * B_raw;
             Eigen::MatrixXd PtP = P.transpose() * P;
 
             // Compute local contributions
@@ -324,7 +320,6 @@ void DrBASolver::construct_problem(double downsample_factor) {
                     auto Hij = H_local.block<3,3>(i*3, j*3);
 
                     lhs_local.block<3,3>(gi, gj) += Hij;
-                    lhs_local.block<3,3>(gj, gi) += Hij.transpose();
                 }
 
                 rhs_local.segment<3>(gi) += g_local.segment<3>(i*3);
