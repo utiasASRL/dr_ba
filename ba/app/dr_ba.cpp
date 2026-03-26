@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
     std::cout << "Starting optimization with solver: " << opts.ba_opts.solver << std::endl;
     std::unique_ptr<ba::Solver> solver;
 
-    if (opts.ba_opts.solver == "direct") {
+    if (opts.ba_opts.solver == "combined") {
         solver = std::make_unique<ba::DirectSolver>(problem);
     } else if (opts.ba_opts.solver == "drba") {
         solver = std::make_unique<ba::DrBASolver>(problem);
