@@ -121,9 +121,6 @@ void DirectSolver::construct_problem(double downsample_factor) {
     // Keep track of exactly which voxel variables are in this linearized system.
     optimized_voxel_keys_ = voxel_keys;
 
-    // Sparse path still needs a properly sized RHS for thread-local accumulation.
-    rhs_.setZero(states_size + voxels_size);
-
     // Create voxel lookup for quick access to column indices in the optimization variable
     std::map<VoxelMap::Index, std::size_t> vox_to_global_pos;
     for (std::size_t i = 0; i < voxel_keys.size(); ++i) {
@@ -131,19 +128,8 @@ void DirectSolver::construct_problem(double downsample_factor) {
     }
 
     // Initialize matrices
-    // Estimate number of non-zeros
-    // Pose-pose block: states_size x states_size, fully dense in practice
-    int nnz_pp = states_size * states_size;
-    // Pose-voxel block: each voxel connects to ~k scans, each scan is 3 DOF
-    // So each voxel contributes ~k*3 off-diagonal entries (upper triangle only)
-    int avg_scans_per_voxel = 10; // tune to your problem
-    int nnz_pv = voxels_size * avg_scans_per_voxel * 3;
-    // Voxel diagonal: one entry per voxel
-    int nnz_vv = voxels_size;
-    int estimated_nnz = nnz_pp + nnz_pv + nnz_vv;
-
-    triplets_.clear();
-    triplets_.reserve(estimated_nnz);
+    lhs_sp_.resize(states_size + voxels_size, states_size + voxels_size);
+    rhs_.setZero(states_size + voxels_size);
 
     // TODO: Add pose prior terms
 
@@ -216,12 +202,12 @@ void DirectSolver::construct_problem(double downsample_factor) {
 
                 // Weight everything by square root of measurement covariance
                 double I_meas = interp_meas->intensity;
-                double meas_cov = interp_meas->covariance;
-                Eigen::Matrix<double, 1, 3> d_beta_d_T = interp_meas->jacobian / std::sqrt(meas_cov);
+                double inv_sqrt_meas_cov = 1 / std::sqrt(interp_meas->covariance);
+                Eigen::Matrix<double, 1, 3> d_beta_d_T = interp_meas->jacobian * inv_sqrt_meas_cov;
 
                 // Assemble into local Jacobian
-                B(scan_count) = I_meas / std::sqrt(meas_cov);
-                weighted_ones(scan_count) = 1.0 / std::sqrt(meas_cov);
+                B(scan_count) = I_meas * inv_sqrt_meas_cov;
+                weighted_ones(scan_count) = inv_sqrt_meas_cov;
                 if (scan_idx > 0) {
                     // Find position in local Jacobian
                     auto it = global_to_local.find((scan_idx - 1) * 3);
@@ -291,7 +277,9 @@ void DirectSolver::construct_problem(double downsample_factor) {
         #pragma omp critical
         {
             // Add local tile contributions to global matrices
-            triplets_.insert(triplets_.end(), local_triplets.begin(), local_triplets.end());
+            Eigen::SparseMatrix<double> tmp(states_size + voxels_size, states_size + voxels_size);
+            tmp.setFromTriplets(local_triplets.begin(), local_triplets.end());
+            lhs_sp_ += tmp;
             rhs_ += rhs_local;
             cost_ += cost_local;
         }
@@ -307,10 +295,6 @@ void DirectSolver::construct_problem(double downsample_factor) {
 }
 
 bool DirectSolver::solve() {
-    // Form sparse matrix from accumulated triplets
-    lhs_sp_.resize(rhs_.size(), rhs_.size());
-    lhs_sp_.setFromTriplets(triplets_.begin(), triplets_.end());
-
     // Regularize by adding to diagonal (sparse-friendly)
     for (int i = 0; i < lhs_sp_.rows(); ++i)
         lhs_sp_.coeffRef(i, i) += 1e-8;
@@ -324,6 +308,8 @@ bool DirectSolver::solve() {
     }
 
     del_x_ = -alpha_ * solver_.solve(rhs_);
+
+    std::cout << "number non-zeros in lhs: " << lhs_sp_.nonZeros() << std::endl;
 
     std::cout << "alpha: " << alpha_
             << " |delta|: " << del_x_.norm()
