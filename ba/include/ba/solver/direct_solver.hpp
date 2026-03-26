@@ -31,7 +31,6 @@ private:
     
     // Variables to be passed around
     Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>, Eigen::Upper> solver_;
-    bool pattern_analyzed_ = false;
     Eigen::VectorXd del_x_;
 };
 

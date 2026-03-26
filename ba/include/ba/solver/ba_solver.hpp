@@ -30,6 +30,7 @@ private:
     std::vector<Tile> tiles_;
     
     // Variables to be passed around
+    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>, Eigen::Upper> solver_;
     Eigen::VectorXd del_x_;
 };
 

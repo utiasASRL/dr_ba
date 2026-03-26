@@ -337,6 +337,8 @@ void DrBASolver::construct_problem(double downsample_factor) {
     avg_per_voxel_time = avg_per_voxel_time / static_cast<double>(voxels_size);
 
     if (full_opts_.ba_opts.save_H && save_results_) {
+        std::cout << "number non-zeros in lhs: " << (lhs_.array() != 0.0).count() << std::endl;
+
         std::string H_save_path = full_opts_.output_path / "H.bin";
         saveBinary(lhs_, H_save_path);
     }
