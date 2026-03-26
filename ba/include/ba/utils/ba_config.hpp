@@ -102,6 +102,7 @@ struct LocalizationOptions {
 
 struct Options {
     int num_threads = 1;
+    int seed = -1; // random seed for reproducibility, <0 for random
 
     // Data paths
     fs::path data_path;

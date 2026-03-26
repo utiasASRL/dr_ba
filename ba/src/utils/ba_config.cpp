@@ -210,6 +210,8 @@ Options load_options(const YAML::Node& config) {
 
     if (config["num_threads"])
         opts.num_threads = config["num_threads"].as<int>();
+    if (config["seed"])
+        opts.seed = config["seed"].as<int>();
 
     if (config["data"]) {
         if (config["data"]["data_path"])
