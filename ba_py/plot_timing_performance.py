@@ -1,6 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+plt.rcParams.update({
+    "text.usetex": True,          # Use LaTeX for all text
+    "font.family": "serif",       # Or any LaTeX-supported font
+    "legend.frameon": True,
+})
+
 
 voxel_res = [10.0, 6.0, 3.0, 1.0, 0.5, 0.2, 0.1]
 voxel_size = [100, 250, 934, 8189, 32505, 202405, 809706]
@@ -22,26 +28,27 @@ voxel_size = voxel_size[1:]
 dr_ba_results = {k: v[1:] for k, v in dr_ba_results.items()}
 combined_results = {k: v[1:] for k, v in combined_results.items()}
 
-fig, axes = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
+fig, axes = plt.subplots(3, 1, figsize=(6, 6), sharex=True)
 
-axes[0].plot(voxel_size, dr_ba_results['time'], label='separable (Dr-BA)', marker='o')
-axes[0].plot(voxel_size, combined_results['time'], label='combined', marker='o')
-axes[0].set_ylabel('solve time (s)', fontsize=14)
+axes[0].plot(voxel_size, dr_ba_results['time'], label=r'separable (Dr-BA)', marker='o', linewidth=3)
+axes[0].plot(voxel_size, combined_results['time'], label=r'combined', marker='o', linewidth=3, linestyle='--')
+axes[0].set_ylabel(r'solve time (s)', fontsize=14)
 axes[0].tick_params(labelsize=12)
 axes[0].set_yscale('log')
-
-axes[1].plot(voxel_size, dr_ba_results['nnz'], label='separable (Dr-BA)', marker='o')
-axes[1].plot(voxel_size, combined_results['nnz'], label='combined', marker='o')
-axes[1].set_ylabel('Hessian non-zeros', fontsize=14)
+axes[1].plot(voxel_size, dr_ba_results['nnz'], label=r'separable (Dr-BA)', marker='o', linewidth=3)
+axes[1].plot(voxel_size, combined_results['nnz'], label=r'combined', marker='o', linewidth=3, linestyle='--')
+axes[1].set_ylabel(r'num.\ non-zeros', fontsize=14)
 axes[1].tick_params(labelsize=12)
 axes[1].set_yscale('log')
-
-axes[2].plot(voxel_size, dr_ba_results['ate'], label='separable (Dr-BA)', marker='o')
-axes[2].plot(voxel_size, combined_results['ate'], label='combined', marker='o')
-axes[2].set_ylabel('ATE (m)', fontsize=14)
-axes[2].set_xlabel('voxel count', fontsize=14)
+axes[2].plot(voxel_size, dr_ba_results['ate'], label=r'separable (Dr-BA)', marker='o', linewidth=3)
+axes[2].plot(voxel_size, combined_results['ate'], label=r'combined', marker='o', linewidth=3, linestyle='--')
+axes[2].set_ylabel(r'ATE (m)', fontsize=14)
+axes[2].set_xlabel(r'voxel count', fontsize=14)
 axes[2].tick_params(labelsize=12, rotation=45)
+axes[2].set_yscale('log')
+
 
 axes[2].legend(fontsize=12)
 plt.tight_layout()
+plt.savefig('/home/dl/Downloads/drba_timing.pdf', bbox_inches='tight')
 plt.show()
