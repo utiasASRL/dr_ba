@@ -494,11 +494,6 @@ void DrBASolver::optimize() {
         std::cout << "Iteration " << iter << " / " << opts_.max_iterations << std::endl;
         downsample_factor = (iter < opts_.num_coarse_iterations) ? opts_.coarse_downsample : opts_.refine_downsample;
 
-        if (iter > 2) {
-            // Slowly decrease alpha
-            alpha_ *= 0.8;
-        }
-
         // Construct problem
         start = std::chrono::high_resolution_clock::now();
         construct_problem(downsample_factor);
