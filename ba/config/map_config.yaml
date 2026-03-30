@@ -1,14 +1,15 @@
 num_threads: 16
+seed: 99 # random seed for reproducibility, <0 for random
 data:
   data_path: '/home/dl/Documents/phd/data/boreas'
   meas_path: '/home/dl/Documents/phd/dev/dr_ba/output'
 output:
   output_path: '/home/dl/Documents/phd/dev/dr_ba/output/ba_results'
   visualize: true
-  save_result: false
+  save_result: true
 mapping:
   voxel_res: 1.0  # m
-  seq_id: boreas-2024-12-05-14-12
+  seq_id: boreas-2020-11-26-13-58
   estimate_location: /home/dl/Documents/phd/dev/dr_ba/output/aa_paper_ablation/no_map_skyway/run_1
   frame_ranges:
   - [0, -1]
@@ -33,4 +34,5 @@ mapping:
     use_cumul_thresh: true
     zero_thresh: 0.2 # max cumul return threshold to consider a measurement as zero return
     cumul_thresh: 0.9  # threshold to ignore measurements with too high a cumulative return
+    tile_size: 100.0  # m, size of tiles to process separately
     max_loaded_scans: 400  # max number of scans to keep loaded in memory at once (<1 all)

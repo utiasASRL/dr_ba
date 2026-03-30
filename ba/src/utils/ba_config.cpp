@@ -50,6 +50,10 @@ OptimizationOptions load_optimization_options(const YAML::Node& config) {
 FrameProcessingOptions load_frame_processing_options(const YAML::Node& config) {
     FrameProcessingOptions opts;
 
+    if (config["input_type"])
+        opts.input_type = config["input_type"].as<std::string>();
+    if (config["local_map_res"])
+        opts.local_map_res = config["local_map_res"].as<double>();
     if (config["max_dist"])
         opts.max_dist = config["max_dist"].as<double>();
     if (config["gauss_blur_sigma"])
@@ -75,6 +79,8 @@ BAOptions load_ba_options(const YAML::Node& config) {
         opts.seq_id = config["seq_id"].as<std::string>();
     if (config["save_H"])
         opts.save_H = config["save_H"].as<bool>();
+    if (config["solver"])
+        opts.solver = config["solver"].as<std::string>();
     if (config["init_poses"])
         opts.init_poses = config["init_poses"].as<std::string>();
     if (config["init_translation_std"])
@@ -204,6 +210,8 @@ Options load_options(const YAML::Node& config) {
 
     if (config["num_threads"])
         opts.num_threads = config["num_threads"].as<int>();
+    if (config["seed"])
+        opts.seed = config["seed"].as<int>();
 
     if (config["data"]) {
         if (config["data"]["data_path"])

@@ -7,27 +7,27 @@
 
 namespace ba {
 
-class DrBASolver : public Solver {
+class DirectSolver : public Solver {
 public:
     struct Tile {
         std::vector<VoxelMap::Index> voxel_indices;
         std::vector<int> scan_ids;
     };
 
-    DrBASolver(Problem& problem) : Solver(problem) {}
+    DirectSolver(Problem& problem) : Solver(problem) {}
 
     void tile_problem();
     void construct_problem(double downsample_factor = 1.0);
     bool solve();
-    void update_poses();
-    void update_map();
+    void update_states();
     void optimize() override;
 
-    ~DrBASolver() = default;
+    ~DirectSolver() = default;
 
 private:
     // Problem tiling
     std::vector<Tile> tiles_;
+    std::vector<VoxelMap::Index> optimized_voxel_keys_;
     
     // Variables to be passed around
     Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>, Eigen::Upper> solver_;

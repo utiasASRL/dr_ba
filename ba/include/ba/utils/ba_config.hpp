@@ -44,6 +44,7 @@ struct BAOptions {
     double voxel_res = 1.0;        // meters
     std::string seq_id;
     bool save_H = false;   // whether to save the visualization of the Hessian, overwrittten each iteration if true
+    std::string solver = "drba";  // 'combined' or 'drba'
     std::string init_poses = "gt";  // 'pogo' or 'gt', 'dro'
     double init_translation_std = 0.0; // m
     double init_rotation_std = 0.0;    // degrees
@@ -101,6 +102,7 @@ struct LocalizationOptions {
 
 struct Options {
     int num_threads = 1;
+    int seed = -1; // random seed for reproducibility, <0 for random
 
     // Data paths
     fs::path data_path;

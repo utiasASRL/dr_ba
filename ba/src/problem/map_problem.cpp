@@ -270,7 +270,7 @@ void MapProblem::init_scans_and_map_from_data() {
     std::uniform_real_distribution<double> translation_dist(-opts_.map_opts.init_translation_std, opts_.map_opts.init_translation_std);
     double rotation_std_rad = opts_.map_opts.init_rotation_std * M_PI / 180.0;
     std::uniform_real_distribution<double> rotation_dist(-rotation_std_rad, rotation_std_rad);
-    std::mt19937 rng(99); // Fixed seed for reproducibility
+    std::mt19937 rng(opts_.seed >= 0 ? opts_.seed : std::random_device{}());
 
     lgmath::se3::Transformation T_est_abs_0 = T_est_abs_list_[0];
     for (size_t i=0; i < scan_indices_.size(); i++) {

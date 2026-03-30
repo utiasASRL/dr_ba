@@ -185,7 +185,7 @@ void BAProblem::init_scans() {
     std::uniform_real_distribution<double> translation_dist(-opts_.ba_opts.init_translation_std, opts_.ba_opts.init_translation_std);
     double rotation_std_rad = opts_.ba_opts.init_rotation_std * M_PI / 180.0;
     std::uniform_real_distribution<double> rotation_dist(-rotation_std_rad, rotation_std_rad);
-    std::mt19937 rng(99); // Fixed seed for reproducibility
+    std::mt19937 rng(opts_.seed >= 0 ? opts_.seed : std::random_device{}());
 
     for (size_t i=0; i < scan_indices_.size(); i++) {
         int idx = scan_indices_[i];

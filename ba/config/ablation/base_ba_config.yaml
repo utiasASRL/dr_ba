@@ -1,4 +1,5 @@
 num_threads: 16
+seed: -1 # random seed for reproducibility, <0 for random
 data:
   data_path: '/home/dl/Documents/phd/data/boreas'
   meas_path: '/home/dl/Documents/phd/dev/dr_ba/output'
@@ -24,6 +25,7 @@ ba:
     max_dist: 100.0  # m
     adaptive_blur: true # adaptively choose Gaussian blur sigma based on scan content
     gauss_blur_sigma: 3.0  # pixels
+    max_blur_sigma: 15.0 # max sigma to use for adaptive blur
     min_int_val_tol: 0.5 # min intensity value to consider a non-zero pixel
     min_percent_nonzero: 0.3 # Minimum percent of scan pixels above min_int_val_tol to stop blurring scan
   optimization:
