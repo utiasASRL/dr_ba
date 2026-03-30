@@ -2,7 +2,7 @@ output
 build
 venv
 *pycache*
-*ini*
+__init__.py
 .vscode
 .DS_Store
 

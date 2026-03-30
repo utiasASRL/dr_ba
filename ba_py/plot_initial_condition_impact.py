@@ -29,18 +29,21 @@ combined_results = {
     'initial_noise': [[0,0],
                       [1.0, 0.5],
                       [2.0, 1.0],
+                      [3.0, 1.5],
                       [4.0, 2.0],
                       [5.0, 2.5]],
     'ate': [[0.417094, 1.41608, 2.49765, 0.970215],
             [0.42998, 1.4058, 2.51497, 0.971655],
             [0.435093, 1.46285, 2.48604, 0.955731],
+            [0.469427, 1.3971, 2.54792, 0.987848],
             [0.626338, 1.51342, 2.63685, 0.937372],
-            [0.650984, 1.64281]],
+            [0.650984, 1.64281, 2.62944, 1.07676]],
     'num_iter': [[7, 5, 5, 6],
                  [11, 15, 7, 8],
                  [26, 26, 27, 27],
+                 [21, 34, 29, 25],
                  [39, 42, 44, 48],
-                 [79, 61, ]]
+                 [79, 61, 95, 82]]
 }
 
 
@@ -75,7 +78,7 @@ ax1.set_xticklabels(noise_labels, rotation=20, ha='center', fontsize=14)
 ax1.tick_params(axis='x', labelsize=12)
 lines1, labels1 = ax1.get_legend_handles_labels()
 lines2, labels2 = ax2.get_legend_handles_labels()
-ax1.set_ylim(1.2, 1.5)
+ax1.set_ylim(1.2, 1.6)
 ax2.set_ylim(0, 100)
 fig.tight_layout()
 plt.savefig('/home/dl/Downloads/drba_init_conditions.pdf', bbox_inches='tight')

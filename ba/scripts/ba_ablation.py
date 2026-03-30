@@ -18,12 +18,10 @@ def set_by_path(cfg, key_path, value):
 
 if __name__ == "__main__":
     common_overrides = {
-        "optimization.alpha": 2.0,
-        "map.voxel_res": 1.0,
-        "input.adaptive_blur": False,
-        "optimization.use_cumul_thresh": True,
-        "keyframing.max_kf_dist": 5.0,
-        "input.input_type": "local_maps",
+        "output.output_path": '/home/dl/Documents/phd/dev/dr_ba/output/initial_condition_study',
+        "ba.init_translation_std": 3.0,  # m
+        "ba.init_rotation_std": 1.50,  # degrees
+        "ba.optimization.max_cost_increases": 2,  # number of times we allow cost to increase before stopping optimization
     }
 
     param_sets = [
@@ -32,23 +30,32 @@ if __name__ == "__main__":
         #     "input.seq_id": "boreas-2024-12-03-12-54",
         #     # "mapping.frame_ranges": [[300, 700], [3300, 3600]],
         # },
-        {
-            "input.seq_id": "boreas-2025-01-08-10-59",
-            # "mapping.frame_ranges": [[300, 700], [3250, 3600]],
-        },
-        {
-            "input.seq_id": "boreas-2025-01-08-11-22",
-            # "mapping.frame_ranges": [[300, 700], [3350, 3600]],
-        },
-        {
-            "input.seq_id": "boreas-2025-01-08-12-28",
-            # "mapping.frame_ranges": [[300, 700], [3350, 3600]],
-        },
-        # Industrial
         # {
-        #     "input.seq_id": "boreas-2024-12-05-14-12",
-        #     "mapping.frame_ranges": [[0, 600], [2000, -1]],
-        # }
+        #     "input.seq_id": "boreas-2025-01-08-10-59",
+        #     # "mapping.frame_ranges": [[300, 700], [3250, 3600]],
+        # },
+        # {
+        #     "input.seq_id": "boreas-2025-01-08-11-22",
+        #     # "mapping.frame_ranges": [[300, 700], [3350, 3600]],
+        # },
+        # {
+        #     "input.seq_id": "boreas-2025-01-08-12-28",
+        #     # "mapping.frame_ranges": [[300, 700], [3350, 3600]],
+        # },
+        # Industrial
+        {
+            "ba.seq_id": "boreas-2024-12-05-14-12",
+            # "mapping.frame_ranges": [[0, 600], [2000, -1]],
+        },
+        {
+            "ba.seq_id": "boreas-2024-12-23-16-27",
+        },
+        {
+            "ba.seq_id": "boreas-2024-12-23-16-44",
+        },
+        {
+            "ba.seq_id": "boreas-2024-12-23-17-01",
+        },
         # Skyway
         # {
         #     "input.seq_id": "boreas-2024-12-04-11-45",
