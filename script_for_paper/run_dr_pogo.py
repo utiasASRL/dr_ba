@@ -7,23 +7,10 @@ import yaml
 
 # RSS data
 sequences = [
-
-    # Boreas leaderboard
-    'boreas-2020-11-26-13-58',
-    'boreas-2020-12-04-14-00',
-    'boreas-2021-01-26-10-59',
-    'boreas-2021-02-09-12-55',
-    'boreas-2021-03-09-14-23',
-    'boreas-2021-06-29-18-53',
-    'boreas-2021-09-08-21-00',
-    'boreas-2021-10-05-15-35',
-    'boreas-2021-10-26-12-35',
-    'boreas-2021-11-28-09-18',
-
-    'boreas-2024-12-03-12-54', # Glenshield
-    'boreas-2025-01-08-10-59', # Glenshield
-    'boreas-2025-01-08-11-22', # Glenshield
-    'boreas-2025-01-08-12-28', # Glenshield
+    'boreas-2024-12-03-12-54', # Suburbs
+    'boreas-2025-01-08-10-59', # Suburbs
+    'boreas-2025-01-08-11-22', # Suburbs
+    'boreas-2025-01-08-12-28', # Suburbs
 
     'boreas-2024-12-04-11-45', # Skyway
     'boreas-2024-12-04-11-56', # Skyway

@@ -107,49 +107,49 @@ print("Saving error histograms to:", loc_path)
 plt.savefig(osp.join(loc_path, 'loc_error_histograms.png'), dpi=300, bbox_inches="tight")
 
 # Plot errors and 3-sigma bounds over frames
-if len(stds) > 0:
-    fig, axs = plt.subplots(3, 1, figsize=(10, 12))
-    # Set title
-    fig.suptitle(title_name, fontsize=16)
-    frame_ids = [res[1] for res in loc_results]
-    errs = np.array(errs)
-    stds = np.array(stds)
-    axs[0].plot(frame_ids, errs[:, 0], label='X Error', color='blue')
-    axs[0].fill_between(frame_ids,
-                    -3 * stds[:, 0],
-                    3 * stds[:, 0],
-                    color='blue',
-                    alpha=0.2,
-                    label='3-Sigma Bound')
-    axs[0].set_title('X Errors with 3-Sigma Bounds')
-    axs[0].set_xlabel('Frame ID')
-    axs[0].set_ylabel('Error (m)')
-    axs[0].legend()
-    axs[1].plot(frame_ids, errs[:, 1], label='Y Error', color='green')
-    axs[1].fill_between(frame_ids,
-                    -3 * stds[:, 1],
-                    3 * stds[:, 1],
-                    color='blue',
-                    alpha=0.2,
-                    label='3-Sigma Bound')
-    axs[1].set_title('Y Errors with 3-Sigma Bounds')
-    axs[1].set_xlabel('Frame ID')
-    axs[1].set_ylabel('Error (m)')
-    axs[1].legend()
-    axs[2].plot(frame_ids, errs[:, 2], label='Yaw Error', color='red')
-    axs[2].fill_between(frame_ids,
-                    -3 * stds[:, 2],
-                    3 * stds[:, 2],
-                    color='blue',
-                    alpha=0.2,
-                    label='3-Sigma Bound')
-    axs[2].set_title('Yaw Errors with 3-Sigma Bounds')
-    axs[2].set_xlabel('Frame ID')
-    axs[2].set_ylabel('Error (deg)')
-    axs[2].legend()
-    plt.tight_layout()
-    print("Saving error plots with 3-sigma bounds to:", loc_path)
-    plt.savefig(osp.join(loc_path, 'loc_error_with_uncertainty.png'), dpi=300, bbox_inches="tight")
+# if len(stds) > 0:
+#     fig, axs = plt.subplots(3, 1, figsize=(10, 12))
+#     # Set title
+#     fig.suptitle(title_name, fontsize=16)
+#     frame_ids = [res[1] for res in loc_results]
+#     errs = np.array(errs)
+#     stds = np.array(stds)
+#     axs[0].plot(frame_ids, errs[:, 0], label='X Error', color='blue')
+#     axs[0].fill_between(frame_ids,
+#                     -3 * stds[:, 0],
+#                     3 * stds[:, 0],
+#                     color='blue',
+#                     alpha=0.2,
+#                     label='3-Sigma Bound')
+#     axs[0].set_title('X Errors with 3-Sigma Bounds')
+#     axs[0].set_xlabel('Frame ID')
+#     axs[0].set_ylabel('Error (m)')
+#     axs[0].legend()
+#     axs[1].plot(frame_ids, errs[:, 1], label='Y Error', color='green')
+#     axs[1].fill_between(frame_ids,
+#                     -3 * stds[:, 1],
+#                     3 * stds[:, 1],
+#                     color='blue',
+#                     alpha=0.2,
+#                     label='3-Sigma Bound')
+#     axs[1].set_title('Y Errors with 3-Sigma Bounds')
+#     axs[1].set_xlabel('Frame ID')
+#     axs[1].set_ylabel('Error (m)')
+#     axs[1].legend()
+#     axs[2].plot(frame_ids, errs[:, 2], label='Yaw Error', color='red')
+#     axs[2].fill_between(frame_ids,
+#                     -3 * stds[:, 2],
+#                     3 * stds[:, 2],
+#                     color='blue',
+#                     alpha=0.2,
+#                     label='3-Sigma Bound')
+#     axs[2].set_title('Yaw Errors with 3-Sigma Bounds')
+#     axs[2].set_xlabel('Frame ID')
+#     axs[2].set_ylabel('Error (deg)')
+#     axs[2].legend()
+#     plt.tight_layout()
+#     print("Saving error plots with 3-sigma bounds to:", loc_path)
+#     plt.savefig(osp.join(loc_path, 'loc_error_with_uncertainty.png'), dpi=300, bbox_inches="tight")
 
 if show:
     plt.show()
