@@ -1,5 +1,5 @@
-# DRPoGO: Direct Radar Map Alighnment for Loop Closure in Pose Graph Optimization
-This repository provides the codebase for radar-based coarse registration and evaluation against ground truth. The pipeline includes local map generation using DRO, loop closure proposal using RaPlace, and pose graph optimization.
+# Dr-BA: Separable Optimization for Direct Radar Bundle Adjustment & Localization
+This repository provides the codebase for radar-based bundle adjustment and localization. The pipeline includes local map generation using DRO, loop closure proposal using RaPlace, pose graph optimization using Dr-PoGO, bundle adjustment using Dr-BA, and direct localization using DRL. Please refer to our paper for full details: https://arxiv.org/abs/2605.07041.
 
 ## Dependencies
 
@@ -8,7 +8,7 @@ All dependencies should be in `requirements.txt`. Please install them in you vir
 pip install -r requirements.txt
 ```
 
-For __pogo__ you will need Eigen3 and Ceres Solver:
+For Dr-PoGO, a required part of this repo, you will need Eigen3 and Ceres Solver:
 ```bash
 sudo apt-get install python3-tk
 sudo apt-get install python3-dev
@@ -19,9 +19,14 @@ sudo apt-get install libceres-dev
 sudo apt-get install libyaml-cpp-dev
 ```
 
-## Compile (pogo part)
+Also clone the submodules
+```bash
+git submodule update --init --recursive
+```
 
-To compile pogo:
+## Compile
+
+1) Compile Dr-PoGO:
 ```bash
 cd pogo
 mkdir -p build
@@ -30,108 +35,78 @@ cmake ..
 make -j8
 cd ../..
 ```
+2) Compile Dr-BA
+```bash
+bash ba/scripts/build_package.sh
+```
+
+## Download data
+First, download data from the Boreas dataset [here](https://www.boreas.utias.utoronto.ca/#/download). The pipeline has thus far only been tested on Boreas RT data and the config files are populated with good values for this data. To run everything including localization you will need to download at least two sequences from the same route. The full set of sequences used in the paper can be found in `script_for_paper/run_dr_pogo.py`.
 
 ## Run the full pipeline
 
 You need to run the following steps in order:
 
-1. Run odometry (DRO)
-2. Run the loop closure detection (RaPlace)
-3. Run the coarse registration (Coarse Registration)
-4. Run the pose refinement (Fine Registration)
-5. Run the pose graph optimization (PoGO)
+1. Run pose graph optimization for local maps, cumulative images, and initial guess generation (Dr-PoGO)
+2. Run bundle adjustment for refined map poses (Dr-BA)
+3. (Optional) Run mapping step to create a map based on the BA results. Only needed if the mapping parameters are different from those used in BA.
+4. Run direct localization based on a created map (DRL)
 
-__Every script should be run from the root of the repository.__
-
-### Run DRO
-First, download data from the Boreas dataset [here](https://www.boreas.utias.utoronto.ca/#/download). DRO generates local maps that accounts for motion distortion of the radar scans.
-
-Then copy the example config file `DRO/config_dro_dg.yaml` to `DRO/config.yaml` and modify the parameters as needed, especially the `data_path` with the root path to the Boreas dataset on your machine:
-```yaml
-  data:
-    data_path: /absolute/path/to/Boreas
-```
-
-If you want to run only a specific sequence, you can give the sequence path and change the `multi_sequence` parameter to `false`:
+### Run Dr-PoGO
+Modify the `data_path` in the `DRO/config.yaml` file to point to one of the downloaded sequences:
 ```yaml
   data:
     data_path: /absolute/path/to/Boreas/<seq-name>
     multi_sequence: false
 ```
 
-In the root of the repository, run the following command to generate local maps:
+It does not matter what sequence name you put here as it will be swapped out automatically later. The main runfile that will be used is `script_for_paper/run_dr_pogo.py`. Edit the set of sequences that you want Dr-PoGO to be run on.
+Then, simply run
 ```bash
-python dro/radar_gp_state_estimation.py
+python script_for_paper/run_dr_pogo.py
 ```
 
-It will output the local maps and scans in the `output/<SEQ-NAME>/local_maps` and `output/<SEQ-NAME>/scans` folders.
-The file name is the timestamp of the reference frame used to project the data.
+### Run Dr-BA
+Modify the `ba/config/ba_config.yaml` file with at minimum an udpate to:
 
-The scans are stored as numpy arrays of shape (N, 3) where N is the number of points, and each point has (x, y, intensity). A script for random visualization of the point clouds is available in `debug_scripts/visualize_point_clouds.py`.
+- `data/data_path` to point to where Boreas data is downloaded
+- `data/meas_path` to point to the output of Dr-PoGO (automatically located under `this/repo/output`)
+- `output/output_path` to point to where you want to save Dr-BA results to (if saving is enabled)
+- `output/visualize` and `output/save_result` for self-explanatory behaviour. You must save results if you want to run localization.
+- `ba/seq_id` must be set to the sequence name
 
-### Run RaPlace
-Simply run RaPlace as follows in the root of the repository (all the paths should be automatically using what was specified in the DRO config file):
+If you are running out of RAM to run BA, you can also lower the `ba/optimization/max_loaded_scans` parameter. The lower this is the slower the optimization will be, but the less RAM it will require.
+
+Once the config file is good, run
 ```bash
-python raplace/raplace.py
+bash ba/scripts/run_ba.sh
 ```
 
-It will generate a CSV of proposed scan pairs in the `output/<SEQ-NAME>/raplace_loops.csv` folder.
-Each row contains the following columns:
-- `time_i`: Timestamp of the first scan in the pair \[s\].
-- `time_j`: Timestamp of the second scan in the pair \[s\].
-- `scan_i_name`: Name of the first scan in the pair.
-- `scan_j_name`: Name of the second scan in the pair.
-- `score`: The score of the proposed loop closure as defined in RaPlace (not used)
-- `min_dist`: The minimum dist between the scores as defined in RaPlace (not used)
+### Run Dr-BA Mapping
+This step is optional in the case that you wish to generate a map with parameters different from those used to run BA. To generate a new map on the base of the BA-optimized poses, modify the `ba/config/map_config.yaml` file with at minimum an udpate to:
+- `mapping/seq_id` with the same sequence ID as what was used to generate the BA solution
+- `mapping/estimate_location` with `output/output_path` from the BA solve
 
-### Run the feature-based coarse registration
-
-In the root of the repository, run the following command:
+Once the config file is good, run
 ```bash
-python coarse_registration/coarse_registrations.py
+bash ba/scripts/run_map.sh
 ```
 
-It will generate a CSV of coarse registration results in the `output/<SEQ-NAME>/coarse_registration.csv` folder.
-Each row contains the following columns:
-- `scan_i_name`: Name of the first scan in the pair.
-- `scan_j_name`: Name of the second scan in the pair.
-- `x`, `y`, `theta`: The estimated transformation from scan i to scan j.
+### Run DRL (localization)
+Modify the `ba/config/loc_config.yaml` file with at minimum an udpate to:
 
-### Run the pose refinement
+- `localization/seq_id` with the localizing sequence ID
+- `localization/map_seq_id` with the sequence ID of the mapping sequence (the one that BA was run on)
+- `localization/map_location` with the location of the BA or mapping step output
 
-In the root of the repository, run the following command:
+Once the config file is good, run
 ```bash
-python dro/fine_registration.py
+bash ba/scripts/run_loc.sh
 ```
 
-It will generate a CSV of fine registration results in the `output/<SEQ-NAME>/fine_registration.csv` folder.
-Each row contains the following columns:
-- `scan_i_name`: Name of the first scan in the pair.
-- `scan_j_name`: Name of the second scan in the pair.
-- `x`, `y`, `theta`: The estimated transformation from scan i to scan j.
+The script will automatically print out the localization RMSE for the sequence.
 
-### Run PoGO
-
-You can modify the configuration file `pogo/config.yaml` to adjust the parameters for the pose graph optimization.
-To run, in the root of the repository, run the following command:
-```bash
-python pogo/pogo.py
-```
-
-### For paper and evaluation
-
-To plot the coarse registration errors, run the following command:
-```bash
-python script_for_paper/plot_coarse_registration_error.py
-```
-
-To plot the trajectory estimates and get metrics:
-```bash
-python script_for_paper/eval.py
-```
-This will diplay the ATE errors and write to file different trajectory estimates (aligned with the 1st pose in `<SEQ-NAME>_trajectories.pdf` or fully aligned in `<SEQ-NAME>_XXXX_aligned.pdf`)
-
-## Release TODOs
-
-
-- [ ] Create a script to get the pogo parameters automatically from a calib sequence
+### Visualization
+A number of self-explanatory visualization scripts are available under `ba_py`.
+These get automatically triggered when the `output/visualize` options are enabled under any part of the Dr-BA pipeline.
+They can also be manually called with a specific output directory.
