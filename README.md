@@ -69,7 +69,7 @@ python script_for_paper/run_dr_pogo.py
 ### Run Dr-BA
 Modify the `ba/config/ba_config.yaml` file with at minimum an udpate to:
 
-- `data/data_path` to point to where Boreas data is downloaded
+- `data/data_path` to point to parent directory of Boreas data is downloaded
 - `data/meas_path` to point to the output of Dr-PoGO (automatically located under `this/repo/output`)
 - `output/output_path` to point to where you want to save Dr-BA results to (if saving is enabled)
 - `output/visualize` and `output/save_result` for self-explanatory behaviour. You must save results if you want to run localization.
