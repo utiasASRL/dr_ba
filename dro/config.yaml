@@ -1,5 +1,5 @@
 data:
-  data_path: /home/dl/Documents/phd/data/boreas/boreas-2025-07-18-15-12
+  data_path: /path/to/boreas/data/sequence
   multi_sequence: false
 direct:
   local_map_res: 0.1
