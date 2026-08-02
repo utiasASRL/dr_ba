@@ -806,7 +806,6 @@ class GPStateEstimator:
                             # Remove the resize entirely
                             lm = (self.local_map.detach().cpu().numpy().clip(0, 1) * 255).astype('uint8')
                             cv2.imwrite(self.local_map_path + "/" + str(timestamps[0]) + ".png", lm)
-                            print("Max cumulated return: ", torch.max(local_map_update_cumulative))
                             lm = (local_map_update_cumulative.detach().cpu().numpy()).clip(0,255).astype('uint8')
                             cv2.imwrite(self.cumulated_returns_path + "/" + str(timestamps[0]) + ".png", lm)
                             cv2.imwrite(self.scan_path + "/" + str(timestamps[0]) + ".png", (local_map_update.detach().cpu().numpy().clip(0,1)*255).astype('uint8'))
