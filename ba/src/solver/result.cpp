@@ -63,9 +63,9 @@ void Result::visualize_map() const {
         save_poses_to_csv(temp_poses_path);
         fs::path temp_voxel_path = temp_dir / "voxel_map.bin";
         save_voxel_map(temp_voxel_path);
-        cmd_map = "python3 /home/dl/Documents/phd/dev/dr_ba/ba_py/visualize_voxel_map.py " + temp_dir.string();
+        cmd_map = "python3 " DR_BA_PY_DIR "/visualize_voxel_map.py " + temp_dir.string();
     } else {
-        cmd_map = "python3 /home/dl/Documents/phd/dev/dr_ba/ba_py/visualize_voxel_map.py " + output_dir_.string();
+        cmd_map = "python3 " DR_BA_PY_DIR "/visualize_voxel_map.py " + output_dir_.string();
     }
 
     auto f1 = std::async(std::launch::async, [&]() {
@@ -104,11 +104,11 @@ void Result::visualize_all_results() const {
         save_poses_to_csv(temp_poses_path);
         fs::path temp_voxel_path = temp_dir / "voxel_map.bin";
         save_voxel_map(temp_voxel_path);
-        cmd_errors = "python3 /home/dl/Documents/phd/dev/dr_ba/ba/app/plot_errors.py " + temp_csv_path.string();
-        cmd_map = "python3 /home/dl/Documents/phd/dev/dr_ba/ba_py/visualize_voxel_map.py " + temp_dir.string();
+        cmd_errors = "python3 " DR_BA_APP_DIR "/plot_errors.py " + temp_csv_path.string();
+        cmd_map = "python3 " DR_BA_PY_DIR "/visualize_voxel_map.py " + temp_dir.string();
     } else {
-        cmd_errors = "python3 /home/dl/Documents/phd/dev/dr_ba/ba/app/plot_errors.py " + csv_path_.string() + " " + output_dir_.string();
-        cmd_map = "python3 /home/dl/Documents/phd/dev/dr_ba/ba_py/visualize_voxel_map.py " + output_dir_.string();
+        cmd_errors = "python3 " DR_BA_APP_DIR "/plot_errors.py " + csv_path_.string() + " " + output_dir_.string();
+        cmd_map = "python3 " DR_BA_PY_DIR "/visualize_voxel_map.py " + output_dir_.string();
     }
 
     auto f1 = std::async(std::launch::async, [&]() {

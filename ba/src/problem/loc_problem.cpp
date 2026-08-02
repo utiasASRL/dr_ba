@@ -193,9 +193,9 @@ void LocProblem::visualize_loc_results() {
         fs::path voxel_map_src = opts_.loc_opts.map_location / "voxel_map.bin";
         fs::path voxel_map_dst = temp_dir / "voxel_map.bin";
         fs::copy_file(voxel_map_src, voxel_map_dst);
-        cmd = "python3 /home/dl/Documents/phd/dev/dr_ba/ba_py/visualize_loc_result.py --loc_path " + temp_dir.string();
+        cmd = "python3 " DR_BA_PY_DIR "/visualize_loc_result.py --loc_path " + temp_dir.string();
     } else {
-        cmd = "python3 /home/dl/Documents/phd/dev/dr_ba/ba_py/visualize_loc_result.py --loc_path " + opts_.output_path.string();
+        cmd = "python3 " DR_BA_PY_DIR "/visualize_loc_result.py --loc_path " + opts_.output_path.string();
     }
 
     if (opts_.visualize_result) {

@@ -1,9 +1,9 @@
 num_threads: 16
 data:
-  data_path: '/home/dl/Documents/phd/data/boreas'
-  meas_path: '/home/dl/Documents/phd/dev/dr_ba/output'
+  data_path: /path/to/boreas/data
+  meas_path: /path/to/this/repo/output
 output:
-  output_path: '/home/dl/Documents/phd/dev/dr_ba/output/ba_vid'
+  output_path: /path/to/this/repo/output/ba_vid
   visualize: true
   save_result: false
 ba:

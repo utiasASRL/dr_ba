@@ -1,15 +1,15 @@
 num_threads: 16
 data:
-  data_path: '/home/dl/Documents/phd/data/boreas'
-  meas_path: '/home/dl/Documents/phd/dev/dr_ba/output'
+  data_path: /path/to/boreas/data
+  meas_path: /path/to/this/repo/output
 output:
-  output_path: '/home/dl/Documents/phd/dev/dr_ba/output/loc_ablation'
+  output_path: /path/to/this/repo/output/loc_ablation
   visualize: false
   save_result: true
 localization:
   seq_id: boreas-2024-12-23-16-27
   map_seq_id: boreas-2024-12-05-14-12
-  map_location: '/home/dl/Documents/phd/dev/dr_ba/output/aaa_paper_results/gt_maps/boreas-2024-12-05-14-12/'
+  map_location: /path/to/map/location
   start_frame: 0
   end_frame: -1
   odometry_prior:

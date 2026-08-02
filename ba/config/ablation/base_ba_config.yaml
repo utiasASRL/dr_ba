@@ -1,10 +1,10 @@
 num_threads: 16
 seed: -1 # random seed for reproducibility, <0 for random
 data:
-  data_path: '/home/dl/Documents/phd/data/boreas'
-  meas_path: '/home/dl/Documents/phd/dev/dr_ba/output'
+  data_path: /path/to/boreas/data
+  meas_path: /path/to/this/repo/output
 output:
-  output_path: '/home/dl/Documents/phd/dev/dr_ba/output/ba_ablation'
+  output_path: /path/to/this/repo/output/ba_ablation
   visualize: false
   save_result: true
 ba:
